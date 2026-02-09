@@ -1,0 +1,62 @@
+version: "3.9"
+services:
+  db:
+    image: mariadb:11
+    environment:
+      MARIADB_DATABASE: app_test
+      MARIADB_USER: app
+      MARIADB_PASSWORD: app
+      MARIADB_ROOT_PASSWORD: root
+    healthcheck:
+      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  backend_server:
+    build: ./backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mariadb://db:3306/app_test
+      SPRING_DATASOURCE_USERNAME: app
+      SPRING_DATASOURCE_PASSWORD: app
+      SPRING_PROFILES_ACTIVE: test
+      SERVER_PORT: "8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    command: ["./gradlew", "bootRun"]
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8080/actuator/health | grep UP",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  backend_unit:
+    build: ./backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mariadb://db:3306/app_test
+      SPRING_DATASOURCE_USERNAME: app
+      SPRING_DATASOURCE_PASSWORD: app
+      SPRING_PROFILES_ACTIVE: test
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["./gradlew", "test"]
+
+  e2e:
+    image: mcr.microsoft.com/playwright:v1.50.0-jammy
+    working_dir: /work
+    volumes:
+      - ./e2e:/work
+    environment:
+      BASE_URL: http://backend_server:8080
+    depends_on:
+      backend_server:
+        condition: service_healthy
+    command: ["bash", "-lc", "npm ci && npx playwright test"]

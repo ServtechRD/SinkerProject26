@@ -1,0 +1,24 @@
+{
+  "branch": {
+    "base": "claude/integration",
+    "prefix": "claude/feat/"
+  },
+  "rules": {
+    "forbidMerge": ["main"],
+    "requireTests": true
+  },
+  "commands": {
+    "backendTest": "cd backend && ./gradlew test",
+    "frontendBuild": "cd frontend && npm ci && npm run build",
+    "dockerBuild": "docker compose build"
+  },
+  "pr": {
+    "target": "claude/integration"
+  },
+  "tools": {
+    "gh": true,
+    "git": true,
+    "docker": true
+  }
+}
+

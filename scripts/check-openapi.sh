@@ -15,8 +15,8 @@ if [ ! -f "$SNAPSHOT" ]; then
   exit 1
 fi
 
-echo "Fetching current OpenAPI spec from $BASE_URL/api/v3/api-docs ..."
-curl -sf "$BASE_URL/api/v3/api-docs" | python3 -m json.tool > "$TMPFILE"
+echo "Fetching current OpenAPI spec from $BASE_URL/v3/api-docs ..."
+curl -sf "$BASE_URL/v3/api-docs" | python3 -m json.tool > "$TMPFILE"
 
 if diff -q "$SNAPSHOT" "$TMPFILE" > /dev/null 2>&1; then
   echo "OK: OpenAPI spec matches committed snapshot."

@@ -1,0 +1,69 @@
+# =========================
+# Java / Gradle
+# =========================
+.gradle/
+build/
+out/
+bin/
+target/
+!gradle/wrapper/gradle-wrapper.jar
+
+# Gradle Wrapper
+gradlew
+gradlew.bat
+!gradle/wrapper/gradle-wrapper.properties
+
+# Logs
+*.log
+
+# =========================
+# IDE
+# =========================
+# IntelliJ
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# VS Code
+.vscode/
+
+# Eclipse
+.project
+.classpath
+.settings/
+
+# =========================
+# OS Files
+# =========================
+.DS_Store
+Thumbs.db
+
+# =========================
+# Env / Secrets
+# =========================
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.jks
+
+# =========================
+# Spring Boot
+# =========================
+spring.log
+
+# =========================
+# Node (如果有 frontend)
+# =========================
+node_modules/
+dist/
+coverage/
+npm-debug.log*
+yarn-error.log*
+
+# =========================
+# Docker
+# =========================
+docker-data/

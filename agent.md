@@ -4,6 +4,9 @@
 - NEVER push or merge to `main`.
 - Base branch: `claude/integration`.
 - Claude MAY merge into `claude/integration` only if tests pass.
+- Always create a new branch for each task.
+- Always open PR to claude/integration.
+- Never commit directly to integration or main.
 
 ## Task Source
 - Tasks are defined under `spec/feat/*` and `spec/fix/*`.

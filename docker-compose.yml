@@ -1,19 +1,20 @@
 version: "3.9"
 services:
   db:
-    image: mariadb:11
+    image: mariadb:10
     environment:
       MARIADB_DATABASE: app
       MARIADB_USER: app
       MARIADB_PASSWORD: app
       MARIADB_ROOT_PASSWORD: root
-    ports:
-      - "3306:3306"
+    
     healthcheck:
-      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "mariadb-admin ping -h localhost -uapp -p$${MARIADB_PASSWORD} --silent"]
       interval: 5s
       timeout: 5s
       retries: 20
+    networks:
+      - appnet
 
   backend:
     build: ./backend
@@ -27,6 +28,9 @@ services:
         condition: service_healthy
     ports:
       - "8080:8080"
+    networks:
+      - appnet
+
 
   frontend:
     build: ./frontend
@@ -36,3 +40,6 @@ services:
       - "5173:5173"
     depends_on:
       - backend
+
+  networks:
+    appnet:

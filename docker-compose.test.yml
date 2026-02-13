@@ -1,14 +1,14 @@
 version: "3.9"
 services:
   db:
-    image: mariadb:11
+    image: mariadb:10
     environment:
       MARIADB_DATABASE: app_test
       MARIADB_USER: app
       MARIADB_PASSWORD: app
       MARIADB_ROOT_PASSWORD: root
     healthcheck:
-      test: ["CMD", "mariadb-admin", "ping", "-h", "localhost"]
+      test: ["CMD-SHELL", "mariadb-admin ping -h localhost -uapp -p$${MARIADB_PASSWORD} --silent"]
       interval: 5s
       timeout: 5s
       retries: 30

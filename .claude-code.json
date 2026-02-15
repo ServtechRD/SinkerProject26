@@ -1,0 +1,45 @@
+{
+  "branch": {
+    "base": "claude/integration",
+    "featPrefix": "claude/feat/",
+    "fixPrefix": "claude/fix/"
+  },
+   "tasks": {
+    "root": "spec",
+    "featDir": "feat",
+    "fixDir": "fix",
+    "idPattern": "^[FX][0-9]{3}",
+    "files": {
+      "description": "description.md",
+      "acceptance": "acceptance.md"
+    },
+    "status": {
+      "todo": "status.todo",
+      "doing": "status.doing",
+      "done": "status.done"
+    }
+  },
+  "rules": {
+    "forbidMerge": ["main"],
+    "requireTests": true,
+    "conventionalCommits": true
+  },
+  "commands": {
+    "backendTest": "cd backend && ./gradlew test",
+    "backendBuild": "cd backend && ./gradlew build -x test",
+    "frontendInstall": "cd frontend && npm ci",
+    "frontendBuild": "cd frontend && npm run build",
+    "dockerBuild": "docker compose build"
+  },
+  "pr": {
+    "target": "claude/integration",
+    "deleteBranchAfterMerge": true,
+    "titleFormat": "[{{taskId}}] {{type}}: {{slug}}"
+  },
+  "tools": {
+    "git": true,
+    "gh": true,
+    "docker": true
+  }
+}
+

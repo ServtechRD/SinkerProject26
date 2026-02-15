@@ -1,5 +1,6 @@
 package com.sinker.app.security;
 
+import com.sinker.app.repository.PermissionRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -15,6 +16,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -24,9 +26,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtTokenProvider tokenProvider;
+    private final PermissionRepository permissionRepository;
 
-    public JwtAuthenticationFilter(JwtTokenProvider tokenProvider) {
+    public JwtAuthenticationFilter(JwtTokenProvider tokenProvider,
+                                   PermissionRepository permissionRepository) {
         this.tokenProvider = tokenProvider;
+        this.permissionRepository = permissionRepository;
     }
 
     @Override
@@ -41,8 +46,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String roleCode = tokenProvider.getRoleCodeFromToken(token);
 
             JwtUserPrincipal principal = new JwtUserPrincipal(userId, username, roleCode);
-            List<SimpleGrantedAuthority> authorities = List.of(
-                    new SimpleGrantedAuthority("ROLE_" + roleCode.toUpperCase()));
+
+            List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + roleCode.toUpperCase()));
+
+            try {
+                List<String> permissionCodes = permissionRepository.findPermissionCodesByRoleCode(roleCode);
+                for (String code : permissionCodes) {
+                    authorities.add(new SimpleGrantedAuthority(code));
+                }
+            } catch (Exception e) {
+                log.warn("Failed to load permissions for role {}: {}", roleCode, e.getMessage());
+            }
 
             UsernamePasswordAuthenticationToken authentication =
                     new UsernamePasswordAuthenticationToken(principal, null, authorities);

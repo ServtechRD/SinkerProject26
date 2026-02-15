@@ -119,12 +119,31 @@ class SecurityConfigIntegrationTest {
     }
 
     @Test
-    void corsAllowsLocalhost3000() throws Exception {
+    void corsAllowsRemoteVmOrigin() throws Exception {
         mockMvc.perform(options("/api/auth/login")
-                        .header("Origin", "http://localhost:3000")
+                        .header("Origin", "http://192.168.1.100:5173")
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "Content-Type,Authorization"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://192.168.1.100:5173"));
+    }
+
+    @Test
+    void corsAllows127001Origin() throws Exception {
+        mockMvc.perform(options("/api/auth/login")
+                        .header("Origin", "http://127.0.0.1:5173")
                         .header("Access-Control-Request-Method", "POST")
                         .header("Access-Control-Request-Headers", "Content-Type"))
                 .andExpect(status().isOk())
-                .andExpect(header().string("Access-Control-Allow-Origin", "http://localhost:3000"));
+                .andExpect(header().string("Access-Control-Allow-Origin", "http://127.0.0.1:5173"));
+    }
+
+    @Test
+    void corsRejectsDisallowedOrigin() throws Exception {
+        mockMvc.perform(options("/api/auth/login")
+                        .header("Origin", "http://evil.com")
+                        .header("Access-Control-Request-Method", "POST")
+                        .header("Access-Control-Request-Headers", "Content-Type"))
+                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
     }
 }

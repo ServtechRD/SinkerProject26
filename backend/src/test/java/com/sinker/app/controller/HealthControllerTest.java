@@ -1,6 +1,7 @@
 package com.sinker.app.controller;
 
 import com.sinker.app.config.SecurityConfig;
+import com.sinker.app.repository.PermissionRepository;
 import com.sinker.app.security.JwtAuthenticationFilter;
 import com.sinker.app.security.JwtTokenProvider;
 import org.junit.jupiter.api.Test;
@@ -23,6 +24,9 @@ class HealthControllerTest {
 
     @MockBean
     private JwtTokenProvider jwtTokenProvider;
+
+    @MockBean
+    private PermissionRepository permissionRepository;
 
     @Test
     void healthEndpointReturnsUp() throws Exception {

@@ -139,6 +139,7 @@ Do not modify this file unless explicitly instructed by a human.
 - React Router
 - Axios for API calls
 - CSS or Tailwind (keep consistent)
+- material ui v5
 
 ## Database
 - MariaDB 10+

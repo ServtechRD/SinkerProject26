@@ -102,3 +102,6 @@ The agent MAY decide:
 - Test framework choice
 - Folder naming
 - Lint rules
+
+
+All UI text must follow spec/task/X008-ui-text-zh-tw/glossary.md.

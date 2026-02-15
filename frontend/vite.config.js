@@ -12,6 +12,9 @@ export default defineConfig({
   ],
   server: {
     host: '0.0.0.0',
+    port: 5173,
+    // Allow remote VM access (bypasses Vite DNS rebinding protection for dev)
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: 'http://localhost:8080',
@@ -31,5 +34,6 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: './src/test/setup.js',
+    exclude: ['e2e/**', 'node_modules/**'],
   },
 })

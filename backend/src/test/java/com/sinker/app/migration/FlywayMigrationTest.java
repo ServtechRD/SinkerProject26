@@ -22,7 +22,7 @@ class FlywayMigrationTest {
     void migrationsRunSuccessfully() {
         List<Map<String, Object>> history = jdbc.queryForList(
                 "SELECT version, success FROM flyway_schema_history ORDER BY installed_rank");
-        assertTrue(history.size() >= 3, "At least V1, V2, and V3 migrations should exist");
+        assertTrue(history.size() >= 4, "At least V1, V2, V3, and V4 migrations should exist");
 
         Map<String, Object> v1 = history.get(0);
         assertEquals("1", v1.get("version").toString());
@@ -38,6 +38,11 @@ class FlywayMigrationTest {
         assertEquals("3", v3.get("version").toString());
         assertTrue(Boolean.TRUE.equals(v3.get("success")) || Integer.valueOf(1).equals(v3.get("success")),
                 "V3 migration should be successful");
+
+        Map<String, Object> v4 = history.get(3);
+        assertEquals("4", v4.get("version").toString());
+        assertTrue(Boolean.TRUE.equals(v4.get("success")) || Integer.valueOf(1).equals(v4.get("success")),
+                "V4 migration should be successful");
     }
 
     // --- Table structure tests ---
@@ -496,5 +501,156 @@ class FlywayMigrationTest {
                 "SELECT DISTINCT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS " +
                 "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_logs' AND INDEX_NAME = 'idx_login_logs_user_id_created_at'");
         assertFalse(indexes.isEmpty(), "Composite index on (user_id, created_at) should exist");
+    }
+
+    // --- V4: sales_forecast_config tests ---
+
+    @Test
+    void salesForecastConfigTableExists() {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sales_forecast_config'",
+                Integer.class);
+        assertEquals(1, count, "sales_forecast_config table should exist");
+    }
+
+    @Test
+    void salesForecastConfigTableHasAllColumns() {
+        List<String> columns = jdbc.queryForList(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sales_forecast_config' ORDER BY ORDINAL_POSITION",
+                String.class);
+        assertEquals(7, columns.size(), "sales_forecast_config table should have 7 columns");
+        assertTrue(columns.containsAll(List.of(
+                "id", "month", "auto_close_day", "is_closed", "closed_at", "created_at", "updated_at")));
+    }
+
+    @Test
+    void salesForecastConfigMonthIsVarchar7() {
+        String columnType = jdbc.queryForObject(
+                "SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sales_forecast_config' AND COLUMN_NAME = 'month'",
+                String.class);
+        assertEquals("varchar(7)", columnType);
+    }
+
+    @Test
+    void salesForecastConfigAutoCloseDayIsInt() {
+        String dataType = jdbc.queryForObject(
+                "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sales_forecast_config' AND COLUMN_NAME = 'auto_close_day'",
+                String.class);
+        assertEquals("int", dataType);
+    }
+
+    @Test
+    void salesForecastConfigUniqueConstraintOnMonth() {
+        jdbc.update("INSERT INTO sales_forecast_config (month) VALUES ('202501')");
+        try {
+            assertThrows(org.springframework.dao.DuplicateKeyException.class, () ->
+                    jdbc.update("INSERT INTO sales_forecast_config (month) VALUES ('202501')"));
+        } finally {
+            jdbc.update("DELETE FROM sales_forecast_config WHERE month = '202501'");
+        }
+    }
+
+    @Test
+    void salesForecastConfigDefaultValues() {
+        jdbc.update("INSERT INTO sales_forecast_config (month) VALUES ('202502')");
+        try {
+            Map<String, Object> row = jdbc.queryForMap(
+                    "SELECT auto_close_day, is_closed, closed_at, created_at, updated_at FROM sales_forecast_config WHERE month = '202502'");
+            assertEquals(10, ((Number) row.get("auto_close_day")).intValue(), "auto_close_day should default to 10");
+            assertFalse((Boolean) row.get("is_closed"), "is_closed should default to FALSE");
+            assertNull(row.get("closed_at"), "closed_at should default to NULL");
+            assertNotNull(row.get("created_at"), "created_at should be auto-populated");
+            assertNotNull(row.get("updated_at"), "updated_at should be auto-populated");
+        } finally {
+            jdbc.update("DELETE FROM sales_forecast_config WHERE month = '202502'");
+        }
+    }
+
+    @Test
+    void salesForecastConfigClosedAtAcceptsNull() {
+        jdbc.update("INSERT INTO sales_forecast_config (month, closed_at) VALUES ('202503', NULL)");
+        try {
+            Object closedAt = jdbc.queryForObject(
+                    "SELECT closed_at FROM sales_forecast_config WHERE month = '202503'", Object.class);
+            assertNull(closedAt);
+
+            // Update to non-null
+            jdbc.update("UPDATE sales_forecast_config SET closed_at = CURRENT_TIMESTAMP WHERE month = '202503'");
+            Object updatedClosedAt = jdbc.queryForObject(
+                    "SELECT closed_at FROM sales_forecast_config WHERE month = '202503'", Object.class);
+            assertNotNull(updatedClosedAt);
+
+            // Update back to null
+            jdbc.update("UPDATE sales_forecast_config SET closed_at = NULL WHERE month = '202503'");
+            Object reNulled = jdbc.queryForObject(
+                    "SELECT closed_at FROM sales_forecast_config WHERE month = '202503'", Object.class);
+            assertNull(reNulled);
+        } finally {
+            jdbc.update("DELETE FROM sales_forecast_config WHERE month = '202503'");
+        }
+    }
+
+    @Test
+    void salesForecastConfigAutoUpdateTimestamp() throws InterruptedException {
+        jdbc.update("INSERT INTO sales_forecast_config (month) VALUES ('202504')");
+        try {
+            Thread.sleep(1100); // Wait for timestamp granularity
+            jdbc.update("UPDATE sales_forecast_config SET is_closed = TRUE WHERE month = '202504'");
+
+            Map<String, Object> row = jdbc.queryForMap(
+                    "SELECT created_at, updated_at FROM sales_forecast_config WHERE month = '202504'");
+            java.sql.Timestamp createdAt = (java.sql.Timestamp) row.get("created_at");
+            java.sql.Timestamp updatedAt = (java.sql.Timestamp) row.get("updated_at");
+            assertTrue(updatedAt.after(createdAt), "updated_at should be after created_at after update");
+        } finally {
+            jdbc.update("DELETE FROM sales_forecast_config WHERE month = '202504'");
+        }
+    }
+
+    @Test
+    void salesForecastConfigIndexOnIsClosed() {
+        List<Map<String, Object>> indexes = jdbc.queryForList(
+                "SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sales_forecast_config' AND COLUMN_NAME = 'is_closed'");
+        assertFalse(indexes.isEmpty(), "Index on is_closed should exist");
+    }
+
+    @Test
+    void salesForecastConfigIndexOnAutoCloseDay() {
+        List<Map<String, Object>> indexes = jdbc.queryForList(
+                "SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sales_forecast_config' AND COLUMN_NAME = 'auto_close_day'");
+        assertFalse(indexes.isEmpty(), "Index on auto_close_day should exist");
+    }
+
+    @Test
+    void salesForecastConfigCheckConstraintOnAutoCloseDay() {
+        // Valid values
+        jdbc.update("INSERT INTO sales_forecast_config (month, auto_close_day) VALUES ('202505', 1)");
+        jdbc.update("INSERT INTO sales_forecast_config (month, auto_close_day) VALUES ('202506', 31)");
+        try {
+            // Invalid values should fail
+            assertThrows(org.springframework.dao.DataAccessException.class, () ->
+                    jdbc.update("INSERT INTO sales_forecast_config (month, auto_close_day) VALUES ('202507', 0)"));
+            assertThrows(org.springframework.dao.DataAccessException.class, () ->
+                    jdbc.update("INSERT INTO sales_forecast_config (month, auto_close_day) VALUES ('202508', 32)"));
+        } finally {
+            jdbc.update("DELETE FROM sales_forecast_config WHERE month IN ('202505', '202506', '202507', '202508')");
+        }
+    }
+
+    @Test
+    void salesForecastConfigIdIsAutoIncrement() {
+        jdbc.update("INSERT INTO sales_forecast_config (month) VALUES ('202509')");
+        jdbc.update("INSERT INTO sales_forecast_config (month) VALUES ('202510')");
+        try {
+            List<Integer> ids = jdbc.queryForList(
+                    "SELECT id FROM sales_forecast_config WHERE month IN ('202509', '202510') ORDER BY id",
+                    Integer.class);
+            assertEquals(2, ids.size());
+            assertTrue(ids.get(1) > ids.get(0), "IDs should auto-increment");
+        } finally {
+            jdbc.update("DELETE FROM sales_forecast_config WHERE month IN ('202509', '202510')");
+        }
     }
 }

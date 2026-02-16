@@ -5,6 +5,7 @@ import com.sinker.app.dto.auth.LoginResponse;
 import com.sinker.app.exception.AccountInactiveException;
 import com.sinker.app.exception.AccountLockedException;
 import com.sinker.app.service.AuthService;
+import com.sinker.app.util.IPAddressUtil;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -27,8 +28,11 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        LoginResponse response = authService.login(request);
+    public ResponseEntity<LoginResponse> login(@Valid @RequestBody LoginRequest request,
+                                               HttpServletRequest httpRequest) {
+        String ipAddress = IPAddressUtil.extractIP(httpRequest);
+        String userAgent = IPAddressUtil.extractUserAgent(httpRequest);
+        LoginResponse response = authService.login(request, ipAddress, userAgent);
         return ResponseEntity.ok(response);
     }
 

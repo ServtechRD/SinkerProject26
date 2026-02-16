@@ -3,10 +3,10 @@ import { useAuth } from '../contexts/AuthContext'
 import './Sidebar.css'
 
 const navItems = [
-  { to: '/', label: 'Dashboard' },
-  { to: '/users', label: 'Users' },
-  { to: '/sales-forecast/config', label: 'Forecast Config' },
-  { to: '/sales-forecast/upload', label: 'Forecast Upload' },
+  { to: '/', label: '儀表板' },
+  { to: '/users', label: '使用者' },
+  { to: '/sales-forecast/config', label: '預測設定' },
+  { to: '/sales-forecast/upload', label: '預測上傳' },
 ]
 
 export default function Sidebar() {
@@ -36,7 +36,7 @@ export default function Sidebar() {
           <div className="sidebar-user">{user.fullName || user.username}</div>
         )}
         <button className="sidebar-logout" onClick={logout}>
-          Logout
+          登出
         </button>
       </div>
     </aside>

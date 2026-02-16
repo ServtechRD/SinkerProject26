@@ -1,8 +1,8 @@
 export default function ForecastConfigPage() {
   return (
     <div>
-      <h1>Forecast Configuration</h1>
-      <p>Under construction</p>
+      <h1>預測設定</h1>
+      <p>功能建置中</p>
     </div>
   )
 }

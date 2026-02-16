@@ -22,7 +22,7 @@ test.describe('Navigation', () => {
 
     expect(page.url()).toContain('/users')
     await expect(layout.usersLink).toHaveClass(/sidebar-link--active/)
-    await expect(page.getByText('User Management')).toBeVisible()
+    await expect(page.getByText('使用者管理')).toBeVisible()
   })
 
   test('sidebar navigation to Forecast Config', async ({ page }) => {
@@ -55,7 +55,7 @@ test.describe('Navigation', () => {
     await page.waitForURL(/\/$/)
 
     await expect(layout.dashboardLink).toHaveClass(/sidebar-link--active/)
-    await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '儀表板' })).toBeVisible()
   })
 
   test('logout clears auth and redirects to login', async ({ page }) => {

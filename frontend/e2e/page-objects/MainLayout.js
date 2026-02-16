@@ -2,11 +2,11 @@ export class MainLayout {
   constructor(page) {
     this.page = page
     this.sidebar = page.getByTestId('sidebar')
-    this.dashboardLink = page.getByRole('link', { name: 'Dashboard' })
-    this.usersLink = page.getByRole('link', { name: 'Users' })
-    this.forecastConfigLink = page.getByRole('link', { name: 'Forecast Config' })
-    this.forecastUploadLink = page.getByRole('link', { name: 'Forecast Upload' })
-    this.logoutButton = page.getByRole('button', { name: /logout/i })
+    this.dashboardLink = page.getByRole('link', { name: '儀表板' })
+    this.usersLink = page.getByRole('link', { name: '使用者' })
+    this.forecastConfigLink = page.getByRole('link', { name: '預測設定' })
+    this.forecastUploadLink = page.getByRole('link', { name: '預測上傳' })
+    this.logoutButton = page.getByRole('button', { name: '登出' })
   }
 
   async clickDashboard() {

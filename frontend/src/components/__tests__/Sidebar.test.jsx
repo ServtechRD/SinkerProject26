@@ -14,15 +14,15 @@ describe('Sidebar', () => {
   it('renders all navigation links', () => {
     renderWithAuth(<Sidebar />, { authValue })
 
-    expect(screen.getByText('Dashboard')).toBeInTheDocument()
-    expect(screen.getByText('Users')).toBeInTheDocument()
-    expect(screen.getByText('Forecast Config')).toBeInTheDocument()
-    expect(screen.getByText('Forecast Upload')).toBeInTheDocument()
+    expect(screen.getByText('儀表板')).toBeInTheDocument()
+    expect(screen.getByText('使用者')).toBeInTheDocument()
+    expect(screen.getByText('預測設定')).toBeInTheDocument()
+    expect(screen.getByText('預測上傳')).toBeInTheDocument()
   })
 
   it('renders logout button', () => {
     renderWithAuth(<Sidebar />, { authValue })
-    expect(screen.getByRole('button', { name: /logout/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '登出' })).toBeInTheDocument()
   })
 
   it('displays user full name', () => {
@@ -37,7 +37,7 @@ describe('Sidebar', () => {
       authValue: { ...authValue, logout: logoutMock },
     })
 
-    await user.click(screen.getByRole('button', { name: /logout/i }))
+    await user.click(screen.getByRole('button', { name: '登出' }))
     expect(logoutMock).toHaveBeenCalledOnce()
   })
 
@@ -47,7 +47,7 @@ describe('Sidebar', () => {
       initialEntries: ['/'],
     })
 
-    const dashboardLink = screen.getByText('Dashboard').closest('a')
+    const dashboardLink = screen.getByText('儀表板').closest('a')
     expect(dashboardLink).toHaveClass('sidebar-link--active')
   })
 
@@ -57,7 +57,7 @@ describe('Sidebar', () => {
       initialEntries: ['/users'],
     })
 
-    const usersLink = screen.getByText('Users').closest('a')
+    const usersLink = screen.getByText('使用者').closest('a')
     expect(usersLink).toHaveClass('sidebar-link--active')
   })
 })

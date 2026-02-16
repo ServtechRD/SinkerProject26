@@ -20,7 +20,7 @@ export default function LoginPage() {
     setError('')
 
     if (!username.trim() || !password) {
-      setError('Username and password are required')
+      setError('請輸入帳號與密碼')
       return
     }
 
@@ -32,11 +32,11 @@ export default function LoginPage() {
       const status = err.response?.status
       const message = err.response?.data?.message
       if (status === 401) {
-        setError(message || 'Invalid username or password')
+        setError(message || '帳號或密碼錯誤')
       } else if (status === 403) {
-        setError(message || 'Account access denied')
+        setError(message || '帳號存取被拒絕')
       } else {
-        setError('Network error. Please try again.')
+        setError('網路錯誤，請稍後再試')
       }
     } finally {
       setLoading(false)
@@ -53,7 +53,7 @@ export default function LoginPage() {
           </div>
         )}
         <div className="login-field">
-          <label htmlFor="username">Username</label>
+          <label htmlFor="username">帳號</label>
           <input
             id="username"
             type="text"
@@ -65,7 +65,7 @@ export default function LoginPage() {
           />
         </div>
         <div className="login-field">
-          <label htmlFor="password">Password</label>
+          <label htmlFor="password">密碼</label>
           <input
             id="password"
             type="password"
@@ -76,7 +76,7 @@ export default function LoginPage() {
           />
         </div>
         <button type="submit" className="login-submit" disabled={loading}>
-          {loading ? 'Logging in...' : 'Login'}
+          {loading ? '登入中...' : '登入'}
         </button>
       </form>
     </div>

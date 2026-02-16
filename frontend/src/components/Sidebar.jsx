@@ -5,6 +5,7 @@ import './Sidebar.css'
 const navItems = [
   { to: '/', label: '儀表板' },
   { to: '/users', label: '使用者' },
+  { to: '/roles', label: '角色管理' },
   { to: '/sales-forecast/config', label: '預測設定' },
   { to: '/sales-forecast/upload', label: '預測上傳' },
 ]

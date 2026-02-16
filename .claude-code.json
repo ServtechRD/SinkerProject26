@@ -1,4 +1,5 @@
 {
+  "model":"claude-sonnet-4-5-20250929",
   "branch": {
     "base": "claude/integration",
     "featPrefix": "claude/feat/",

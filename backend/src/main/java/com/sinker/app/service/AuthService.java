@@ -23,21 +23,26 @@ import java.util.Optional;
 public class AuthService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+    private static final int MAX_FAILED_ATTEMPTS = 5;
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider tokenProvider;
+    private final LoginLogService loginLogService;
 
     public AuthService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
-                       JwtTokenProvider tokenProvider) {
+                       JwtTokenProvider tokenProvider,
+                       LoginLogService loginLogService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenProvider = tokenProvider;
+        this.loginLogService = loginLogService;
     }
 
-    @Transactional
-    public LoginResponse login(LoginRequest request) {
+    @Transactional(noRollbackFor = {BadCredentialsException.class, AccountLockedException.class,
+            UsernameNotFoundException.class, AccountInactiveException.class})
+    public LoginResponse login(LoginRequest request, String ipAddress, String userAgent) {
         String username = request.getUsername();
         String email = request.getEmail();
 
@@ -45,37 +50,59 @@ public class AuthService {
             throw new BadCredentialsException("Username or email is required");
         }
 
+        String loginIdentifier = StringUtils.hasText(username) ? username.trim() : email.trim();
+
         Optional<User> optionalUser;
         if (StringUtils.hasText(username)) {
             optionalUser = userRepository.findByUsername(username.trim());
-            if (optionalUser.isEmpty()) {
-                log.debug("Login failed: user not found by username '{}'", username.trim());
-            }
         } else {
             optionalUser = userRepository.findByEmail(email.trim());
-            if (optionalUser.isEmpty()) {
-                log.debug("Login failed: user not found by email '{}'", email.trim());
-            }
         }
 
-        User user = optionalUser
-                .orElseThrow(() -> new UsernameNotFoundException("Invalid username or password"));
+        if (optionalUser.isEmpty()) {
+            log.debug("Login failed: user not found '{}'", loginIdentifier);
+            loginLogService.logFailedLogin(loginIdentifier, null, ipAddress, userAgent,
+                    "Invalid username or password");
+            throw new UsernameNotFoundException("Invalid username or password");
+        }
+
+        User user = optionalUser.get();
 
         if (!Boolean.TRUE.equals(user.getIsActive())) {
+            loginLogService.logFailedLogin(user.getUsername(), user.getId(), ipAddress, userAgent,
+                    "Account is inactive");
             throw new AccountInactiveException("Account is inactive");
         }
 
         if (Boolean.TRUE.equals(user.getIsLocked())) {
+            loginLogService.logFailedLogin(user.getUsername(), user.getId(), ipAddress, userAgent,
+                    "Account is locked");
             throw new AccountLockedException("Account is locked");
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getHashedPassword())) {
             log.debug("Login failed: password mismatch for user '{}'", user.getUsername());
+            int newCount = user.getFailedLoginCount() + 1;
+            user.setFailedLoginCount(newCount);
+            if (newCount >= MAX_FAILED_ATTEMPTS) {
+                user.setIsLocked(true);
+                log.warn("Account '{}' locked after {} failed attempts", user.getUsername(), newCount);
+            }
+            userRepository.save(user);
+            loginLogService.logFailedLogin(user.getUsername(), user.getId(), ipAddress, userAgent,
+                    "Invalid username or password");
+            if (Boolean.TRUE.equals(user.getIsLocked())) {
+                throw new AccountLockedException("Account is locked");
+            }
             throw new BadCredentialsException("Invalid username or password");
         }
 
+        // Successful login: reset failed count and update last login
+        user.setFailedLoginCount(0);
         user.setLastLoginAt(LocalDateTime.now());
         userRepository.save(user);
+
+        loginLogService.logSuccessfulLogin(user, ipAddress, userAgent);
 
         String token = tokenProvider.generateToken(
                 user.getId(), user.getUsername(), user.getRole().getCode());

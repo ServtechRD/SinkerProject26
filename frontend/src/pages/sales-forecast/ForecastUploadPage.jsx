@@ -1,8 +1,8 @@
 export default function ForecastUploadPage() {
   return (
     <div>
-      <h1>Forecast Upload</h1>
-      <p>Under construction</p>
+      <h1>預測上傳</h1>
+      <p>功能建置中</p>
     </div>
   )
 }

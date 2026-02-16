@@ -17,9 +17,9 @@ describe('LoginPage', () => {
       authValue: { login: loginMock },
     })
 
-    expect(screen.getByLabelText('Username')).toBeInTheDocument()
-    expect(screen.getByLabelText('Password')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /login/i })).toBeInTheDocument()
+    expect(screen.getByLabelText('帳號')).toBeInTheDocument()
+    expect(screen.getByLabelText('密碼')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '登入' })).toBeInTheDocument()
   })
 
   it('password field has type password', () => {
@@ -28,7 +28,7 @@ describe('LoginPage', () => {
       authValue: { login: loginMock },
     })
 
-    expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password')
+    expect(screen.getByLabelText('密碼')).toHaveAttribute('type', 'password')
   })
 
   it('shows validation error when submitting empty form', async () => {
@@ -38,9 +38,9 @@ describe('LoginPage', () => {
       authValue: { login: loginMock },
     })
 
-    await user.click(screen.getByRole('button', { name: /login/i }))
+    await user.click(screen.getByRole('button', { name: '登入' }))
 
-    expect(screen.getByRole('alert')).toHaveTextContent('Username and password are required')
+    expect(screen.getByRole('alert')).toHaveTextContent('請輸入帳號與密碼')
     expect(loginMock).not.toHaveBeenCalled()
   })
 
@@ -52,9 +52,9 @@ describe('LoginPage', () => {
       authValue: { login: loginMock },
     })
 
-    await user.type(screen.getByLabelText('Username'), 'admin')
-    await user.type(screen.getByLabelText('Password'), 'admin123')
-    await user.click(screen.getByRole('button', { name: /login/i }))
+    await user.type(screen.getByLabelText('帳號'), 'admin')
+    await user.type(screen.getByLabelText('密碼'), 'admin123')
+    await user.click(screen.getByRole('button', { name: '登入' }))
 
     await waitFor(() => {
       expect(loginMock).toHaveBeenCalledWith('admin', 'admin123')
@@ -71,9 +71,9 @@ describe('LoginPage', () => {
       authValue: { login: loginMock },
     })
 
-    await user.type(screen.getByLabelText('Username'), 'admin')
-    await user.type(screen.getByLabelText('Password'), 'wrong')
-    await user.click(screen.getByRole('button', { name: /login/i }))
+    await user.type(screen.getByLabelText('帳號'), 'admin')
+    await user.type(screen.getByLabelText('密碼'), 'wrong')
+    await user.click(screen.getByRole('button', { name: '登入' }))
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('Invalid username or password')
@@ -90,9 +90,9 @@ describe('LoginPage', () => {
       authValue: { login: loginMock },
     })
 
-    await user.type(screen.getByLabelText('Username'), 'locked')
-    await user.type(screen.getByLabelText('Password'), 'password')
-    await user.click(screen.getByRole('button', { name: /login/i }))
+    await user.type(screen.getByLabelText('帳號'), 'locked')
+    await user.type(screen.getByLabelText('密碼'), 'password')
+    await user.click(screen.getByRole('button', { name: '登入' }))
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('Account is locked')
@@ -110,11 +110,11 @@ describe('LoginPage', () => {
       authValue: { login: loginMock },
     })
 
-    await user.type(screen.getByLabelText('Username'), 'admin')
-    await user.type(screen.getByLabelText('Password'), 'admin123')
-    await user.click(screen.getByRole('button', { name: /login/i }))
+    await user.type(screen.getByLabelText('帳號'), 'admin')
+    await user.type(screen.getByLabelText('密碼'), 'admin123')
+    await user.click(screen.getByRole('button', { name: '登入' }))
 
-    expect(screen.getByRole('button', { name: /logging in/i })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '登入中...' })).toBeDisabled()
 
     resolveLogin({ token: 'tok', user: {} })
   })
@@ -127,12 +127,12 @@ describe('LoginPage', () => {
       authValue: { login: loginMock },
     })
 
-    await user.type(screen.getByLabelText('Username'), 'admin')
-    await user.type(screen.getByLabelText('Password'), 'admin123')
-    await user.click(screen.getByRole('button', { name: /login/i }))
+    await user.type(screen.getByLabelText('帳號'), 'admin')
+    await user.type(screen.getByLabelText('密碼'), 'admin123')
+    await user.click(screen.getByRole('button', { name: '登入' }))
 
     await waitFor(() => {
-      expect(screen.getByRole('alert')).toHaveTextContent('Network error')
+      expect(screen.getByRole('alert')).toHaveTextContent('網路錯誤')
     })
   })
 })

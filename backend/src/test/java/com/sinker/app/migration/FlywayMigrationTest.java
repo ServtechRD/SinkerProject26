@@ -22,7 +22,7 @@ class FlywayMigrationTest {
     void migrationsRunSuccessfully() {
         List<Map<String, Object>> history = jdbc.queryForList(
                 "SELECT version, success FROM flyway_schema_history ORDER BY installed_rank");
-        assertTrue(history.size() >= 2, "At least V1 and V2 migrations should exist");
+        assertTrue(history.size() >= 3, "At least V1, V2, and V3 migrations should exist");
 
         Map<String, Object> v1 = history.get(0);
         assertEquals("1", v1.get("version").toString());
@@ -33,6 +33,11 @@ class FlywayMigrationTest {
         assertEquals("2", v2.get("version").toString());
         assertTrue(Boolean.TRUE.equals(v2.get("success")) || Integer.valueOf(1).equals(v2.get("success")),
                 "V2 migration should be successful");
+
+        Map<String, Object> v3 = history.get(2);
+        assertEquals("3", v3.get("version").toString());
+        assertTrue(Boolean.TRUE.equals(v3.get("success")) || Integer.valueOf(1).equals(v3.get("success")),
+                "V3 migration should be successful");
     }
 
     // --- Table structure tests ---
@@ -221,5 +226,275 @@ class FlywayMigrationTest {
         Integer countAfter = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM role_permissions WHERE role_id = ?", Integer.class, testRoleId);
         assertEquals(0, countAfter, "Role permission should be cascade deleted");
+    }
+
+    // --- V3: sales_channels_users tests ---
+
+    @Test
+    void salesChannelsUsersTableHasAllColumns() {
+        List<String> columns = jdbc.queryForList(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sales_channels_users' ORDER BY ORDINAL_POSITION",
+                String.class);
+        assertEquals(4, columns.size(), "sales_channels_users table should have 4 columns");
+        assertTrue(columns.containsAll(List.of("id", "user_id", "channel", "created_at")));
+    }
+
+    @Test
+    void salesChannelsUsersChannelIsVarchar50() {
+        String dataType = jdbc.queryForObject(
+                "SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sales_channels_users' AND COLUMN_NAME = 'channel'",
+                String.class);
+        assertEquals("varchar(50)", dataType);
+    }
+
+    @Test
+    void salesChannelsUsersForeignKeyReferencesUsers() {
+        List<Map<String, Object>> fks = jdbc.queryForList(
+                "SELECT REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sales_channels_users' AND REFERENCED_TABLE_NAME IS NOT NULL");
+        assertEquals(1, fks.size());
+        assertEquals("users", fks.get(0).get("REFERENCED_TABLE_NAME"));
+        assertEquals("id", fks.get(0).get("REFERENCED_COLUMN_NAME"));
+    }
+
+    @Test
+    void salesChannelsUsersForeignKeyCascadeDelete() {
+        String deleteRule = jdbc.queryForObject(
+                "SELECT DELETE_RULE FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS " +
+                "WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'sales_channels_users'",
+                String.class);
+        assertEquals("CASCADE", deleteRule);
+    }
+
+    @Test
+    void salesChannelsUsersUniqueConstraintOnUserIdChannel() {
+        Integer adminId = jdbc.queryForObject("SELECT id FROM users WHERE username = 'admin'", Integer.class);
+        jdbc.update("INSERT INTO sales_channels_users (user_id, channel) VALUES (?, 'PX/大全聯')", adminId);
+        try {
+            assertThrows(org.springframework.dao.DuplicateKeyException.class, () ->
+                    jdbc.update("INSERT INTO sales_channels_users (user_id, channel) VALUES (?, 'PX/大全聯')", adminId));
+
+            // Different channel for same user should succeed
+            jdbc.update("INSERT INTO sales_channels_users (user_id, channel) VALUES (?, '家樂福')", adminId);
+        } finally {
+            jdbc.update("DELETE FROM sales_channels_users WHERE user_id = ?", adminId);
+        }
+    }
+
+    @Test
+    void salesChannelsUsersForeignKeyRejectsInvalidUserId() {
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () ->
+                jdbc.update("INSERT INTO sales_channels_users (user_id, channel) VALUES (9999, 'PX/大全聯')"));
+    }
+
+    @Test
+    void salesChannelsUsersCascadeDeleteOnUserDelete() {
+        // Create test user
+        jdbc.update("INSERT INTO users (username, email, hashed_password, role_id, is_active, is_locked, failed_login_count) " +
+                "VALUES ('test_cascade_ch', 'cascade_ch@test.com', 'hash', 1, TRUE, FALSE, 0)");
+        Integer testUserId = jdbc.queryForObject("SELECT id FROM users WHERE username = 'test_cascade_ch'", Integer.class);
+
+        jdbc.update("INSERT INTO sales_channels_users (user_id, channel) VALUES (?, 'PX/大全聯')", testUserId);
+        Integer countBefore = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sales_channels_users WHERE user_id = ?", Integer.class, testUserId);
+        assertEquals(1, countBefore);
+
+        jdbc.update("DELETE FROM users WHERE id = ?", testUserId);
+
+        Integer countAfter = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM sales_channels_users WHERE user_id = ?", Integer.class, testUserId);
+        assertEquals(0, countAfter, "Channel assignments should be cascade deleted with user");
+    }
+
+    @Test
+    void salesChannelsUsersIndexOnUserId() {
+        List<Map<String, Object>> indexes = jdbc.queryForList(
+                "SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sales_channels_users' AND COLUMN_NAME = 'user_id'");
+        assertFalse(indexes.isEmpty(), "Index on user_id should exist");
+    }
+
+    // --- V3: login_logs tests ---
+
+    @Test
+    void loginLogsTableHasAllColumns() {
+        List<String> columns = jdbc.queryForList(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_logs' ORDER BY ORDINAL_POSITION",
+                String.class);
+        assertEquals(8, columns.size(), "login_logs table should have 8 columns");
+        assertTrue(columns.containsAll(List.of(
+                "id", "user_id", "username", "login_type", "ip_address", "user_agent", "failed_reason", "created_at")));
+    }
+
+    @Test
+    void loginLogsIdIsBigint() {
+        String dataType = jdbc.queryForObject(
+                "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_logs' AND COLUMN_NAME = 'id'",
+                String.class);
+        assertEquals("bigint", dataType);
+    }
+
+    @Test
+    void loginLogsUsernameIsVarchar50() {
+        String columnType = jdbc.queryForObject(
+                "SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_logs' AND COLUMN_NAME = 'username'",
+                String.class);
+        assertEquals("varchar(50)", columnType);
+    }
+
+    @Test
+    void loginLogsIpAddressIsVarchar45() {
+        String columnType = jdbc.queryForObject(
+                "SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_logs' AND COLUMN_NAME = 'ip_address'",
+                String.class);
+        assertEquals("varchar(45)", columnType);
+    }
+
+    @Test
+    void loginLogsUserAgentIsText() {
+        String dataType = jdbc.queryForObject(
+                "SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_logs' AND COLUMN_NAME = 'user_agent'",
+                String.class);
+        assertEquals("text", dataType);
+    }
+
+    @Test
+    void loginLogsFailedReasonIsVarchar255() {
+        String columnType = jdbc.queryForObject(
+                "SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_logs' AND COLUMN_NAME = 'failed_reason'",
+                String.class);
+        assertEquals("varchar(255)", columnType);
+    }
+
+    @Test
+    void loginLogsLoginTypeIsEnum() {
+        String columnType = jdbc.queryForObject(
+                "SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_logs' AND COLUMN_NAME = 'login_type'",
+                String.class);
+        assertEquals("enum('success','failed')", columnType);
+    }
+
+    @Test
+    void loginLogsForeignKeyReferencesUsers() {
+        List<Map<String, Object>> fks = jdbc.queryForList(
+                "SELECT REFERENCED_TABLE_NAME, REFERENCED_COLUMN_NAME FROM INFORMATION_SCHEMA.KEY_COLUMN_USAGE " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_logs' AND REFERENCED_TABLE_NAME IS NOT NULL");
+        assertEquals(1, fks.size());
+        assertEquals("users", fks.get(0).get("REFERENCED_TABLE_NAME"));
+        assertEquals("id", fks.get(0).get("REFERENCED_COLUMN_NAME"));
+    }
+
+    @Test
+    void loginLogsForeignKeySetNullOnDelete() {
+        String deleteRule = jdbc.queryForObject(
+                "SELECT DELETE_RULE FROM INFORMATION_SCHEMA.REFERENTIAL_CONSTRAINTS " +
+                "WHERE CONSTRAINT_SCHEMA = DATABASE() AND TABLE_NAME = 'login_logs'",
+                String.class);
+        assertEquals("SET NULL", deleteRule);
+    }
+
+    @Test
+    void loginLogsEnumAcceptsSuccessAndFailed() {
+        jdbc.update("INSERT INTO login_logs (username, login_type, ip_address) VALUES ('enum_test', 'success', '127.0.0.1')");
+        jdbc.update("INSERT INTO login_logs (username, login_type, ip_address) VALUES ('enum_test', 'failed', '127.0.0.1')");
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM login_logs WHERE username = 'enum_test'", Integer.class);
+        assertEquals(2, count);
+        jdbc.update("DELETE FROM login_logs WHERE username = 'enum_test'");
+    }
+
+    @Test
+    void loginLogsEnumRejectsInvalidValue() {
+        assertThrows(org.springframework.dao.DataAccessException.class, () ->
+                jdbc.update("INSERT INTO login_logs (username, login_type, ip_address) VALUES ('enum_test', 'invalid', '127.0.0.1')"));
+    }
+
+    @Test
+    void loginLogsSetNullOnUserDelete() {
+        // Create test user
+        jdbc.update("INSERT INTO users (username, email, hashed_password, role_id, is_active, is_locked, failed_login_count) " +
+                "VALUES ('test_setnull', 'setnull@test.com', 'hash', 1, TRUE, FALSE, 0)");
+        Integer testUserId = jdbc.queryForObject("SELECT id FROM users WHERE username = 'test_setnull'", Integer.class);
+
+        jdbc.update("INSERT INTO login_logs (user_id, username, login_type, ip_address) VALUES (?, 'test_setnull', 'success', '127.0.0.1')", testUserId);
+
+        // Delete user
+        jdbc.update("DELETE FROM users WHERE id = ?", testUserId);
+
+        // Verify log remains but user_id is NULL
+        List<Map<String, Object>> logs = jdbc.queryForList(
+                "SELECT user_id, username FROM login_logs WHERE username = 'test_setnull'");
+        assertEquals(1, logs.size(), "Login log should still exist after user deletion");
+        assertNull(logs.get(0).get("user_id"), "user_id should be NULL after user deletion");
+        assertEquals("test_setnull", logs.get(0).get("username"), "username should be preserved");
+
+        jdbc.update("DELETE FROM login_logs WHERE username = 'test_setnull'");
+    }
+
+    @Test
+    void loginLogsAllowsNullUserId() {
+        jdbc.update("INSERT INTO login_logs (user_id, username, login_type, ip_address) VALUES (NULL, 'unknown_user', 'failed', '127.0.0.1')");
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM login_logs WHERE username = 'unknown_user'", Integer.class);
+        assertEquals(1, count);
+        jdbc.update("DELETE FROM login_logs WHERE username = 'unknown_user'");
+    }
+
+    @Test
+    void loginLogsIpv6AddressStorage() {
+        String ipv4 = "192.168.1.1";
+        String ipv6 = "2001:0db8:85a3:0000:0000:8a2e:0370:7334";
+
+        jdbc.update("INSERT INTO login_logs (username, login_type, ip_address) VALUES ('ipv_test', 'success', ?)", ipv4);
+        jdbc.update("INSERT INTO login_logs (username, login_type, ip_address) VALUES ('ipv_test', 'success', ?)", ipv6);
+
+        List<String> addresses = jdbc.queryForList(
+                "SELECT ip_address FROM login_logs WHERE username = 'ipv_test' ORDER BY id",
+                String.class);
+        assertEquals(2, addresses.size());
+        assertEquals(ipv4, addresses.get(0));
+        assertEquals(ipv6, addresses.get(1));
+
+        jdbc.update("DELETE FROM login_logs WHERE username = 'ipv_test'");
+    }
+
+    @Test
+    void loginLogsIndexOnUserId() {
+        List<Map<String, Object>> indexes = jdbc.queryForList(
+                "SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_logs' AND COLUMN_NAME = 'user_id'");
+        assertFalse(indexes.isEmpty(), "Index on login_logs.user_id should exist");
+    }
+
+    @Test
+    void loginLogsIndexOnUsername() {
+        List<Map<String, Object>> indexes = jdbc.queryForList(
+                "SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_logs' AND COLUMN_NAME = 'username' AND INDEX_NAME LIKE '%username%'");
+        assertFalse(indexes.isEmpty(), "Index on login_logs.username should exist");
+    }
+
+    @Test
+    void loginLogsIndexOnCreatedAt() {
+        List<Map<String, Object>> indexes = jdbc.queryForList(
+                "SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_logs' AND COLUMN_NAME = 'created_at' AND INDEX_NAME LIKE '%created_at'");
+        assertFalse(indexes.isEmpty(), "Index on login_logs.created_at should exist");
+    }
+
+    @Test
+    void loginLogsIndexOnLoginType() {
+        List<Map<String, Object>> indexes = jdbc.queryForList(
+                "SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_logs' AND COLUMN_NAME = 'login_type'");
+        assertFalse(indexes.isEmpty(), "Index on login_logs.login_type should exist");
+    }
+
+    @Test
+    void loginLogsCompositeIndexOnUserIdCreatedAt() {
+        List<Map<String, Object>> indexes = jdbc.queryForList(
+                "SELECT DISTINCT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_logs' AND INDEX_NAME = 'idx_login_logs_user_id_created_at'");
+        assertFalse(indexes.isEmpty(), "Composite index on (user_id, created_at) should exist");
     }
 }

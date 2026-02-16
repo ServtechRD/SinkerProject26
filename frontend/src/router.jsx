@@ -4,6 +4,8 @@ import ProtectedRoute from './components/ProtectedRoute'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import UserListPage from './pages/users/UserListPage'
+import UserCreatePage from './pages/users/UserCreatePage'
+import UserEditPage from './pages/users/UserEditPage'
 import ForecastConfigPage from './pages/sales-forecast/ForecastConfigPage'
 import ForecastUploadPage from './pages/sales-forecast/ForecastUploadPage'
 
@@ -20,6 +22,8 @@ export default function AppRoutes() {
       >
         <Route index element={<DashboardPage />} />
         <Route path="users" element={<UserListPage />} />
+        <Route path="users/create" element={<UserCreatePage />} />
+        <Route path="users/:id/edit" element={<UserEditPage />} />
         <Route path="sales-forecast/config" element={<ForecastConfigPage />} />
         <Route path="sales-forecast/upload" element={<ForecastUploadPage />} />
       </Route>

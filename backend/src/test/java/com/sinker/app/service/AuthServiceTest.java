@@ -72,6 +72,7 @@ class AuthServiceTest {
         assertNotNull(response);
         assertNotNull(response.getToken());
         assertFalse(response.getToken().isBlank());
+        assertEquals("Bearer", response.getTokenType());
         assertEquals("admin", response.getUser().getUsername());
         assertEquals("admin@sinker.local", response.getUser().getEmail());
         assertEquals("Test User", response.getUser().getFullName());
@@ -79,6 +80,26 @@ class AuthServiceTest {
         assertEquals(1L, response.getUser().getId());
 
         verify(userRepository).save(any(User.class));
+    }
+
+    @Test
+    void loginWithEmailReturnsToken() {
+        User user = createTestUser("admin", "admin123", true, false);
+        when(userRepository.findByEmail("admin@sinker.local")).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenReturn(user);
+
+        LoginRequest request = new LoginRequest();
+        request.setEmail("admin@sinker.local");
+        request.setPassword("admin123");
+
+        LoginResponse response = authService.login(request);
+
+        assertNotNull(response);
+        assertNotNull(response.getToken());
+        assertEquals("Bearer", response.getTokenType());
+        assertEquals("admin", response.getUser().getUsername());
+        verify(userRepository, never()).findByUsername(any());
+        verify(userRepository).findByEmail("admin@sinker.local");
     }
 
     @Test
@@ -100,6 +121,17 @@ class AuthServiceTest {
 
         assertThrows(UsernameNotFoundException.class,
                 () -> authService.login(new LoginRequest("nonexistent", "password")));
+    }
+
+    @Test
+    void loginWithInvalidEmail() {
+        when(userRepository.findByEmail("bad@email.com")).thenReturn(Optional.empty());
+
+        LoginRequest request = new LoginRequest();
+        request.setEmail("bad@email.com");
+        request.setPassword("password");
+
+        assertThrows(UsernameNotFoundException.class, () -> authService.login(request));
     }
 
     @Test
@@ -155,5 +187,28 @@ class AuthServiceTest {
         assertEquals("admin", tokenProvider.getUsernameFromToken(token));
         assertEquals(1L, tokenProvider.getUserIdFromToken(token));
         assertEquals("admin", tokenProvider.getRoleCodeFromToken(token));
+    }
+
+    @Test
+    void loginWithNoUsernameOrEmailThrows() {
+        LoginRequest request = new LoginRequest();
+        request.setPassword("admin123");
+
+        assertThrows(BadCredentialsException.class, () -> authService.login(request));
+    }
+
+    @Test
+    void loginPrefersUsernameOverEmail() {
+        User user = createTestUser("admin", "admin123", true, false);
+        when(userRepository.findByUsername("admin")).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenReturn(user);
+
+        LoginRequest request = new LoginRequest("admin", "admin123");
+        request.setEmail("admin@sinker.local");
+
+        LoginResponse response = authService.login(request);
+        assertNotNull(response);
+        verify(userRepository).findByUsername("admin");
+        verify(userRepository, never()).findByEmail(any());
     }
 }

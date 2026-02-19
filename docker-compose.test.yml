@@ -38,16 +38,19 @@ services:
       retries: 30
 
   backend_unit:
-    build: ./backend
+    build: 
+      context: ./backend
+      target: builder
     environment:
       SPRING_DATASOURCE_URL: jdbc:mariadb://db:3306/app_test
       SPRING_DATASOURCE_USERNAME: app
       SPRING_DATASOURCE_PASSWORD: app
       SPRING_PROFILES_ACTIVE: test
+      GRADLE_OPTS: "-Dorg.gradle.daemon=false -Xmx2g"
     depends_on:
       db:
         condition: service_healthy
-    command: ["./gradlew", "test"]
+    #command: ["./gradlew", "test"]
 
   e2e:
     image: mcr.microsoft.com/playwright:v1.50.0-jammy

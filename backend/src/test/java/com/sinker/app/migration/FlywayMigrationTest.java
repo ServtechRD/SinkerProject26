@@ -22,7 +22,7 @@ class FlywayMigrationTest {
     void migrationsRunSuccessfully() {
         List<Map<String, Object>> history = jdbc.queryForList(
                 "SELECT version, success FROM flyway_schema_history ORDER BY installed_rank");
-        assertTrue(history.size() >= 4, "At least V1, V2, V3, and V4 migrations should exist");
+        assertTrue(history.size() >= 5, "At least V1-V5 migrations should exist");
 
         Map<String, Object> v1 = history.get(0);
         assertEquals("1", v1.get("version").toString());
@@ -43,6 +43,11 @@ class FlywayMigrationTest {
         assertEquals("4", v4.get("version").toString());
         assertTrue(Boolean.TRUE.equals(v4.get("success")) || Integer.valueOf(1).equals(v4.get("success")),
                 "V4 migration should be successful");
+
+        Map<String, Object> v5 = history.get(4);
+        assertEquals("5", v5.get("version").toString());
+        assertTrue(Boolean.TRUE.equals(v5.get("success")) || Integer.valueOf(1).equals(v5.get("success")),
+                "V5 migration should be successful");
     }
 
     // --- Table structure tests ---

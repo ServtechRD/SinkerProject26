@@ -1,5 +1,8 @@
 {
   "model":"claude-sonnet-4-5-20250929",
+  "autoApprove": true,
+  "interactive": false,
+  "confirmBeforeRun": false,
   "branch": {
     "base": "claude/integration",
     "featPrefix": "claude/feat/",
@@ -23,7 +26,8 @@
   "rules": {
     "forbidMerge": ["main"],
     "requireTests": true,
-    "conventionalCommits": true
+    "conventionalCommits": true,
+    "autoExecute": true
   },
   "commands": {
     "backendTest": "cd backend && ./gradlew test",

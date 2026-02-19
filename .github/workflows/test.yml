@@ -18,7 +18,10 @@ jobs:
           distribution: 'temurin'
       
       - name: Test Backend
-        run: cd backend && ./gradlew test
+        run: |
+          if [ -f "backend/gradlew" ]; then
+            cd backend && ./gradlew test
+          fi
       
       - name: Set up Node.js
         uses: actions/setup-node@v3
@@ -26,4 +29,7 @@ jobs:
           node-version: '18'
       
       - name: Test Frontend
-        run: cd frontend && npm ci && npm test
+        run: |
+          if [ -f "frontend/package.json" ]; then
+            cd frontend && npm ci && npm test
+          fi

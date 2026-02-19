@@ -1,0 +1,29 @@
+name: Test
+
+on:
+  pull_request:
+    branches: [claude/integration]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+      
+      - name: Set up JDK
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+      
+      - name: Test Backend
+        run: cd backend && ./gradlew test
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Test Frontend
+        run: cd frontend && npm ci && npm test

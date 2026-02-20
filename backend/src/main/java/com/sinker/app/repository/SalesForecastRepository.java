@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface SalesForecastRepository extends JpaRepository<SalesForecast, Integer> {
 
@@ -17,4 +18,6 @@ public interface SalesForecastRepository extends JpaRepository<SalesForecast, In
     void deleteByMonthAndChannel(@Param("month") String month, @Param("channel") String channel);
 
     int countByMonthAndChannel(String month, String channel);
+
+    Optional<SalesForecast> findByMonthAndChannelAndProductCode(String month, String channel, String productCode);
 }

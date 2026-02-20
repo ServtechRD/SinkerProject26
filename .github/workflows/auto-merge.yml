@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   enable:
-    if: github.event.pull_request.base.ref == 'claude/integration'
+    if: github.event.pull_request.base.ref == 'claude/intergration'
     runs-on: ubuntu-latest
     steps:
       - name: Enable auto-merge

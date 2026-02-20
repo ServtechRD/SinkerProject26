@@ -3,6 +3,7 @@ package com.sinker.app.controller;
 import com.sinker.app.dto.forecast.CreateForecastRequest;
 import com.sinker.app.dto.forecast.ForecastResponse;
 import com.sinker.app.dto.forecast.UpdateForecastRequest;
+import com.sinker.app.dto.forecast.VersionInfo;
 import com.sinker.app.exception.ResourceNotFoundException;
 import com.sinker.app.security.JwtUserPrincipal;
 import com.sinker.app.service.SalesForecastService;
@@ -14,12 +15,16 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/sales-forecast")
@@ -31,6 +36,67 @@ public class SalesForecastController {
 
     public SalesForecastController(SalesForecastService forecastService) {
         this.forecastService = forecastService;
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAnyAuthority('sales_forecast.view', 'sales_forecast.view_own')")
+    public ResponseEntity<List<ForecastResponse>> queryForecasts(
+            @RequestParam String month,
+            @RequestParam String channel,
+            @RequestParam(required = false) String version,
+            @AuthenticationPrincipal JwtUserPrincipal principal,
+            Authentication authentication) {
+
+        log.info("GET /api/sales-forecast - user={}, month={}, channel={}, version={}",
+                principal.getUserId(), month, channel, version);
+
+        // Validate required parameters
+        if (month == null || month.isEmpty()) {
+            throw new IllegalArgumentException("Missing required parameter: month");
+        }
+        if (channel == null || channel.isEmpty()) {
+            throw new IllegalArgumentException("Missing required parameter: channel");
+        }
+
+        // Extract authorities
+        Set<String> authorities = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toSet());
+
+        List<ForecastResponse> forecasts = forecastService.queryForecasts(
+                month, channel, version, principal.getUserId(), authorities);
+
+        return ResponseEntity.ok(forecasts);
+    }
+
+    @GetMapping("/versions")
+    @PreAuthorize("hasAnyAuthority('sales_forecast.view', 'sales_forecast.view_own')")
+    public ResponseEntity<List<VersionInfo>> queryVersions(
+            @RequestParam String month,
+            @RequestParam String channel,
+            @AuthenticationPrincipal JwtUserPrincipal principal,
+            Authentication authentication) {
+
+        log.info("GET /api/sales-forecast/versions - user={}, month={}, channel={}",
+                principal.getUserId(), month, channel);
+
+        // Validate required parameters
+        if (month == null || month.isEmpty()) {
+            throw new IllegalArgumentException("Missing required parameter: month");
+        }
+        if (channel == null || channel.isEmpty()) {
+            throw new IllegalArgumentException("Missing required parameter: channel");
+        }
+
+        // Extract authorities
+        Set<String> authorities = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toSet());
+
+        List<VersionInfo> versions = forecastService.queryVersions(
+                month, channel, principal.getUserId(), authorities);
+
+        return ResponseEntity.ok(versions);
     }
 
     @PostMapping

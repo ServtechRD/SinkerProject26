@@ -56,10 +56,10 @@ services:
     image: mcr.microsoft.com/playwright:v1.50.0-jammy
     working_dir: /work
     volumes:
-      - ./e2e:/work
+      - ./frontend/e2e:/work
     environment:
       BASE_URL: http://backend_server:8080
     depends_on:
       backend_server:
         condition: service_healthy
-    command: ["bash", "-lc", "npm ci && npx playwright test"]
+    command: ["bash", "-lc", "test -f package-lock.json && npm ci || npm install; npx playwright test"]

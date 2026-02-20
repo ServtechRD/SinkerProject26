@@ -3,6 +3,7 @@ package com.sinker.app.service;
 import com.sinker.app.dto.forecast.CreateForecastRequest;
 import com.sinker.app.dto.forecast.ForecastResponse;
 import com.sinker.app.dto.forecast.UpdateForecastRequest;
+import com.sinker.app.dto.forecast.VersionInfo;
 import com.sinker.app.entity.SalesForecast;
 import com.sinker.app.entity.SalesForecastConfig;
 import com.sinker.app.exception.ResourceNotFoundException;
@@ -17,6 +18,10 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class SalesForecastService {
@@ -172,6 +177,82 @@ public class SalesForecastService {
         if (count == null || count == 0) {
             throw new AccessDeniedException("No permission for channel: " + channel);
         }
+    }
+
+    // T017: Query methods
+    @Transactional(readOnly = true)
+    public List<ForecastResponse> queryForecasts(String month, String channel, String version,
+                                                 Long userId, Set<String> authorities) {
+        log.info("Querying forecasts: user={}, month={}, channel={}, version={}", userId, month, channel, version);
+
+        // Validate month format
+        validateMonthFormat(month);
+
+        // Check permissions and channel access
+        checkQueryPermission(userId, channel, authorities);
+
+        // Query with or without version
+        List<SalesForecast> forecasts;
+        if (version != null && !version.isEmpty()) {
+            forecasts = forecastRepository.findByMonthAndChannelAndVersionOrderByCategoryAscSpecAscProductCodeAsc(
+                    month, channel, version);
+        } else {
+            forecasts = forecastRepository.findLatestByMonthAndChannel(month, channel);
+        }
+
+        return forecasts.stream()
+                .map(ForecastResponse::fromEntity)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    public List<VersionInfo> queryVersions(String month, String channel, Long userId, Set<String> authorities) {
+        log.info("Querying versions: user={}, month={}, channel={}", userId, month, channel);
+
+        // Validate month format
+        validateMonthFormat(month);
+
+        // Check permissions and channel access
+        checkQueryPermission(userId, channel, authorities);
+
+        // Get distinct versions
+        List<String> versions = forecastRepository.findDistinctVersionsByMonthAndChannel(month, channel);
+
+        // Build version info list
+        List<VersionInfo> versionInfos = new ArrayList<>();
+        for (String version : versions) {
+            Integer count = forecastRepository.countByMonthAndChannelAndVersion(month, channel, version);
+            LocalDateTime timestamp = forecastRepository.findMaxUpdatedAtByMonthAndChannelAndVersion(
+                    month, channel, version);
+
+            versionInfos.add(new VersionInfo(version, count, timestamp));
+        }
+
+        return versionInfos;
+    }
+
+    private void checkQueryPermission(Long userId, String channel, Set<String> authorities) {
+        // Check if user has sales_forecast.view (can access all channels)
+        if (authorities.contains("sales_forecast.view")) {
+            log.debug("User {} has sales_forecast.view permission", userId);
+            return;
+        }
+
+        // Check if user has sales_forecast.view_own (can access only own channels)
+        if (authorities.contains("sales_forecast.view_own")) {
+            log.debug("User {} has sales_forecast.view_own permission, checking channel ownership", userId);
+            // Check if user owns this channel
+            Integer count = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM sales_channels_users WHERE user_id = ? AND channel = ?",
+                    Integer.class, userId, channel);
+            if (count == null || count == 0) {
+                throw new AccessDeniedException("No permission for channel: " + channel);
+            }
+            return;
+        }
+
+        // No valid permission
+        throw new AccessDeniedException("Missing required permission: sales_forecast.view or sales_forecast.view_own");
     }
 
     public static class DuplicateEntryException extends RuntimeException {

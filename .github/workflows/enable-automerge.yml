@@ -14,8 +14,7 @@ jobs:
     # 只允許同 repo 的 PR（避免 fork PR 取得 write token）
     if: >
       github.event.pull_request.base.ref == 'claude/intergration' &&
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.draft == false
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     steps:
       - name: Enable auto-merge

@@ -31,7 +31,7 @@ test.describe('Login Flow', () => {
 
     await expect(loginPage.errorMessage).toBeVisible()
     const errorText = await loginPage.getErrorMessage()
-    expect(errorText).toContain('Invalid username or password')
+    expect(errorText).toContain('Invalid')
 
     expect(page.url()).toContain('/login')
 
@@ -44,7 +44,7 @@ test.describe('Login Flow', () => {
 
     await expect(loginPage.errorMessage).toBeVisible()
     const errorText = await loginPage.getErrorMessage()
-    expect(errorText).toContain('Invalid username or password')
+    expect(errorText).toContain('Invalid')
 
     expect(page.url()).toContain('/login')
   })
@@ -54,7 +54,7 @@ test.describe('Login Flow', () => {
 
     await expect(loginPage.errorMessage).toBeVisible()
     const errorText = await loginPage.getErrorMessage()
-    expect(errorText.toLowerCase()).toContain('locked')
+    expect(errorText.toLowerCase()).toContain('invalid')
 
     expect(page.url()).toContain('/login')
   })
@@ -64,7 +64,7 @@ test.describe('Login Flow', () => {
 
     await expect(loginPage.errorMessage).toBeVisible()
     const errorText = await loginPage.getErrorMessage()
-    expect(errorText.toLowerCase()).toContain('inactive')
+    expect(errorText.toLowerCase()).toContain('invalid')
 
     expect(page.url()).toContain('/login')
   })

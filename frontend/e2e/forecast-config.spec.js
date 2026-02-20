@@ -44,7 +44,7 @@ test.describe('Forecast Config Page', () => {
     await startInput.fill('202701')
     await endInput.fill('202703')
 
-    const submitBtn = page.getByRole('button', { name: '建立' })
+    const submitBtn = page.getByRole('button', { name: '建立', exact: true })
     await expect(submitBtn).toBeEnabled()
     await submitBtn.click()
 
@@ -91,7 +91,7 @@ test.describe('Forecast Config Page', () => {
     await page.getByLabel('起始月份').fill('202705')
     await page.getByLabel('結束月份').fill('202703')
 
-    await expect(page.getByRole('button', { name: '建立' })).toBeDisabled()
+    await expect(page.getByRole('button', { name: '建立' , exact: true})).toBeDisabled()
 
     // Cancel
     await page.getByRole('button', { name: '取消' }).click()

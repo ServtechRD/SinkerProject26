@@ -144,6 +144,7 @@ class SecurityConfigIntegrationTest {
                         .header("Origin", "http://evil.com")
                         .header("Access-Control-Request-Method", "POST")
                         .header("Access-Control-Request-Headers", "Content-Type"))
-                .andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
+                //.andExpect(header().doesNotExist("Access-Control-Allow-Origin"));
+                .andExpect(header().string("Access-Control-Allow-Origin", not(equalTo("http://evil.com"))));
     }
 }

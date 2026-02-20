@@ -13,7 +13,7 @@ services:
       timeout: 5s
       retries: 30
 
-  backend_server:
+  backendserver:
     build: ./backend
     environment:
       SPRING_DATASOURCE_URL: jdbc:mariadb://db:3306/app_test
@@ -58,7 +58,7 @@ services:
     volumes:
       - ./frontend/e2e:/work
     environment:
-      BASE_URL: http://backend_server:8080
+      BASE_URL: http://backendserver:8080
     depends_on:
       backend_server:
         condition: service_healthy

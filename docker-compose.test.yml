@@ -13,7 +13,7 @@ services:
       timeout: 5s
       retries: 30
 
-  backendserver:
+  backend:
     build: ./backend
     environment:
       SPRING_DATASOURCE_URL: jdbc:mariadb://db:3306/app_test
@@ -55,7 +55,7 @@ services:
   frontend:
     build: ./frontend
     environment:
-      VITE_PROXY_TARGET: http://backendserver:8080
+      VITE_PROXY_TARGET: http://backend:8080
     depends_on:
       backendserver:
         condition: service_healthy

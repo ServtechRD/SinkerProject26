@@ -50,7 +50,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    #command: ["./gradlew", "test"]
+    command: ["./gradlew", "test", "--no-daemon"]
 
   e2e:
     image: mcr.microsoft.com/playwright:v1.50.0-jammy

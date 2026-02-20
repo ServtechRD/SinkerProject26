@@ -8,6 +8,7 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -32,6 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
+@Timeout(60)
 class SalesForecastUploadControllerIntegrationTest {
 
     @Autowired private MockMvc mockMvc;
@@ -246,8 +248,8 @@ class SalesForecastUploadControllerIntegrationTest {
 
     @Test
     void testUpload_DoesNotOwnChannel() throws Exception {
-        // Sales user does NOT own "大全聯" (only owns "家樂福")
-        String targetChannel = "大全聯";
+        // Sales user does NOT own "PX/大全聯" (only owns "家樂福")
+        String targetChannel = "PX/大全聯";
 
         MockMultipartFile file = createExcelFile(3);
         mockMvc.perform(multipart("/api/sales-forecast/upload")

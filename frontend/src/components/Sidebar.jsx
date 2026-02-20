@@ -8,6 +8,7 @@ const navItems = [
   { to: '/roles', label: '角色管理' },
   { to: '/sales-forecast/config', label: '預測設定' },
   { to: '/sales-forecast/upload', label: '預測上傳' },
+  { to: '/sales-forecast', label: '銷售預測' },
 ]
 
 export default function Sidebar() {

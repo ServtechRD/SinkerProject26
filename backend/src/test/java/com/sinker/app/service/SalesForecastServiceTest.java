@@ -279,6 +279,6 @@ class SalesForecastServiceTest {
         ForecastResponse response = service.createForecast(request, 1L, "admin");
 
         assertNotNull(response);
-        verify(jdbcTemplate, never()).queryForObject(anyString(), any(), anyLong(), anyString());
+        verify(jdbcTemplate, never()).queryForObject(anyString(), eq(Integer.class), anyLong(), anyString());
     }
 }

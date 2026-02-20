@@ -3,6 +3,7 @@ package com.sinker.app.service;
 import com.sinker.app.dto.forecast.CreateForecastRequest;
 import com.sinker.app.dto.forecast.ForecastResponse;
 import com.sinker.app.dto.forecast.UpdateForecastRequest;
+import com.sinker.app.dto.forecast.VersionInfo;
 import com.sinker.app.entity.SalesForecast;
 import com.sinker.app.entity.SalesForecastConfig;
 import com.sinker.app.exception.ResourceNotFoundException;
@@ -19,7 +20,7 @@ import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.Optional;
+import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
@@ -280,5 +281,206 @@ class SalesForecastServiceTest {
 
         assertNotNull(response);
         verify(jdbcTemplate, never()).queryForObject(anyString(), eq(Integer.class), anyLong(), anyString());
+    }
+
+    // T017: Query methods tests
+    @Test
+    void queryForecasts_withSpecificVersion_success() {
+        String month = "202601";
+        String channel = "大全聯";
+        String version = "2026/01/15 14:30:00(大全聯)";
+        Set<String> authorities = Set.of("sales_forecast.view");
+
+        SalesForecast forecast1 = createMockForecast(1, month, channel, "飲料類", "P001", version);
+        SalesForecast forecast2 = createMockForecast(2, month, channel, "零食類", "P002", version);
+
+        when(forecastRepository.findByMonthAndChannelAndVersionOrderByCategoryAscSpecAscProductCodeAsc(
+                month, channel, version)).thenReturn(Arrays.asList(forecast1, forecast2));
+
+        List<ForecastResponse> results = service.queryForecasts(month, channel, version, 1L, authorities);
+
+        assertNotNull(results);
+        assertEquals(2, results.size());
+        assertEquals("P001", results.get(0).getProductCode());
+        assertEquals("P002", results.get(1).getProductCode());
+        verify(forecastRepository).findByMonthAndChannelAndVersionOrderByCategoryAscSpecAscProductCodeAsc(
+                month, channel, version);
+    }
+
+    @Test
+    void queryForecasts_withoutVersion_returnsLatest() {
+        String month = "202601";
+        String channel = "大全聯";
+        Set<String> authorities = Set.of("sales_forecast.view");
+
+        SalesForecast forecast1 = createMockForecast(1, month, channel, "飲料類", "P001", "2026/01/15 14:30:00(大全聯)");
+
+        when(forecastRepository.findLatestByMonthAndChannel(month, channel))
+                .thenReturn(Collections.singletonList(forecast1));
+
+        List<ForecastResponse> results = service.queryForecasts(month, channel, null, 1L, authorities);
+
+        assertNotNull(results);
+        assertEquals(1, results.size());
+        verify(forecastRepository).findLatestByMonthAndChannel(month, channel);
+    }
+
+    @Test
+    void queryForecasts_withViewPermission_success() {
+        String month = "202601";
+        String channel = "大全聯";
+        Set<String> authorities = Set.of("sales_forecast.view");
+
+        when(forecastRepository.findLatestByMonthAndChannel(month, channel))
+                .thenReturn(Collections.emptyList());
+
+        List<ForecastResponse> results = service.queryForecasts(month, channel, null, 1L, authorities);
+
+        assertNotNull(results);
+        verify(forecastRepository).findLatestByMonthAndChannel(month, channel);
+        verify(jdbcTemplate, never()).queryForObject(anyString(), eq(Integer.class), anyLong(), anyString());
+    }
+
+    @Test
+    void queryForecasts_withViewOwnPermission_ownedChannel_success() {
+        String month = "202601";
+        String channel = "大全聯";
+        Set<String> authorities = Set.of("sales_forecast.view_own");
+
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), anyLong(), eq(channel)))
+                .thenReturn(1);
+        when(forecastRepository.findLatestByMonthAndChannel(month, channel))
+                .thenReturn(Collections.emptyList());
+
+        List<ForecastResponse> results = service.queryForecasts(month, channel, null, 1L, authorities);
+
+        assertNotNull(results);
+        verify(jdbcTemplate).queryForObject(anyString(), eq(Integer.class), anyLong(), eq(channel));
+    }
+
+    @Test
+    void queryForecasts_withViewOwnPermission_nonOwnedChannel_throwsAccessDenied() {
+        String month = "202601";
+        String channel = "大全聯";
+        Set<String> authorities = Set.of("sales_forecast.view_own");
+
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), anyLong(), eq(channel)))
+                .thenReturn(0);
+
+        assertThrows(AccessDeniedException.class, () ->
+                service.queryForecasts(month, channel, null, 1L, authorities));
+
+        verify(forecastRepository, never()).findLatestByMonthAndChannel(anyString(), anyString());
+    }
+
+    @Test
+    void queryForecasts_noPermission_throwsAccessDenied() {
+        String month = "202601";
+        String channel = "大全聯";
+        Set<String> authorities = Set.of("some_other_permission");
+
+        assertThrows(AccessDeniedException.class, () ->
+                service.queryForecasts(month, channel, null, 1L, authorities));
+
+        verify(forecastRepository, never()).findLatestByMonthAndChannel(anyString(), anyString());
+    }
+
+    @Test
+    void queryForecasts_invalidMonthFormat_throwsIllegalArgument() {
+        String invalidMonth = "2026-01";
+        String channel = "大全聯";
+        Set<String> authorities = Set.of("sales_forecast.view");
+
+        assertThrows(IllegalArgumentException.class, () ->
+                service.queryForecasts(invalidMonth, channel, null, 1L, authorities));
+    }
+
+    @Test
+    void queryVersions_success() {
+        String month = "202601";
+        String channel = "大全聯";
+        Set<String> authorities = Set.of("sales_forecast.view");
+
+        String version1 = "2026/01/20 09:00:00(大全聯)";
+        String version2 = "2026/01/15 14:30:00(大全聯)";
+        String version3 = "2026/01/10 10:00:00(大全聯)";
+
+        when(forecastRepository.findDistinctVersionsByMonthAndChannel(month, channel))
+                .thenReturn(Arrays.asList(version1, version2, version3));
+        when(forecastRepository.countByMonthAndChannelAndVersion(month, channel, version1)).thenReturn(5);
+        when(forecastRepository.countByMonthAndChannelAndVersion(month, channel, version2)).thenReturn(3);
+        when(forecastRepository.countByMonthAndChannelAndVersion(month, channel, version3)).thenReturn(2);
+        when(forecastRepository.findMaxUpdatedAtByMonthAndChannelAndVersion(eq(month), eq(channel), anyString()))
+                .thenReturn(LocalDateTime.now());
+
+        List<VersionInfo> results = service.queryVersions(month, channel, 1L, authorities);
+
+        assertNotNull(results);
+        assertEquals(3, results.size());
+        assertEquals(version1, results.get(0).getVersion());
+        assertEquals(5, results.get(0).getItemCount());
+        assertEquals(version2, results.get(1).getVersion());
+        assertEquals(3, results.get(1).getItemCount());
+    }
+
+    @Test
+    void queryVersions_withViewOwnPermission_ownedChannel_success() {
+        String month = "202601";
+        String channel = "大全聯";
+        Set<String> authorities = Set.of("sales_forecast.view_own");
+
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), anyLong(), eq(channel)))
+                .thenReturn(1);
+        when(forecastRepository.findDistinctVersionsByMonthAndChannel(month, channel))
+                .thenReturn(Collections.emptyList());
+
+        List<VersionInfo> results = service.queryVersions(month, channel, 1L, authorities);
+
+        assertNotNull(results);
+        assertEquals(0, results.size());
+        verify(jdbcTemplate).queryForObject(anyString(), eq(Integer.class), anyLong(), eq(channel));
+    }
+
+    @Test
+    void queryVersions_withViewOwnPermission_nonOwnedChannel_throwsAccessDenied() {
+        String month = "202601";
+        String channel = "大全聯";
+        Set<String> authorities = Set.of("sales_forecast.view_own");
+
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), anyLong(), eq(channel)))
+                .thenReturn(0);
+
+        assertThrows(AccessDeniedException.class, () ->
+                service.queryVersions(month, channel, 1L, authorities));
+
+        verify(forecastRepository, never()).findDistinctVersionsByMonthAndChannel(anyString(), anyString());
+    }
+
+    @Test
+    void queryVersions_noPermission_throwsAccessDenied() {
+        String month = "202601";
+        String channel = "大全聯";
+        Set<String> authorities = Set.of("some_other_permission");
+
+        assertThrows(AccessDeniedException.class, () ->
+                service.queryVersions(month, channel, 1L, authorities));
+
+        verify(forecastRepository, never()).findDistinctVersionsByMonthAndChannel(anyString(), anyString());
+    }
+
+    private SalesForecast createMockForecast(Integer id, String month, String channel,
+                                            String category, String productCode, String version) {
+        SalesForecast forecast = new SalesForecast();
+        forecast.setId(id);
+        forecast.setMonth(month);
+        forecast.setChannel(channel);
+        forecast.setCategory(category);
+        forecast.setProductCode(productCode);
+        forecast.setQuantity(new BigDecimal("100.00"));
+        forecast.setVersion(version);
+        forecast.setIsModified(false);
+        forecast.setCreatedAt(LocalDateTime.now());
+        forecast.setUpdatedAt(LocalDateTime.now());
+        return forecast;
     }
 }

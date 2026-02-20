@@ -1,25 +1,20 @@
-name: Auto Merge
+name: enable-automerge
 
 on:
   pull_request:
-    types: [opened, synchronize]
-  check_suite:
-    types: [completed]
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  pull-requests: write
+  contents: read
 
 jobs:
-  auto-merge:
+  enable:
+    if: github.event.pull_request.base.ref == 'claude/integration'
     runs-on: ubuntu-latest
-    if: contains(github.event.pull_request.labels.*.name, 'auto-generated')
-    
     steps:
-      - name: Auto approve
-        uses: hmarr/auto-approve-action@v3
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-      
       - name: Enable auto-merge
-        run: |
-          gh pr merge ${{ github.event.pull_request.number }} \
-            --auto --squash --delete-branch
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: peter-evans/enable-pull-request-automerge@v3
+        with:
+          pull-request-number: ${{ github.event.pull_request.number }}
+          merge-method: merge

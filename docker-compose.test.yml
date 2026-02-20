@@ -31,7 +31,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "curl -fsS http://localhost:8080/actuator/health | grep UP",
+          "curl -fsS http://localhost:8080/api/health | grep UP",
         ]
       interval: 5s
       timeout: 5s

@@ -60,6 +60,6 @@ services:
     environment:
       BASE_URL: http://backendserver:8080
     depends_on:
-      backend_server:
+      backendserver:
         condition: service_healthy
     command: ["bash", "-lc", "test -f package-lock.json && npm ci || npm install; npx playwright test"]

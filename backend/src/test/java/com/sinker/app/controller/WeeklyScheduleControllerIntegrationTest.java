@@ -85,11 +85,13 @@ class WeeklyScheduleControllerIntegrationTest {
         editToken = tokenProvider.generateToken(editUserId, "test_ws_edit", "sales");
 
         // Clean up test data
+        jdbc.update("DELETE FROM material_demand WHERE factory = ?", FACTORY);
         jdbc.update("DELETE FROM production_weekly_schedule WHERE factory = ?", FACTORY);
     }
 
     @AfterEach
     void tearDown() {
+        jdbc.update("DELETE FROM material_demand WHERE factory = ?", FACTORY);
         jdbc.update("DELETE FROM production_weekly_schedule WHERE factory = ?", FACTORY);
         jdbc.update("DELETE FROM users WHERE username IN ('test_ws_upload', 'test_ws_view', 'test_ws_edit')");
     }
@@ -396,5 +398,72 @@ class WeeklyScheduleControllerIntegrationTest {
                         .content(objectMapper.writeValueAsString(request))
                         .header("Authorization", "Bearer " + viewToken)) // view-only user
                 .andExpect(status().isForbidden());
+    }
+
+    // ============ PDCA Integration Tests ============
+
+    @Test
+    void testUpload_TriggersPdcaIntegration() throws Exception {
+        MockMultipartFile file = createExcelFile(3);
+
+        mockMvc.perform(multipart("/api/weekly-schedule/upload")
+                        .file(file)
+                        .param("week_start", WEEK_START_MONDAY)
+                        .param("factory", FACTORY)
+                        .header("Authorization", "Bearer " + uploadToken))
+                .andExpect(status().isOk());
+
+        // Wait for async PDCA integration to complete
+        Thread.sleep(2000);
+
+        // Verify material demand records were created
+        Integer materialCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM material_demand WHERE week_start = ? AND factory = ?",
+                Integer.class, WEEK_START_MONDAY, FACTORY);
+        assertTrue(materialCount > 0, "PDCA integration should create material demand records");
+        // Stub generates 3 materials per schedule item, 3 items = 9 materials
+        assertEquals(9, materialCount);
+    }
+
+    @Test
+    void testUpdate_ReTriggersIntegration() throws Exception {
+        // First upload
+        MockMultipartFile file = createExcelFile(2);
+        mockMvc.perform(multipart("/api/weekly-schedule/upload")
+                        .file(file)
+                        .param("week_start", WEEK_START_MONDAY)
+                        .param("factory", FACTORY)
+                        .header("Authorization", "Bearer " + uploadToken))
+                .andExpect(status().isOk());
+
+        Thread.sleep(2000);
+
+        Integer initialCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM material_demand WHERE week_start = ? AND factory = ?",
+                Integer.class, WEEK_START_MONDAY, FACTORY);
+        assertEquals(6, initialCount); // 2 schedule items × 3 materials
+
+        // Update a schedule item
+        Integer id = jdbc.queryForObject(
+                "SELECT id FROM production_weekly_schedule WHERE week_start = ? AND factory = ? LIMIT 1",
+                Integer.class, WEEK_START_MONDAY, FACTORY);
+
+        UpdateScheduleRequest request = new UpdateScheduleRequest();
+        request.setQuantity(new BigDecimal("500.00"));
+
+        mockMvc.perform(put("/api/weekly-schedule/" + id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request))
+                        .header("Authorization", "Bearer " + editToken))
+                .andExpect(status().isOk());
+
+        // Wait for async re-integration
+        Thread.sleep(2000);
+
+        // Material demand should be refreshed (count should remain same but values updated)
+        Integer finalCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM material_demand WHERE week_start = ? AND factory = ?",
+                Integer.class, WEEK_START_MONDAY, FACTORY);
+        assertEquals(6, finalCount); // Still 6 materials (2 items × 3)
     }
 }

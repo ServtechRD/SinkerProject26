@@ -114,7 +114,7 @@ echo $?  # Should output: 0
 
 **Backend API:**
 ```bash
-curl http://localhost:8080/actuator/health
+curl http://localhost:8080/api/health
 # Expected: {"status":"UP"}
 ```
 

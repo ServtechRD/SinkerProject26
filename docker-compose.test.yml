@@ -4,11 +4,9 @@ services:
     image: mariadb:10
     environment:
       MARIADB_DATABASE: app_test
-      MARIADB_USER: app
-      MARIADB_PASSWORD: app
       MARIADB_ROOT_PASSWORD: root
     healthcheck:
-      test: ["CMD-SHELL", "mariadb-admin ping -h localhost -uapp -p$${MARIADB_PASSWORD} --silent"]
+      test: ["CMD-SHELL", "mariadb-admin ping -h localhost -uroot -proot --silent"]
       interval: 5s
       timeout: 5s
       retries: 30
@@ -17,8 +15,8 @@ services:
     build: ./backend
     environment:
       SPRING_DATASOURCE_URL: jdbc:mariadb://db:3306/app_test
-      SPRING_DATASOURCE_USERNAME: app
-      SPRING_DATASOURCE_PASSWORD: app
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
       SPRING_PROFILES_ACTIVE: test
       SERVER_PORT: "8080"
     depends_on:
@@ -38,13 +36,13 @@ services:
       retries: 30
 
   backend_unit:
-    build: 
+    build:
       context: ./backend
       target: builder
     environment:
       SPRING_DATASOURCE_URL: jdbc:mariadb://db:3306/app_test
-      SPRING_DATASOURCE_USERNAME: app
-      SPRING_DATASOURCE_PASSWORD: app
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
       SPRING_PROFILES_ACTIVE: test
       GRADLE_OPTS: "-Dorg.gradle.daemon=false -Xmx2g"
     depends_on:

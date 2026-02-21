@@ -53,7 +53,7 @@ test.describe('Navigation', () => {
 
     expect(page.url()).toContain('/production-plan')
     await expect(layout.productionPlanLink).toHaveClass(/sidebar-link--active/)
-    await expect(page.getByText('生產計畫')).toBeVisible()
+    await expect(page.getByRole('heading', { name: /生產計畫/ })).toBeVisible()
   })
 
   test('sidebar navigation back to Dashboard', async ({ page }) => {

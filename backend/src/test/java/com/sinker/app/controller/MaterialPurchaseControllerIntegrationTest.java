@@ -28,6 +28,8 @@ class MaterialPurchaseControllerIntegrationTest {
 
     private String viewToken;
     private Long viewUserId;
+    private String triggerToken;
+    private Long triggerUserId;
     private String noPermToken;
     private Long noPermUserId;
 
@@ -36,8 +38,9 @@ class MaterialPurchaseControllerIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        // Ensure permission exists
+        // Ensure permissions exist
         ensurePermissionExists("material_purchase.view", "View material purchase data");
+        ensurePermissionExists("material_purchase.trigger_erp", "Trigger ERP purchase order");
 
         // Get admin role to ensure permission
         Long adminRoleId = jdbc.queryForObject("SELECT id FROM roles WHERE code = 'admin'", Long.class);
@@ -49,6 +52,14 @@ class MaterialPurchaseControllerIntegrationTest {
         viewUserId = jdbc.queryForObject("SELECT id FROM users WHERE username = 'test_mp_view'", Long.class);
         ensurePermission(adminRoleId, "material_purchase.view");
         viewToken = tokenProvider.generateToken(viewUserId, "test_mp_view", "admin");
+
+        // Create user with trigger permission
+        jdbc.update("DELETE FROM users WHERE username = 'test_mp_trigger'");
+        jdbc.update("INSERT INTO users (username, email, hashed_password, full_name, role_id, is_active, is_locked, failed_login_count) " +
+                "VALUES ('test_mp_trigger', 'mp_trigger@test.com', '$2b$10$test', 'MP Trigger', ?, TRUE, FALSE, 0)", adminRoleId);
+        triggerUserId = jdbc.queryForObject("SELECT id FROM users WHERE username = 'test_mp_trigger'", Long.class);
+        ensurePermission(adminRoleId, "material_purchase.trigger_erp");
+        triggerToken = tokenProvider.generateToken(triggerUserId, "test_mp_trigger", "admin");
 
         // Create user without permission
         Long salesRoleId = jdbc.queryForObject("SELECT id FROM roles WHERE code = 'sales'", Long.class);
@@ -65,7 +76,7 @@ class MaterialPurchaseControllerIntegrationTest {
     @AfterEach
     void tearDown() {
         jdbc.update("DELETE FROM material_purchase WHERE factory = ?", FACTORY);
-        jdbc.update("DELETE FROM users WHERE username IN ('test_mp_view', 'test_mp_noperm')");
+        jdbc.update("DELETE FROM users WHERE username IN ('test_mp_view', 'test_mp_trigger', 'test_mp_noperm')");
     }
 
     private void ensurePermissionExists(String code, String description) {
@@ -222,5 +233,99 @@ class MaterialPurchaseControllerIntegrationTest {
                 .andExpect(jsonPath("$[0].basketQuantity", is(837.01)))
                 .andExpect(jsonPath("$[0].boxesPerBarrel", is(22.50)))
                 .andExpect(jsonPath("$[0].requiredBarrels", is(37.20)));
+    }
+
+    // T042: ERP Trigger Tests
+
+    @Test
+    void testTriggerErpSuccess() throws Exception {
+        // Insert test data
+        jdbc.update("INSERT INTO material_purchase (week_start, factory, product_code, product_name, quantity, " +
+                "semi_product_name, semi_product_code, kg_per_box, basket_quantity, boxes_per_barrel, required_barrels, " +
+                "is_erp_triggered, erp_order_no) " +
+                "VALUES (?, ?, 'P001', '產品A', 1000.00, '半成品A', 'SP001', 5.50, 5500.00, 20.00, 275.00, FALSE, NULL)",
+                WEEK_START, FACTORY);
+
+        Integer id = jdbc.queryForObject("SELECT id FROM material_purchase WHERE product_code = 'P001' AND factory = ?",
+                Integer.class, FACTORY);
+
+        mockMvc.perform(post("/api/material-purchase/" + id + "/trigger-erp")
+                        .header("Authorization", "Bearer " + triggerToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", is(id)))
+                .andExpect(jsonPath("$.isErpTriggered", is(true)))
+                .andExpect(jsonPath("$.erpOrderNo", matchesPattern("^ERP-\\d{4}-\\d{4}$")))
+                .andExpect(jsonPath("$.updatedAt", notNullValue()));
+
+        // Verify database state
+        Boolean isTriggered = jdbc.queryForObject(
+                "SELECT is_erp_triggered FROM material_purchase WHERE id = ?", Boolean.class, id);
+        String erpOrderNo = jdbc.queryForObject(
+                "SELECT erp_order_no FROM material_purchase WHERE id = ?", String.class, id);
+
+        assert Boolean.TRUE.equals(isTriggered);
+        assert erpOrderNo != null && erpOrderNo.startsWith("ERP-");
+    }
+
+    @Test
+    void testTriggerErpAlreadyTriggered() throws Exception {
+        // Insert test data that is already triggered
+        jdbc.update("INSERT INTO material_purchase (week_start, factory, product_code, product_name, quantity, " +
+                "semi_product_name, semi_product_code, kg_per_box, basket_quantity, boxes_per_barrel, required_barrels, " +
+                "is_erp_triggered, erp_order_no) " +
+                "VALUES (?, ?, 'P002', '產品B', 500.00, '半成品B', 'SP002', 3.00, 1500.00, 15.00, 100.00, TRUE, 'ERP-2026-0001')",
+                WEEK_START, FACTORY);
+
+        Integer id = jdbc.queryForObject("SELECT id FROM material_purchase WHERE product_code = 'P002' AND factory = ?",
+                Integer.class, FACTORY);
+
+        mockMvc.perform(post("/api/material-purchase/" + id + "/trigger-erp")
+                        .header("Authorization", "Bearer " + triggerToken))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.error", is("Conflict")))
+                .andExpect(jsonPath("$.message", containsString("already triggered")))
+                .andExpect(jsonPath("$.message", containsString("ERP-2026-0001")));
+    }
+
+    @Test
+    void testTriggerErpNotFound() throws Exception {
+        mockMvc.perform(post("/api/material-purchase/999999/trigger-erp")
+                        .header("Authorization", "Bearer " + triggerToken))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error", is("Not Found")))
+                .andExpect(jsonPath("$.message", containsString("not found")));
+    }
+
+    @Test
+    void testTriggerErpWithoutPermission() throws Exception {
+        // Insert test data
+        jdbc.update("INSERT INTO material_purchase (week_start, factory, product_code, product_name, quantity, " +
+                "semi_product_name, semi_product_code, kg_per_box, basket_quantity, boxes_per_barrel, required_barrels, " +
+                "is_erp_triggered, erp_order_no) " +
+                "VALUES (?, ?, 'P001', '產品A', 1000.00, '半成品A', 'SP001', 5.50, 5500.00, 20.00, 275.00, FALSE, NULL)",
+                WEEK_START, FACTORY);
+
+        Integer id = jdbc.queryForObject("SELECT id FROM material_purchase WHERE product_code = 'P001' AND factory = ?",
+                Integer.class, FACTORY);
+
+        mockMvc.perform(post("/api/material-purchase/" + id + "/trigger-erp")
+                        .header("Authorization", "Bearer " + noPermToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void testTriggerErpWithoutAuth() throws Exception {
+        // Insert test data
+        jdbc.update("INSERT INTO material_purchase (week_start, factory, product_code, product_name, quantity, " +
+                "semi_product_name, semi_product_code, kg_per_box, basket_quantity, boxes_per_barrel, required_barrels, " +
+                "is_erp_triggered, erp_order_no) " +
+                "VALUES (?, ?, 'P001', '產品A', 1000.00, '半成品A', 'SP001', 5.50, 5500.00, 20.00, 275.00, FALSE, NULL)",
+                WEEK_START, FACTORY);
+
+        Integer id = jdbc.queryForObject("SELECT id FROM material_purchase WHERE product_code = 'P001' AND factory = ?",
+                Integer.class, FACTORY);
+
+        mockMvc.perform(post("/api/material-purchase/" + id + "/trigger-erp"))
+                .andExpect(status().isUnauthorized());
     }
 }

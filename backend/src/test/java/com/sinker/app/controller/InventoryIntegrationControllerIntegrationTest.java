@@ -246,4 +246,284 @@ class InventoryIntegrationControllerIntegrationTest {
                 .andExpect(jsonPath("$[0].productCode", is("PROD001")))
                 .andExpect(jsonPath("$[1].productCode", is("PROD002")));
     }
+
+    @Test
+    void updateModifiedSubtotal_success() throws Exception {
+        // Create initial record
+        mockMvc.perform(get("/api/inventory-integration")
+                        .header("Authorization", "Bearer " + tokenWithPermission)
+                        .param("month", MONTH))
+                .andExpect(status().isOk());
+
+        Integer recordId = jdbc.queryForObject(
+                "SELECT id FROM inventory_sales_forecast WHERE month = ? AND product_code = ? LIMIT 1",
+                Integer.class, MONTH, "PROD001");
+
+        // Update modified_subtotal
+        mockMvc.perform(put("/api/inventory-integration/" + recordId)
+                        .header("Authorization", "Bearer " + tokenWithPermission)
+                        .header("Content-Type", "application/json")
+                        .content("{\"modifiedSubtotal\": 200.50}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id", not(recordId))) // New ID
+                .andExpect(jsonPath("$.modifiedSubtotal", is(200.50)))
+                .andExpect(jsonPath("$.productionSubtotal", is(250.00))) // Unchanged
+                .andExpect(jsonPath("$.productCode", is("PROD001")))
+                .andExpect(jsonPath("$.version", notNullValue()))
+                .andExpect(jsonPath("$.createdAt", notNullValue()))
+                .andExpect(jsonPath("$.updatedAt", notNullValue()));
+
+        // Verify original record unchanged
+        Object originalModified = jdbc.queryForObject(
+                "SELECT modified_subtotal FROM inventory_sales_forecast WHERE id = ?",
+                Object.class, recordId);
+        assert originalModified == null;
+
+        // Verify two records exist now
+        int count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM inventory_sales_forecast WHERE month = ? AND product_code = ?",
+                Integer.class, MONTH, "PROD001");
+        assert count == 2;
+    }
+
+    @Test
+    void updateModifiedSubtotal_setToNull_success() throws Exception {
+        // Create initial record
+        mockMvc.perform(get("/api/inventory-integration")
+                        .header("Authorization", "Bearer " + tokenWithPermission)
+                        .param("month", MONTH))
+                .andExpect(status().isOk());
+
+        Integer recordId = jdbc.queryForObject(
+                "SELECT id FROM inventory_sales_forecast WHERE month = ? AND product_code = ? LIMIT 1",
+                Integer.class, MONTH, "PROD001");
+
+        // Update modified_subtotal to NULL
+        mockMvc.perform(put("/api/inventory-integration/" + recordId)
+                        .header("Authorization", "Bearer " + tokenWithPermission)
+                        .header("Content-Type", "application/json")
+                        .content("{\"modifiedSubtotal\": null}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.modifiedSubtotal").doesNotExist());
+    }
+
+    @Test
+    void updateModifiedSubtotal_setToZero_success() throws Exception {
+        // Create initial record
+        mockMvc.perform(get("/api/inventory-integration")
+                        .header("Authorization", "Bearer " + tokenWithPermission)
+                        .param("month", MONTH))
+                .andExpect(status().isOk());
+
+        Integer recordId = jdbc.queryForObject(
+                "SELECT id FROM inventory_sales_forecast WHERE month = ? AND product_code = ? LIMIT 1",
+                Integer.class, MONTH, "PROD001");
+
+        // Update modified_subtotal to 0
+        mockMvc.perform(put("/api/inventory-integration/" + recordId)
+                        .header("Authorization", "Bearer " + tokenWithPermission)
+                        .header("Content-Type", "application/json")
+                        .content("{\"modifiedSubtotal\": 0}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.modifiedSubtotal", is(0.0)));
+    }
+
+    @Test
+    void updateModifiedSubtotal_negativeValue_success() throws Exception {
+        // Create initial record
+        mockMvc.perform(get("/api/inventory-integration")
+                        .header("Authorization", "Bearer " + tokenWithPermission)
+                        .param("month", MONTH))
+                .andExpect(status().isOk());
+
+        Integer recordId = jdbc.queryForObject(
+                "SELECT id FROM inventory_sales_forecast WHERE month = ? AND product_code = ? LIMIT 1",
+                Integer.class, MONTH, "PROD001");
+
+        // Update modified_subtotal to negative value
+        mockMvc.perform(put("/api/inventory-integration/" + recordId)
+                        .header("Authorization", "Bearer " + tokenWithPermission)
+                        .header("Content-Type", "application/json")
+                        .content("{\"modifiedSubtotal\": -50.25}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.modifiedSubtotal", is(-50.25)));
+    }
+
+    @Test
+    void updateModifiedSubtotal_multipleEdits_success() throws Exception {
+        // Create initial record
+        mockMvc.perform(get("/api/inventory-integration")
+                        .header("Authorization", "Bearer " + tokenWithPermission)
+                        .param("month", MONTH))
+                .andExpect(status().isOk());
+
+        Integer recordId = jdbc.queryForObject(
+                "SELECT id FROM inventory_sales_forecast WHERE month = ? AND product_code = ? LIMIT 1",
+                Integer.class, MONTH, "PROD001");
+
+        // First edit
+        mockMvc.perform(put("/api/inventory-integration/" + recordId)
+                        .header("Authorization", "Bearer " + tokenWithPermission)
+                        .header("Content-Type", "application/json")
+                        .content("{\"modifiedSubtotal\": 100}"))
+                .andExpect(status().isOk());
+
+        Thread.sleep(1000); // Ensure different version
+
+        // Second edit
+        mockMvc.perform(put("/api/inventory-integration/" + recordId)
+                        .header("Authorization", "Bearer " + tokenWithPermission)
+                        .header("Content-Type", "application/json")
+                        .content("{\"modifiedSubtotal\": 200}"))
+                .andExpect(status().isOk());
+
+        // Verify 3 records exist (1 original + 2 edits)
+        int count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM inventory_sales_forecast WHERE month = ? AND product_code = ?",
+                Integer.class, MONTH, "PROD001");
+        assert count == 3;
+
+        // Verify different versions
+        int versionCount = jdbc.queryForObject(
+                "SELECT COUNT(DISTINCT version) FROM inventory_sales_forecast WHERE month = ? AND product_code = ?",
+                Integer.class, MONTH, "PROD001");
+        assert versionCount == 3;
+    }
+
+    @Test
+    void updateModifiedSubtotal_invalidId_returns404() throws Exception {
+        mockMvc.perform(put("/api/inventory-integration/99999")
+                        .header("Authorization", "Bearer " + tokenWithPermission)
+                        .header("Content-Type", "application/json")
+                        .content("{\"modifiedSubtotal\": 200.50}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.error", is("Not Found")))
+                .andExpect(jsonPath("$.message", containsString("99999")))
+                .andExpect(jsonPath("$.message", containsString("not found")));
+    }
+
+    @Test
+    void updateModifiedSubtotal_tooManyDecimalPlaces_returns400() throws Exception {
+        // Create initial record
+        mockMvc.perform(get("/api/inventory-integration")
+                        .header("Authorization", "Bearer " + tokenWithPermission)
+                        .param("month", MONTH))
+                .andExpect(status().isOk());
+
+        Integer recordId = jdbc.queryForObject(
+                "SELECT id FROM inventory_sales_forecast WHERE month = ? LIMIT 1",
+                Integer.class, MONTH);
+
+        mockMvc.perform(put("/api/inventory-integration/" + recordId)
+                        .header("Authorization", "Bearer " + tokenWithPermission)
+                        .header("Content-Type", "application/json")
+                        .content("{\"modifiedSubtotal\": 200.5555}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error", is("Bad Request")))
+                .andExpect(jsonPath("$.message", containsString("decimal")));
+    }
+
+    @Test
+    void updateModifiedSubtotal_tooManyDigits_returns400() throws Exception {
+        // Create initial record
+        mockMvc.perform(get("/api/inventory-integration")
+                        .header("Authorization", "Bearer " + tokenWithPermission)
+                        .param("month", MONTH))
+                .andExpect(status().isOk());
+
+        Integer recordId = jdbc.queryForObject(
+                "SELECT id FROM inventory_sales_forecast WHERE month = ? LIMIT 1",
+                Integer.class, MONTH);
+
+        mockMvc.perform(put("/api/inventory-integration/" + recordId)
+                        .header("Authorization", "Bearer " + tokenWithPermission)
+                        .header("Content-Type", "application/json")
+                        .content("{\"modifiedSubtotal\": 12345678901.50}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error", is("Bad Request")))
+                .andExpect(jsonPath("$.message", containsString("decimal")));
+    }
+
+    @Test
+    void updateModifiedSubtotal_missingRequestBody_returns400() throws Exception {
+        // Create initial record
+        mockMvc.perform(get("/api/inventory-integration")
+                        .header("Authorization", "Bearer " + tokenWithPermission)
+                        .param("month", MONTH))
+                .andExpect(status().isOk());
+
+        Integer recordId = jdbc.queryForObject(
+                "SELECT id FROM inventory_sales_forecast WHERE month = ? LIMIT 1",
+                Integer.class, MONTH);
+
+        mockMvc.perform(put("/api/inventory-integration/" + recordId)
+                        .header("Authorization", "Bearer " + tokenWithPermission)
+                        .header("Content-Type", "application/json")
+                        .content("{}"))
+                .andExpect(status().isOk()); // NULL is valid
+    }
+
+    @Test
+    void updateModifiedSubtotal_noAuthentication_returns401() throws Exception {
+        mockMvc.perform(put("/api/inventory-integration/1")
+                        .header("Content-Type", "application/json")
+                        .content("{\"modifiedSubtotal\": 200.50}"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void updateModifiedSubtotal_noPermission_returns403() throws Exception {
+        // Create initial record
+        mockMvc.perform(get("/api/inventory-integration")
+                        .header("Authorization", "Bearer " + tokenWithPermission)
+                        .param("month", MONTH))
+                .andExpect(status().isOk());
+
+        Integer recordId = jdbc.queryForObject(
+                "SELECT id FROM inventory_sales_forecast WHERE month = ? LIMIT 1",
+                Integer.class, MONTH);
+
+        mockMvc.perform(put("/api/inventory-integration/" + recordId)
+                        .header("Authorization", "Bearer " + tokenWithoutPermission)
+                        .header("Content-Type", "application/json")
+                        .content("{\"modifiedSubtotal\": 200.50}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.error", is("Forbidden")))
+                .andExpect(jsonPath("$.message", containsString("inventory.edit")));
+    }
+
+    @Test
+    void updateModifiedSubtotal_allFieldsCopied_success() throws Exception {
+        // Create initial record
+        mockMvc.perform(get("/api/inventory-integration")
+                        .header("Authorization", "Bearer " + tokenWithPermission)
+                        .param("month", MONTH))
+                .andExpect(status().isOk());
+
+        Integer recordId = jdbc.queryForObject(
+                "SELECT id FROM inventory_sales_forecast WHERE month = ? AND product_code = ? LIMIT 1",
+                Integer.class, MONTH, "PROD001");
+
+        // Get original values
+        var original = jdbc.queryForMap("SELECT * FROM inventory_sales_forecast WHERE id = ?", recordId);
+
+        // Update modified_subtotal
+        mockMvc.perform(put("/api/inventory-integration/" + recordId)
+                        .header("Authorization", "Bearer " + tokenWithPermission)
+                        .header("Content-Type", "application/json")
+                        .content("{\"modifiedSubtotal\": 200.50}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.month", is(original.get("month"))))
+                .andExpect(jsonPath("$.productCode", is(original.get("product_code"))))
+                .andExpect(jsonPath("$.productName", is(original.get("product_name"))))
+                .andExpect(jsonPath("$.category", is(original.get("category"))))
+                .andExpect(jsonPath("$.spec", is(original.get("spec"))))
+                .andExpect(jsonPath("$.warehouseLocation", is(original.get("warehouse_location"))))
+                .andExpect(jsonPath("$.salesQuantity", is(100.00)))
+                .andExpect(jsonPath("$.inventoryBalance", is(250.00)))
+                .andExpect(jsonPath("$.forecastQuantity", is(600.00)))
+                .andExpect(jsonPath("$.productionSubtotal", is(250.00)))
+                .andExpect(jsonPath("$.queryStartDate", is(original.get("query_start_date"))))
+                .andExpect(jsonPath("$.queryEndDate", is(original.get("query_end_date"))));
+    }
 }

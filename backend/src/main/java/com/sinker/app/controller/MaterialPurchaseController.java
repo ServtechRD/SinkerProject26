@@ -1,6 +1,8 @@
 package com.sinker.app.controller;
 
 import com.sinker.app.dto.materialpurchase.MaterialPurchaseDTO;
+import com.sinker.app.exception.AlreadyTriggeredErpException;
+import com.sinker.app.exception.ResourceNotFoundException;
 import com.sinker.app.security.JwtUserPrincipal;
 import com.sinker.app.service.MaterialPurchaseService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -54,6 +56,19 @@ public class MaterialPurchaseController {
         return ResponseEntity.ok(purchases);
     }
 
+    @PostMapping("/{id}/trigger-erp")
+    @PreAuthorize("hasAuthority('material_purchase.trigger_erp')")
+    public ResponseEntity<MaterialPurchaseDTO> triggerErp(
+            @PathVariable Integer id,
+            @AuthenticationPrincipal JwtUserPrincipal principal) {
+
+        log.info("POST /api/material-purchase/{}/trigger-erp - user={}", id, principal.getUserId());
+
+        MaterialPurchaseDTO result = materialPurchaseService.triggerErp(id);
+
+        return ResponseEntity.ok(result);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArgument(
             IllegalArgumentException ex, HttpServletRequest request) {
@@ -74,6 +89,29 @@ public class MaterialPurchaseController {
             AccessDeniedException ex, HttpServletRequest request) {
         return buildErrorResponse(HttpStatus.FORBIDDEN, "Forbidden",
                 "Insufficient permissions", request.getRequestURI());
+    }
+
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleResourceNotFound(
+            ResourceNotFoundException ex, HttpServletRequest request) {
+        return buildErrorResponse(HttpStatus.NOT_FOUND, "Not Found",
+                ex.getMessage(), request.getRequestURI());
+    }
+
+    @ExceptionHandler(AlreadyTriggeredErpException.class)
+    public ResponseEntity<Map<String, Object>> handleAlreadyTriggeredErp(
+            AlreadyTriggeredErpException ex, HttpServletRequest request) {
+        return buildErrorResponse(HttpStatus.CONFLICT, "Conflict",
+                ex.getMessage(), request.getRequestURI());
+    }
+
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<Map<String, Object>> handleRuntimeException(
+            RuntimeException ex, HttpServletRequest request) {
+        log.error("Runtime exception occurred", ex);
+        String message = "Failed to create ERP order: " + ex.getMessage();
+        return buildErrorResponse(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error",
+                message, request.getRequestURI());
     }
 
     private ResponseEntity<Map<String, Object>> buildErrorResponse(

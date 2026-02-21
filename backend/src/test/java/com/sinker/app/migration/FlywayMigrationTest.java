@@ -22,7 +22,7 @@ class FlywayMigrationTest {
     void migrationsRunSuccessfully() {
         List<Map<String, Object>> history = jdbc.queryForList(
                 "SELECT version, success FROM flyway_schema_history ORDER BY installed_rank");
-        assertTrue(history.size() >= 5, "At least V1-V5 migrations should exist");
+        assertTrue(history.size() >= 10, "At least V1-V10 migrations should exist");
 
         Map<String, Object> v1 = history.get(0);
         assertEquals("1", v1.get("version").toString());
@@ -48,6 +48,18 @@ class FlywayMigrationTest {
         assertEquals("5", v5.get("version").toString());
         assertTrue(Boolean.TRUE.equals(v5.get("success")) || Integer.valueOf(1).equals(v5.get("success")),
                 "V5 migration should be successful");
+
+        // Verify V10 migration ran successfully
+        boolean v10Found = false;
+        for (Map<String, Object> migration : history) {
+            if ("10".equals(migration.get("version").toString())) {
+                v10Found = true;
+                assertTrue(Boolean.TRUE.equals(migration.get("success")) || Integer.valueOf(1).equals(migration.get("success")),
+                        "V10 migration should be successful");
+                break;
+            }
+        }
+        assertTrue(v10Found, "V10 migration should exist in schema history");
     }
 
     // --- Table structure tests ---
@@ -657,5 +669,217 @@ class FlywayMigrationTest {
         } finally {
             jdbc.update("DELETE FROM sales_forecast_config WHERE month IN ('202509', '202510')");
         }
+    }
+
+    // --- V10: material_demand tests ---
+
+    @Test
+    void materialDemandTableExists() {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'material_demand'",
+                Integer.class);
+        assertEquals(1, count, "material_demand table should exist");
+    }
+
+    @Test
+    void materialDemandTableHasAllColumns() {
+        List<String> columns = jdbc.queryForList(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'material_demand' ORDER BY ORDINAL_POSITION",
+                String.class);
+        assertEquals(13, columns.size(), "material_demand table should have 13 columns");
+        assertTrue(columns.containsAll(List.of(
+                "id", "week_start", "factory", "material_code", "material_name", "unit",
+                "last_purchase_date", "demand_date", "expected_delivery", "demand_quantity",
+                "estimated_inventory", "created_at", "updated_at")));
+    }
+
+    @Test
+    void materialDemandIdIsAutoIncrement() {
+        jdbc.update("INSERT INTO material_demand (week_start, factory, material_code, material_name, unit, demand_date) " +
+                "VALUES ('2026-02-17', 'F1', 'M001', '原料A', 'kg', '2026-02-20')");
+        jdbc.update("INSERT INTO material_demand (week_start, factory, material_code, material_name, unit, demand_date) " +
+                "VALUES ('2026-02-17', 'F2', 'M002', '原料B', 'pcs', '2026-02-21')");
+        try {
+            List<Integer> ids = jdbc.queryForList(
+                    "SELECT id FROM material_demand WHERE material_code IN ('M001', 'M002') ORDER BY id",
+                    Integer.class);
+            assertEquals(2, ids.size());
+            assertTrue(ids.get(1) > ids.get(0), "IDs should auto-increment");
+        } finally {
+            jdbc.update("DELETE FROM material_demand WHERE material_code IN ('M001', 'M002')");
+        }
+    }
+
+    @Test
+    void materialDemandCompositeIndexOnWeekStartFactory() {
+        List<Map<String, Object>> indexes = jdbc.queryForList(
+                "SELECT DISTINCT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'material_demand' " +
+                "AND INDEX_NAME = 'idx_material_demand_week_factory'");
+        assertFalse(indexes.isEmpty(), "Composite index on (week_start, factory) should exist");
+
+        // Verify the index contains both columns in correct order
+        List<String> indexColumns = jdbc.queryForList(
+                "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.STATISTICS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'material_demand' " +
+                "AND INDEX_NAME = 'idx_material_demand_week_factory' ORDER BY SEQ_IN_INDEX",
+                String.class);
+        assertEquals(List.of("week_start", "factory"), indexColumns);
+    }
+
+    @Test
+    void materialDemandIndexOnMaterialCode() {
+        List<Map<String, Object>> indexes = jdbc.queryForList(
+                "SELECT INDEX_NAME FROM INFORMATION_SCHEMA.STATISTICS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'material_demand' " +
+                "AND INDEX_NAME = 'idx_material_demand_code'");
+        assertFalse(indexes.isEmpty(), "Index on material_code should exist");
+    }
+
+    @Test
+    void materialDemandDecimalPrecision() {
+        jdbc.update("INSERT INTO material_demand (week_start, factory, material_code, material_name, unit, demand_date, " +
+                "expected_delivery, demand_quantity, estimated_inventory) " +
+                "VALUES ('2026-02-17', 'F1', 'M_DEC', '測試精度', 'kg', '2026-02-20', 123.45, 9999.99, 0.50)");
+        try {
+            Map<String, Object> row = jdbc.queryForMap(
+                    "SELECT expected_delivery, demand_quantity, estimated_inventory FROM material_demand WHERE material_code = 'M_DEC'");
+            assertEquals("123.45", row.get("expected_delivery").toString());
+            assertEquals("9999.99", row.get("demand_quantity").toString());
+            assertEquals("0.50", row.get("estimated_inventory").toString());
+        } finally {
+            jdbc.update("DELETE FROM material_demand WHERE material_code = 'M_DEC'");
+        }
+    }
+
+    @Test
+    void materialDemandDecimalColumnTypesAreDECIMAL10_2() {
+        String expectedDeliveryType = jdbc.queryForObject(
+                "SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'material_demand' AND COLUMN_NAME = 'expected_delivery'",
+                String.class);
+        assertEquals("decimal(10,2)", expectedDeliveryType);
+
+        String demandQuantityType = jdbc.queryForObject(
+                "SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'material_demand' AND COLUMN_NAME = 'demand_quantity'",
+                String.class);
+        assertEquals("decimal(10,2)", demandQuantityType);
+
+        String estimatedInventoryType = jdbc.queryForObject(
+                "SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'material_demand' AND COLUMN_NAME = 'estimated_inventory'",
+                String.class);
+        assertEquals("decimal(10,2)", estimatedInventoryType);
+    }
+
+    @Test
+    void materialDemandDefaultValues() {
+        jdbc.update("INSERT INTO material_demand (week_start, factory, material_code, material_name, unit, demand_date) " +
+                "VALUES ('2026-02-17', 'F1', 'M_DEF', '測試預設值', 'kg', '2026-02-20')");
+        try {
+            Map<String, Object> row = jdbc.queryForMap(
+                    "SELECT expected_delivery, demand_quantity, estimated_inventory FROM material_demand WHERE material_code = 'M_DEF'");
+            assertEquals("0.00", row.get("expected_delivery").toString(), "expected_delivery should default to 0");
+            assertEquals("0.00", row.get("demand_quantity").toString(), "demand_quantity should default to 0");
+            assertEquals("0.00", row.get("estimated_inventory").toString(), "estimated_inventory should default to 0");
+        } finally {
+            jdbc.update("DELETE FROM material_demand WHERE material_code = 'M_DEF'");
+        }
+    }
+
+    @Test
+    void materialDemandLastPurchaseDateNullable() {
+        jdbc.update("INSERT INTO material_demand (week_start, factory, material_code, material_name, unit, demand_date, last_purchase_date) " +
+                "VALUES ('2026-02-17', 'F1', 'M_NULL', '測試NULL', 'kg', '2026-02-20', NULL)");
+        try {
+            Object lastPurchaseDate = jdbc.queryForObject(
+                    "SELECT last_purchase_date FROM material_demand WHERE material_code = 'M_NULL'", Object.class);
+            assertNull(lastPurchaseDate, "last_purchase_date should accept NULL");
+        } finally {
+            jdbc.update("DELETE FROM material_demand WHERE material_code = 'M_NULL'");
+        }
+    }
+
+    @Test
+    void materialDemandNotNullConstraints() {
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () ->
+                jdbc.update("INSERT INTO material_demand (factory, material_code, material_name, unit, demand_date) " +
+                        "VALUES ('F1', 'M_ERR', 'Test', 'kg', '2026-02-20')"),
+                "Should reject NULL week_start");
+
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () ->
+                jdbc.update("INSERT INTO material_demand (week_start, material_code, material_name, unit, demand_date) " +
+                        "VALUES ('2026-02-17', 'M_ERR', 'Test', 'kg', '2026-02-20')"),
+                "Should reject NULL factory");
+
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () ->
+                jdbc.update("INSERT INTO material_demand (week_start, factory, material_name, unit, demand_date) " +
+                        "VALUES ('2026-02-17', 'F1', 'Test', 'kg', '2026-02-20')"),
+                "Should reject NULL material_code");
+
+        assertThrows(org.springframework.dao.DataIntegrityViolationException.class, () ->
+                jdbc.update("INSERT INTO material_demand (week_start, factory, material_code, material_name, unit) " +
+                        "VALUES ('2026-02-17', 'F1', 'M_ERR', 'Test', 'kg')"),
+                "Should reject NULL demand_date");
+    }
+
+    @Test
+    void materialDemandTimestampDefaults() {
+        jdbc.update("INSERT INTO material_demand (week_start, factory, material_code, material_name, unit, demand_date) " +
+                "VALUES ('2026-02-17', 'F1', 'M_TS', '測試時間戳', 'kg', '2026-02-20')");
+        try {
+            Map<String, Object> row = jdbc.queryForMap(
+                    "SELECT created_at, updated_at FROM material_demand WHERE material_code = 'M_TS'");
+            assertNotNull(row.get("created_at"), "created_at should be auto-populated");
+            assertNotNull(row.get("updated_at"), "updated_at should be auto-populated");
+        } finally {
+            jdbc.update("DELETE FROM material_demand WHERE material_code = 'M_TS'");
+        }
+    }
+
+    @Test
+    void materialDemandTimestampAutoUpdate() throws InterruptedException {
+        jdbc.update("INSERT INTO material_demand (week_start, factory, material_code, material_name, unit, demand_date) " +
+                "VALUES ('2026-02-17', 'F1', 'M_UPD', '測試更新', 'kg', '2026-02-20')");
+        try {
+            Thread.sleep(1100); // Wait for timestamp granularity
+            jdbc.update("UPDATE material_demand SET demand_quantity = 100.00 WHERE material_code = 'M_UPD'");
+
+            Map<String, Object> row = jdbc.queryForMap(
+                    "SELECT created_at, updated_at FROM material_demand WHERE material_code = 'M_UPD'");
+            java.sql.Timestamp createdAt = (java.sql.Timestamp) row.get("created_at");
+            java.sql.Timestamp updatedAt = (java.sql.Timestamp) row.get("updated_at");
+            assertTrue(updatedAt.after(createdAt), "updated_at should be after created_at after update");
+        } finally {
+            jdbc.update("DELETE FROM material_demand WHERE material_code = 'M_UPD'");
+        }
+    }
+
+    @Test
+    void materialDemandVarcharColumnTypes() {
+        String factoryType = jdbc.queryForObject(
+                "SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'material_demand' AND COLUMN_NAME = 'factory'",
+                String.class);
+        assertEquals("varchar(50)", factoryType);
+
+        String materialCodeType = jdbc.queryForObject(
+                "SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'material_demand' AND COLUMN_NAME = 'material_code'",
+                String.class);
+        assertEquals("varchar(50)", materialCodeType);
+
+        String materialNameType = jdbc.queryForObject(
+                "SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'material_demand' AND COLUMN_NAME = 'material_name'",
+                String.class);
+        assertEquals("varchar(200)", materialNameType);
+
+        String unitType = jdbc.queryForObject(
+                "SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS " +
+                "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'material_demand' AND COLUMN_NAME = 'unit'",
+                String.class);
+        assertEquals("varchar(20)", unitType);
     }
 }

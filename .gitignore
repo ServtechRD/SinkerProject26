@@ -1,2 +1,8 @@
 node_modules/
 dist/
+
+# Coverage reports
+coverage/
+coverage-reports/
+*.exec
+.nyc_output/

@@ -13,6 +13,7 @@ import ForecastUploadPage from './pages/sales-forecast/ForecastUploadPage'
 import ForecastListPage from './pages/sales-forecast/ForecastListPage'
 import ForecastIntegrationPage from './pages/sales-forecast/ForecastIntegrationPage'
 import InventoryIntegrationPage from './pages/inventory/InventoryIntegrationPage'
+import ProductionPlanPage from './pages/production/ProductionPlanPage'
 
 export default function AppRoutes() {
   return (
@@ -36,6 +37,7 @@ export default function AppRoutes() {
         <Route path="sales-forecast/integration" element={<ForecastIntegrationPage />} />
         <Route path="sales-forecast" element={<ForecastListPage />} />
         <Route path="inventory-integration" element={<InventoryIntegrationPage />} />
+        <Route path="production-plan" element={<ProductionPlanPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

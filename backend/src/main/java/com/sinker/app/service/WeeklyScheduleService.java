@@ -9,6 +9,7 @@ import com.sinker.app.repository.WeeklyScheduleRepository;
 import com.sinker.app.service.WeeklyScheduleExcelParser.WeeklyScheduleRow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -26,11 +27,14 @@ public class WeeklyScheduleService {
 
     private final WeeklyScheduleRepository repository;
     private final WeeklyScheduleExcelParser excelParser;
+    private final PdcaIntegrationService pdcaIntegrationService;
 
     public WeeklyScheduleService(WeeklyScheduleRepository repository,
-                                 WeeklyScheduleExcelParser excelParser) {
+                                 WeeklyScheduleExcelParser excelParser,
+                                 @Lazy PdcaIntegrationService pdcaIntegrationService) {
         this.repository = repository;
         this.excelParser = excelParser;
+        this.pdcaIntegrationService = pdcaIntegrationService;
     }
 
     @Transactional
@@ -82,6 +86,9 @@ public class WeeklyScheduleService {
         log.info("Upload complete: weekStart={}, factory={}, rows={}, duration={}ms",
                 weekStart, factory, rows.size(), duration);
 
+        // Trigger PDCA integration asynchronously
+        pdcaIntegrationService.triggerPdcaIntegration(entities, weekStart, factory);
+
         return new UploadScheduleResponse(
                 "Upload successful",
                 rows.size(),
@@ -132,6 +139,11 @@ public class WeeklyScheduleService {
         WeeklySchedule updated = repository.save(entity);
         log.info("Updated schedule id={}: demandDate={}, quantity={}",
                 id, updated.getDemandDate(), updated.getQuantity());
+
+        // 4. Re-trigger PDCA integration for this week+factory
+        List<WeeklySchedule> schedules = repository.findByWeekStartAndFactoryOrderByDemandDateAscProductCodeAsc(
+                updated.getWeekStart(), updated.getFactory());
+        pdcaIntegrationService.triggerPdcaIntegration(schedules, updated.getWeekStart(), updated.getFactory());
 
         return WeeklyScheduleDTO.fromEntity(updated);
     }

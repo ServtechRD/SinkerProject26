@@ -3,6 +3,7 @@ package com.sinker.app.service;
 import com.sinker.app.dto.forecast.InventoryIntegrationDTO;
 import com.sinker.app.entity.InventorySalesForecast;
 import com.sinker.app.entity.SalesForecast;
+import com.sinker.app.exception.ResourceNotFoundException;
 import com.sinker.app.repository.InventorySalesForecastRepository;
 import com.sinker.app.repository.SalesForecastRepository;
 import org.slf4j.Logger;
@@ -55,6 +56,48 @@ public class InventoryIntegrationService {
 
         // Real-time query mode: aggregate and save
         return performRealTimeQuery(month, startDate, endDate);
+    }
+
+    /**
+     * Update modified subtotal by creating a new version
+     * This preserves the audit trail by not modifying the original record
+     */
+    @Transactional
+    public InventoryIntegrationDTO updateModifiedSubtotal(Integer id, BigDecimal modifiedSubtotal) {
+        log.info("updateModifiedSubtotal: id={}, modifiedSubtotal={}", id, modifiedSubtotal);
+
+        // Load existing record
+        InventorySalesForecast original = inventoryForecastRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Inventory integration record with ID " + id + " not found"));
+
+        // Create new record with all fields copied from original
+        InventorySalesForecast newRecord = new InventorySalesForecast();
+        newRecord.setMonth(original.getMonth());
+        newRecord.setProductCode(original.getProductCode());
+        newRecord.setProductName(original.getProductName());
+        newRecord.setCategory(original.getCategory());
+        newRecord.setSpec(original.getSpec());
+        newRecord.setWarehouseLocation(original.getWarehouseLocation());
+        newRecord.setSalesQuantity(original.getSalesQuantity());
+        newRecord.setInventoryBalance(original.getInventoryBalance());
+        newRecord.setForecastQuantity(original.getForecastQuantity());
+        newRecord.setProductionSubtotal(original.getProductionSubtotal());
+        newRecord.setModifiedSubtotal(modifiedSubtotal);
+        newRecord.setQueryStartDate(original.getQueryStartDate());
+        newRecord.setQueryEndDate(original.getQueryEndDate());
+
+        // Generate new version
+        String newVersion = generateVersion();
+        newRecord.setVersion(newVersion);
+
+        // Save new record (original remains unchanged)
+        InventorySalesForecast savedRecord = inventoryForecastRepository.save(newRecord);
+
+        log.info("Created new version: oldId={}, newId={}, newVersion={}",
+                id, savedRecord.getId(), newVersion);
+
+        return toDTO(savedRecord);
     }
 
     /**

@@ -11,6 +11,7 @@ import RoleEditPage from './pages/roles/RoleEditPage'
 import ForecastConfigPage from './pages/sales-forecast/ForecastConfigPage'
 import ForecastUploadPage from './pages/sales-forecast/ForecastUploadPage'
 import ForecastListPage from './pages/sales-forecast/ForecastListPage'
+import ForecastIntegrationPage from './pages/sales-forecast/ForecastIntegrationPage'
 
 export default function AppRoutes() {
   return (
@@ -31,6 +32,7 @@ export default function AppRoutes() {
         <Route path="roles/:id/edit" element={<RoleEditPage />} />
         <Route path="sales-forecast/config" element={<ForecastConfigPage />} />
         <Route path="sales-forecast/upload" element={<ForecastUploadPage />} />
+        <Route path="sales-forecast/integration" element={<ForecastIntegrationPage />} />
         <Route path="sales-forecast" element={<ForecastListPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

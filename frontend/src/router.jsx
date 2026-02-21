@@ -15,6 +15,7 @@ import ForecastIntegrationPage from './pages/sales-forecast/ForecastIntegrationP
 import InventoryIntegrationPage from './pages/inventory/InventoryIntegrationPage'
 import ProductionPlanPage from './pages/production/ProductionPlanPage'
 import WeeklySchedulePage from './pages/schedule/WeeklySchedulePage'
+import SemiProductPage from './pages/semiProduct/SemiProductPage'
 
 export default function AppRoutes() {
   return (
@@ -40,6 +41,7 @@ export default function AppRoutes() {
         <Route path="inventory-integration" element={<InventoryIntegrationPage />} />
         <Route path="production-plan" element={<ProductionPlanPage />} />
         <Route path="weekly-schedule" element={<WeeklySchedulePage />} />
+        <Route path="semi-product" element={<SemiProductPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

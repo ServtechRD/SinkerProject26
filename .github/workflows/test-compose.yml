@@ -1,0 +1,25 @@
+name: test-compose
+
+on:
+  pull_request:
+    branches:
+      - claude/intergration
+
+permissions:
+  contents: read
+
+jobs:
+  test-compose:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run tests
+        run: |
+          make test-compose
+
+      - name: Cleanup
+        if: always()
+        run: |
+          make test-down

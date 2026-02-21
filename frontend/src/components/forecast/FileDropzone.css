@@ -1,0 +1,107 @@
+.file-dropzone-wrapper {
+  margin-bottom: 16px;
+}
+
+.file-dropzone {
+  border: 2px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 40px 20px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  background: #f8fafc;
+}
+
+.file-dropzone:hover:not(.file-dropzone--disabled) {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.file-dropzone--dragging {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.file-dropzone--disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+  background: #f1f5f9;
+}
+
+.file-dropzone-icon {
+  color: #64748b;
+  margin-bottom: 12px;
+  display: flex;
+  justify-content: center;
+}
+
+.file-dropzone-text {
+  font-size: 0.9rem;
+  color: #334155;
+  margin-bottom: 8px;
+}
+
+.file-dropzone-hint {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.file-selected {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+
+.file-selected-icon {
+  color: #2563eb;
+  flex-shrink: 0;
+}
+
+.file-selected-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.file-selected-name {
+  font-size: 0.9rem;
+  color: #1e293b;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-selected-size {
+  font-size: 0.8rem;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.file-selected-remove {
+  flex-shrink: 0;
+  padding: 6px;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.file-selected-remove:hover {
+  background: #e2e8f0;
+  color: #dc2626;
+}
+
+.file-dropzone-error {
+  color: #dc2626;
+  font-size: 0.8rem;
+  margin-top: 8px;
+}

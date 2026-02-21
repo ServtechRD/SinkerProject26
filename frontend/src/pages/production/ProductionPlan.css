@@ -1,0 +1,265 @@
+.production-plan-page {
+  padding: 2rem;
+}
+
+.production-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.production-page-header h1 {
+  margin: 0;
+  font-size: 1.75rem;
+}
+
+.production-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.production-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background-color: #f5f5f5;
+  border-radius: 4px;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.control-group label {
+  font-weight: 500;
+  margin: 0;
+}
+
+.production-info {
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.production-loading {
+  text-align: center;
+  padding: 3rem;
+  color: #666;
+}
+
+.production-empty {
+  text-align: center;
+  padding: 3rem;
+  color: #999;
+  background-color: #f9f9f9;
+  border-radius: 4px;
+}
+
+.production-access-denied {
+  padding: 2rem;
+  background-color: #ffebee;
+  color: #c62828;
+  border-radius: 4px;
+  text-align: center;
+}
+
+.production-grid-wrap {
+  overflow-x: auto;
+  border: 1px solid #e0e0e0;
+  border-radius: 4px;
+  max-height: calc(100vh - 300px);
+  overflow-y: auto;
+}
+
+.production-grid {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 0.875rem;
+}
+
+.production-grid thead {
+  background-color: #e0e0e0;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.production-grid th {
+  padding: 0.75rem;
+  text-align: left;
+  font-weight: 600;
+  white-space: nowrap;
+  border-bottom: 2px solid #bdbdbd;
+  background-color: #e0e0e0;
+}
+
+.production-grid td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #e0e0e0;
+  white-space: nowrap;
+  background-color: white;
+}
+
+.production-grid tbody tr:hover td {
+  background-color: #fafafa;
+}
+
+.frozen-col {
+  position: sticky;
+  background-color: #f5f5f5;
+  z-index: 2;
+}
+
+.frozen-col-1 {
+  left: 0;
+  border-right: 2px solid #e0e0e0;
+}
+
+.frozen-col-2 {
+  left: 120px;
+  border-right: 2px solid #e0e0e0;
+}
+
+.production-grid thead .frozen-col {
+  z-index: 4;
+}
+
+.month-col,
+.numeric-col {
+  text-align: right;
+}
+
+.editable-cell {
+  cursor: pointer;
+}
+
+.editable {
+  display: block;
+  width: 100%;
+  cursor: pointer;
+  padding: 0.25rem;
+  border-radius: 2px;
+}
+
+.editable:hover {
+  background-color: #e3f2fd;
+  outline: 1px solid #2196f3;
+}
+
+.cell-input {
+  width: 100%;
+  padding: 0.25rem;
+  border: 2px solid #2196f3;
+  border-radius: 2px;
+  font-size: 0.875rem;
+  font-family: inherit;
+  outline: none;
+}
+
+.cell-input:invalid {
+  border-color: #f44336;
+  animation: shake 0.3s;
+}
+
+.row-modified td {
+  background-color: #fff9c4 !important;
+}
+
+.diff-positive {
+  color: #4caf50;
+  font-weight: 600;
+}
+
+.diff-negative {
+  color: #f44336;
+  font-weight: 600;
+}
+
+.remarks-cell {
+  min-width: 150px;
+  max-width: 250px;
+  white-space: normal;
+}
+
+.btn {
+  padding: 0.5rem 1rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn--primary {
+  background-color: #2196f3;
+  color: white;
+}
+
+.btn--primary:hover:not(:disabled) {
+  background-color: #1976d2;
+}
+
+.btn--secondary {
+  background-color: #757575;
+  color: white;
+}
+
+.btn--secondary:hover:not(:disabled) {
+  background-color: #616161;
+}
+
+.form-select {
+  padding: 0.5rem;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  background-color: white;
+  cursor: pointer;
+}
+
+.form-select:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-5px);
+  }
+  75% {
+    transform: translateX(5px);
+  }
+}
+
+@media (max-width: 768px) {
+  .production-plan-page {
+    padding: 1rem;
+  }
+
+  .production-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .production-controls {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+}

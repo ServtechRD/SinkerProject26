@@ -1,0 +1,187 @@
+.semi-product-page {
+  padding: 2rem;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.semi-product-page h1 {
+  font-size: 1.75rem;
+  font-weight: 600;
+  margin-bottom: 2rem;
+  color: #1a1a1a;
+}
+
+.semi-product-upload-section {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 1.5rem;
+  margin-bottom: 2rem;
+}
+
+.upload-area {
+  margin-bottom: 1rem;
+}
+
+.upload-actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.upload-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.6s linear infinite;
+  margin-right: 0.5rem;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.semi-product-loading,
+.semi-product-empty {
+  text-align: center;
+  padding: 3rem;
+  color: #666;
+  font-size: 1rem;
+}
+
+.semi-product-table-wrap {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.semi-product-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.semi-product-table thead {
+  background: #f5f5f5;
+}
+
+.semi-product-table th {
+  padding: 1rem;
+  text-align: left;
+  font-weight: 600;
+  color: #333;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.semi-product-table tbody tr {
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.2s;
+}
+
+.semi-product-table tbody tr:hover {
+  background-color: #fafafa;
+}
+
+.semi-product-table td {
+  padding: 1rem;
+  color: #333;
+}
+
+.editable-cell {
+  position: relative;
+}
+
+.editable-value {
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: background-color 0.2s;
+}
+
+.editable-value:hover {
+  background-color: #f0f0f0;
+}
+
+.editable-value:focus {
+  outline: 2px solid #1976d2;
+  outline-offset: 2px;
+}
+
+.edit-icon {
+  font-size: 0.875rem;
+  color: #666;
+  opacity: 0.7;
+}
+
+.editable-value:hover .edit-icon {
+  opacity: 1;
+  color: #1976d2;
+}
+
+.edit-input-wrapper {
+  position: relative;
+}
+
+.edit-input {
+  width: 120px;
+  padding: 0.375rem 0.5rem;
+  border: 2px solid #1976d2;
+  border-radius: 4px;
+  font-size: 0.95rem;
+  font-family: inherit;
+  outline: none;
+}
+
+.edit-input--error {
+  border-color: #d32f2f;
+}
+
+.edit-input:focus {
+  border-color: #1565c0;
+}
+
+.edit-error {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background: #d32f2f;
+  color: #fff;
+  font-size: 0.75rem;
+  border-radius: 4px;
+  white-space: nowrap;
+  z-index: 10;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .semi-product-page {
+    padding: 1rem;
+  }
+
+  .semi-product-page h1 {
+    font-size: 1.5rem;
+  }
+
+  .upload-actions {
+    flex-direction: column;
+  }
+
+  .semi-product-table-wrap {
+    overflow-x: auto;
+  }
+
+  .semi-product-table {
+    min-width: 600px;
+  }
+}

@@ -45,6 +45,17 @@ test.describe('Navigation', () => {
     await expect(layout.forecastUploadLink).toHaveClass(/sidebar-link--active/)
   })
 
+  test('sidebar navigation to Production Plan', async ({ page }) => {
+    const layout = new MainLayout(page)
+
+    await layout.clickProductionPlan()
+    await page.waitForURL('**/production-plan')
+
+    expect(page.url()).toContain('/production-plan')
+    await expect(layout.productionPlanLink).toHaveClass(/sidebar-link--active/)
+    await expect(page.getByRole('heading', { name: /生產計畫/ })).toBeVisible()
+  })
+
   test('sidebar navigation back to Dashboard', async ({ page }) => {
     const layout = new MainLayout(page)
 

@@ -10,6 +10,7 @@ const navItems = [
   { to: '/sales-forecast/upload', label: '預測上傳' },
   { to: '/sales-forecast', label: '銷售預測' },
   { to: '/inventory-integration', label: '庫存整合' },
+  { to: '/production-plan', label: '生產計畫' },
 ]
 
 export default function Sidebar() {

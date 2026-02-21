@@ -2,10 +2,12 @@ package com.sinker.app.controller;
 
 import com.sinker.app.dto.forecast.CreateForecastRequest;
 import com.sinker.app.dto.forecast.ForecastResponse;
+import com.sinker.app.dto.forecast.IntegrationRowDTO;
 import com.sinker.app.dto.forecast.UpdateForecastRequest;
 import com.sinker.app.dto.forecast.VersionInfo;
 import com.sinker.app.exception.ResourceNotFoundException;
 import com.sinker.app.security.JwtUserPrincipal;
+import com.sinker.app.service.ForecastIntegrationService;
 import com.sinker.app.service.SalesForecastService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -33,9 +35,12 @@ public class SalesForecastController {
     private static final Logger log = LoggerFactory.getLogger(SalesForecastController.class);
 
     private final SalesForecastService forecastService;
+    private final ForecastIntegrationService integrationService;
 
-    public SalesForecastController(SalesForecastService forecastService) {
+    public SalesForecastController(SalesForecastService forecastService,
+                                    ForecastIntegrationService integrationService) {
         this.forecastService = forecastService;
+        this.integrationService = integrationService;
     }
 
     @GetMapping
@@ -97,6 +102,26 @@ public class SalesForecastController {
                 month, channel, principal.getUserId(), authorities);
 
         return ResponseEntity.ok(versions);
+    }
+
+    @GetMapping("/integration")
+    @PreAuthorize("hasAuthority('sales_forecast.view')")
+    public ResponseEntity<List<IntegrationRowDTO>> queryIntegration(
+            @RequestParam String month,
+            @RequestParam(required = false) String version,
+            @AuthenticationPrincipal JwtUserPrincipal principal) {
+
+        log.info("GET /api/sales-forecast/integration - user={}, month={}, version={}",
+                principal.getUserId(), month, version);
+
+        // Validate required parameters
+        if (month == null || month.isEmpty()) {
+            throw new IllegalArgumentException("Missing required parameter: month");
+        }
+
+        List<IntegrationRowDTO> result = integrationService.queryIntegration(month, version);
+
+        return ResponseEntity.ok(result);
     }
 
     @PostMapping

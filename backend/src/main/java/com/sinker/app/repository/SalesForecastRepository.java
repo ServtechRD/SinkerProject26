@@ -41,4 +41,11 @@ public interface SalesForecastRepository extends JpaRepository<SalesForecast, In
 
     @Query("SELECT MAX(sf.updatedAt) FROM SalesForecast sf WHERE sf.month = :month AND sf.channel = :channel AND sf.version = :version")
     java.time.LocalDateTime findMaxUpdatedAtByMonthAndChannelAndVersion(@Param("month") String month, @Param("channel") String channel, @Param("version") String version);
+
+    // Query methods for T020 - Integration
+    @Query("SELECT sf FROM SalesForecast sf WHERE sf.month = :month AND sf.version = :version")
+    List<SalesForecast> findByMonthAndVersion(@Param("month") String month, @Param("version") String version);
+
+    @Query("SELECT DISTINCT sf.version FROM SalesForecast sf WHERE sf.month = :month ORDER BY sf.version DESC")
+    List<String> findDistinctVersionsByMonth(@Param("month") String month);
 }

@@ -1,0 +1,59 @@
+version: "3.9"
+
+services:
+  db:
+    image: mariadb:10
+    environment:
+      MARIADB_DATABASE: app_test
+      MARIADB_ROOT_PASSWORD: root
+    healthcheck:
+      test: ["CMD-SHELL", "mariadb-admin ping -h localhost -uroot -proot --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  backend:
+    build: ./backend
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mariadb://db:3306/app_test
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      SPRING_PROFILES_ACTIVE: test
+      SERVER_PORT: "8080"
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "8080:8080"
+    command: ["./gradlew", "bootRun"]
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:8080/api/health | grep UP",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  backend_coverage:
+    build:
+      context: ./backend
+      target: builder   # ⭐ 使用 gradle stage
+    working_dir: /app
+    volumes:
+      - ./backend:/app
+      - gradle-cache:/home/gradle/.gradle
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mariadb://db:3306/app_test
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      SPRING_PROFILES_ACTIVE: test
+      GRADLE_OPTS: "-Dorg.gradle.daemon=false -Xmx2g"
+    depends_on:
+      backend:
+        condition: service_healthy
+    command: ["./gradlew", "test", "jacocoTestReport", "--no-daemon"]
+
+volumes:
+  gradle-cache:

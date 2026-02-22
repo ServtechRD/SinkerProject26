@@ -74,11 +74,6 @@ After adding the `coverage-backend` target to the Makefile:
 make coverage-backend
 ```
 
-#### Manual Command (fallback)
-
-```bash
-docker compose exec backend ./gradlew test jacocoTestReport
-```
 
 **Expected output:**
 ```
@@ -141,21 +136,7 @@ The HTML report shows:
 - 🔴 Red: Not covered
 - 🟡 Yellow: Partially covered (branches)
 
-### Example: Finding Uncovered Code
 
-```bash
-# Generate report
-docker compose exec backend ./gradlew test jacocoTestReport
-
-# Copy to host
-docker compose cp backend:/app/build/reports/jacoco/test/html ./coverage-reports/backend
-
-# Open and navigate to:
-# coverage-reports/backend/index.html
-# → Click package name
-# → Click class name
-# → See line-by-line coverage with green/red highlighting
-```
 
 ## Frontend Coverage (Vitest)
 

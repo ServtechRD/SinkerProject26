@@ -7,7 +7,14 @@ dev-down:
 
 # Testing
 test-compose:
-	docker compose -f docker-compose.test.yml up --build --abort-on-container-exit --exit-code-from e2e
+#   docker compose -f docker-compose.test.yml up --build  --exit-code-from backend_unit
+	docker compose -f docker-compose.test.yml down -v --remove-orphans || true
+	docker compose -f docker-compose.test.yml up -d --build db backend frontend
+	docker compose -f docker-compose.test.yml build backend_unit
+	docker compose -f docker-compose.test.yml run --rm backend_unit
+	docker compose -f docker-compose.test.yml build e2e
+	docker compose -f docker-compose.test.yml run --rm e2e
+	docker compose -f docker-compose.test.yml down -v --remove-orphans
 
 test-down:
 	docker compose -f docker-compose.test.yml down -v
@@ -38,10 +45,12 @@ db-migrate:
 # Coverage reports
 coverage-backend:
 	@echo "Generating backend coverage report..."
-	@docker compose exec backend ./gradlew clean test jacocoTestReport
-	@mkdir -p coverage-reports
-	@docker compose cp backend:/app/build/reports/jacoco/test/html ./coverage-reports/backend
+	@docker compose -f docker-compose.coverage.yml up --build --abort-on-container-exit --exit-code-from backend_coverage
+	@mkdir -p coverage-reports/backend
+	@cp -r backend/build/reports/jacoco/test/html/* coverage-reports/backend/
+	@docker compose -f docker-compose.coverage.yml down -v
 	@echo "✅ Backend coverage report: coverage-reports/backend/index.html"
+
 
 coverage-frontend:
 	@echo "Generating frontend coverage report..."

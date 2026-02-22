@@ -84,6 +84,14 @@ public class MaterialPurchaseController {
                 message, request.getRequestURI());
     }
 
+    @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+    public ResponseEntity<Map<String, Object>> handleTypeMismatch(
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+        String message = String.format("Invalid format for parameter '%s'", ex.getName());
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "Bad Request",
+                message, request.getRequestURI());
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, Object>> handleAccessDenied(
             AccessDeniedException ex, HttpServletRequest request) {

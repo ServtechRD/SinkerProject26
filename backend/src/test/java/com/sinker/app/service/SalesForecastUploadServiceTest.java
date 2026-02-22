@@ -231,4 +231,40 @@ class SalesForecastUploadServiceTest {
         assertThrows(IllegalArgumentException.class,
                 () -> service.upload(dummyFile(), "ABCDEF", CHANNEL, USER_ID, ROLE_SALES));
     }
+
+    @Test
+    void testBadRequestException_SingleMessage() {
+        SalesForecastUploadService.BadRequestException ex =
+                new SalesForecastUploadService.BadRequestException("Single error message");
+
+        assertEquals("Single error message", ex.getMessage());
+        assertNotNull(ex.getDetails());
+        assertEquals(1, ex.getDetails().size());
+        assertEquals("Single error message", ex.getDetails().get(0));
+    }
+
+    @Test
+    void testBadRequestException_MultipleMessages() {
+        List<String> details = List.of("Error 1", "Error 2", "Error 3");
+        SalesForecastUploadService.BadRequestException ex =
+                new SalesForecastUploadService.BadRequestException(details);
+
+        assertEquals("Error 1; Error 2; Error 3", ex.getMessage());
+        assertNotNull(ex.getDetails());
+        assertEquals(3, ex.getDetails().size());
+        assertEquals("Error 1", ex.getDetails().get(0));
+        assertEquals("Error 2", ex.getDetails().get(1));
+        assertEquals("Error 3", ex.getDetails().get(2));
+    }
+
+    @Test
+    void testBadRequestException_EmptyList() {
+        List<String> details = List.of();
+        SalesForecastUploadService.BadRequestException ex =
+                new SalesForecastUploadService.BadRequestException(details);
+
+        assertEquals("", ex.getMessage());
+        assertNotNull(ex.getDetails());
+        assertEquals(0, ex.getDetails().size());
+    }
 }

@@ -80,6 +80,14 @@ public class InventoryIntegrationController {
                 ex.getMessage(), request.getRequestURI());
     }
 
+    @ExceptionHandler(org.springframework.web.bind.MissingServletRequestParameterException.class)
+    public ResponseEntity<Map<String, Object>> handleMissingParameter(
+            org.springframework.web.bind.MissingServletRequestParameterException ex, HttpServletRequest request) {
+        String message = String.format("Required parameter '%s' is missing", ex.getParameterName());
+        return buildErrorResponse(HttpStatus.BAD_REQUEST, "Bad Request",
+                message, request.getRequestURI());
+    }
+
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, Object>> handleAccessDenied(
             AccessDeniedException ex, HttpServletRequest request) {

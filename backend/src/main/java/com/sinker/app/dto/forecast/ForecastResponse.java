@@ -1,5 +1,6 @@
 package com.sinker.app.dto.forecast;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.sinker.app.entity.SalesForecast;
 
 import java.math.BigDecimal;
@@ -12,13 +13,19 @@ public class ForecastResponse {
     private String channel;
     private String category;
     private String spec;
+    @JsonProperty("product_code")
     private String productCode;
+    @JsonProperty("product_name")
     private String productName;
+    @JsonProperty("warehouse_location")
     private String warehouseLocation;
     private BigDecimal quantity;
     private String version;
+    @JsonProperty("is_modified")
     private Boolean isModified;
+    @JsonProperty("created_at")
     private LocalDateTime createdAt;
+    @JsonProperty("updated_at")
     private LocalDateTime updatedAt;
 
     public static ForecastResponse fromEntity(SalesForecast entity) {

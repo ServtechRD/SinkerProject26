@@ -1,0 +1,22 @@
+name: enable-automerge
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  enable:
+    # 只允許同 repo 的 PR（避免 fork PR 取得 write token）
+    if: >
+      github.event.pull_request.base.ref == 'claude/intergration'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Enable auto-merge
+        uses: peter-evans/enable-pull-request-automerge@v3
+        with:
+          pull-request-number: ${{ github.event.pull_request.number }}
+          merge-method: merge

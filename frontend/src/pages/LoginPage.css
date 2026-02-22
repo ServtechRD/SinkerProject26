@@ -1,0 +1,141 @@
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: #f1f5f9;
+}
+
+.login-form {
+  width: 360px;
+  padding: 32px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.login-logo {
+  display: block;
+  width: 100%;
+  max-width: 160px;
+  height: auto;
+  margin: 0 auto 20px;
+  object-fit: contain;
+}
+
+.login-title {
+  text-align: center;
+  margin: 0 0 24px;
+  font-size: 1.5rem;
+  color: #1e293b;
+}
+
+.login-error {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  margin-bottom: 16px;
+}
+
+.login-field {
+  margin-bottom: 16px;
+}
+
+.login-field label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.login-field input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  color: #1f2937;
+  background-color: #ffffff;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.login-field input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.15);
+}
+
+.login-field input:disabled {
+  background-color: #f3f4f6;
+}
+
+.login-password-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.login-password-wrap input {
+  padding-right: 44px;
+}
+
+.login-password-toggle {
+  position: absolute;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #6b7280;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: color 0.15s, background-color 0.15s;
+}
+
+.login-password-toggle:hover:not(:disabled) {
+  color: #374151;
+  background-color: #f3f4f6;
+}
+
+.login-password-toggle:disabled {
+  color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.login-submit {
+  width: 100%;
+  padding: 10px;
+  background-color: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.login-submit:hover:not(:disabled) {
+  background-color: #1d4ed8;
+}
+
+.login-submit:disabled {
+  background-color: #93c5fd;
+  cursor: not-allowed;
+}
+
+.login-version {
+  text-align: center;
+  margin: 16px 0 0;
+  font-size: 0.75rem;
+  color: #9ca3af;
+}

@@ -45,7 +45,7 @@ db-migrate:
 # Coverage reports
 coverage-backend:
 	@echo "Generating backend coverage report..."
-	@docker compose -f docker-compose.coverage.yml up --build --abort-on-container-exit --exit-code-from backend_coverage
+	@docker compose -f docker-compose.coverage.yml up --build db backend backend_coverage --abort-on-container-exit --exit-code-from backend_coverage
 	@mkdir -p coverage-reports/backend
 	@cp -r backend/build/reports/jacoco/test/html/* coverage-reports/backend/
 	@docker compose -f docker-compose.coverage.yml down -v
@@ -54,9 +54,8 @@ coverage-backend:
 
 coverage-frontend:
 	@echo "Generating frontend coverage report..."
-	@mkdir -p coverage-reports
-	@docker compose run --rm frontend npm run test:coverage
-	@cp -r frontend/coverage ./coverage-reports/frontend
+	@mkdir -p coverage-reports/frontend
+	@docker compose -f docker-compose.coverage.yml run --rm frontend_coverage
 	@echo "✅ Frontend coverage report: coverage-reports/frontend/index.html"
 
 coverage: coverage-backend coverage-frontend

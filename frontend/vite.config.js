@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import path from "node:path";
 
 const proxyTarget = process.env.VITE_PROXY_TARGET || 'http://localhost:8080'
 
@@ -32,10 +33,26 @@ export default defineConfig({
       },
     },
   },
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "src"),
+    },
+  },
   test: {
     environment: 'jsdom',
     globals: true,
     setupFiles: './src/test/setup.js',
     exclude: ['e2e/**', 'node_modules/**'],
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "html", "lcov"],
+      reportsDirectory: "coverage",
+      thresholds: {
+        lines: 70,
+        branches: 70,     // ⭐ 目標：branches >= 70
+        functions: 70,
+        statements: 70,
+      },
+    },
   },
 })

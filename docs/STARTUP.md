@@ -128,8 +128,8 @@ curl -I http://localhost:5173
 
 - **Frontend:** http://localhost:5173
 - **Backend API:** http://localhost:8080/api
-- **API Documentation (Swagger):** http://localhost:8080/swagger-ui.html
-- **Health Endpoint:** http://localhost:8080/actuator/health
+- **API Documentation (Swagger):** http://localhost:5173/swagger-ui/index.html
+- **Health Endpoint:** http://localhost:8080/api/health
 
 ## Viewing Logs
 

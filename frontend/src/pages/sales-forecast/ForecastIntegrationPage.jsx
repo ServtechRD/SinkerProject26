@@ -272,7 +272,7 @@ export default function ForecastIntegrationPage() {
 
           {selectedVersion && (
             <div className="forecast-info">
-              版本: {selectedVersion} | 產品數: {integrationData.length}
+              版本: {selectedVersion} | 產品數: {integrationData?.length}
             </div>
           )}
 
@@ -281,7 +281,7 @@ export default function ForecastIntegrationPage() {
               載入中...
             </div>
           ) : selectedMonth && selectedVersion ? (
-            integrationData.length === 0 ? (
+            integrationData?.length === 0 ? (
               <div className="forecast-empty">所選月份與版本無整合資料</div>
             ) : (
               <div className="forecast-table-wrap">
@@ -311,7 +311,7 @@ export default function ForecastIntegrationPage() {
                     </tr>
                   </thead>
                   <tbody>
-                    {integrationData.map((item, index) => (
+                    {integrationData?.map((item, index) => (
                       <tr key={index}>
                         <td>{item.warehouseLocation || '-'}</td>
                         <td>{item.category || '-'}</td>

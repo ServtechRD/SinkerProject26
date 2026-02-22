@@ -1,5 +1,6 @@
 package com.sinker.app.dto.forecast;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
@@ -7,20 +8,32 @@ public class InventoryIntegrationDTO {
 
     private Integer id;
     private String month;
+    @JsonProperty("product_code")
     private String productCode;
+    @JsonProperty("product_name")
     private String productName;
     private String category;
     private String spec;
+    @JsonProperty("warehouse_location")
     private String warehouseLocation;
+    @JsonProperty("sales_quantity")
     private BigDecimal salesQuantity;
+    @JsonProperty("inventory_balance")
     private BigDecimal inventoryBalance;
+    @JsonProperty("forecast_quantity")
     private BigDecimal forecastQuantity;
+    @JsonProperty("production_subtotal")
     private BigDecimal productionSubtotal;
+    @JsonProperty("modified_subtotal")
     private BigDecimal modifiedSubtotal;
     private String version;
+    @JsonProperty("query_start_date")
     private String queryStartDate;
+    @JsonProperty("query_end_date")
     private String queryEndDate;
+    @JsonProperty("created_at")
     private LocalDateTime createdAt;
+    @JsonProperty("updated_at")
     private LocalDateTime updatedAt;
 
     public InventoryIntegrationDTO() {

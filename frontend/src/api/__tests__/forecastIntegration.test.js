@@ -93,9 +93,14 @@ describe('forecastIntegration API', () => {
       const removeChild = vi.spyOn(document.body, 'removeChild').mockImplementation(() => {})
 
       // Mock Date to ensure consistent filename
-      const mockDate = new Date('2024-01-15T10:30:00Z')
-      vi.spyOn(global, 'Date').mockImplementation(() => mockDate)
+      beforeEach(() => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date("2026-02-22T12:00:00Z"));
+      });
 
+      afterEach(() => {
+        vi.useRealTimers();
+      });
       await exportIntegrationExcel('202601', 'v1')
 
       expect(api.get).toHaveBeenCalledWith('/api/sales-forecast/integration/export', {

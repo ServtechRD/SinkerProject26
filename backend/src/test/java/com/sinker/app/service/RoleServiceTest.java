@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Sort;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -23,6 +24,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class RoleServiceTest {
@@ -41,6 +43,7 @@ class RoleServiceTest {
     @BeforeEach
     void setUp() {
         roleService = new RoleService(roleRepository, permissionRepository, rolePermissionRepository);
+        lenient().when(permissionRepository.findAll(any(Sort.class))).thenReturn(List.of());
     }
 
     private Role createTestRole(Long id, String code, String name, boolean isSystem) {
@@ -126,6 +129,7 @@ class RoleServiceTest {
 
         when(roleRepository.findById(1L)).thenReturn(Optional.of(role));
         when(permissionRepository.findByRoleId(1L)).thenReturn(List.of(p1, p2, p3));
+        when(permissionRepository.findAll(any(Sort.class))).thenReturn(List.of(p1, p2, p3));
 
         RoleDetailDTO result = roleService.getRoleById(1L);
 

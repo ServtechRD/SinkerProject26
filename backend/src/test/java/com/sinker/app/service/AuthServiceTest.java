@@ -7,6 +7,7 @@ import com.sinker.app.entity.User;
 import com.sinker.app.exception.AccountInactiveException;
 import com.sinker.app.exception.AccountLockedException;
 import com.sinker.app.repository.LoginLogRepository;
+import com.sinker.app.repository.PermissionRepository;
 import com.sinker.app.repository.UserRepository;
 import com.sinker.app.security.JwtTokenProvider;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,11 +20,13 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.lenient;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
@@ -33,6 +36,9 @@ class AuthServiceTest {
 
     @Mock
     private LoginLogRepository loginLogRepository;
+
+    @Mock
+    private PermissionRepository permissionRepository;
 
     private PasswordEncoder passwordEncoder;
     private JwtTokenProvider tokenProvider;
@@ -48,7 +54,8 @@ class AuthServiceTest {
         tokenProvider = new JwtTokenProvider(
                 "test-secret-key-for-unit-tests-must-be-at-least-32-bytes!", 86400000L);
         loginLogService = new LoginLogService(loginLogRepository);
-        authService = new AuthService(userRepository, passwordEncoder, tokenProvider, loginLogService);
+        lenient().when(permissionRepository.findPermissionCodesByRoleCode(any())).thenReturn(List.of());
+        authService = new AuthService(userRepository, passwordEncoder, tokenProvider, loginLogService, permissionRepository);
     }
 
     private User createTestUser(String username, String password, boolean active, boolean locked) {

@@ -5,11 +5,7 @@ import { useToast } from '../../components/Toast'
 import './ProductionPlan.css'
 
 function hasPermission(user, perm) {
-  if (user?.permissions && Array.isArray(user.permissions)) {
-    return user.permissions.includes(perm)
-  }
-  if (user?.roleCode === 'admin') return true
-  return false
+  return Boolean(user?.permissions && Array.isArray(user.permissions) && user.permissions.includes(perm))
 }
 
 const MONTHS = [

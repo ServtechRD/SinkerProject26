@@ -2,7 +2,7 @@ export class LoginPage {
   constructor(page) {
     this.page = page
     this.usernameInput = page.getByLabel('帳號')
-    this.passwordInput = page.getByLabel('密碼')
+    this.passwordInput = page.locator('#password')
     this.submitButton = page.getByRole('button', { name: '登入' })
     this.errorMessage = page.getByRole('alert')
   }

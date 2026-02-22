@@ -56,17 +56,17 @@ test.describe('Navigation', () => {
     await expect(page.getByRole('heading', { name: /生產計畫/ })).toBeVisible()
   })
 
-  test('sidebar navigation back to Dashboard', async ({ page }) => {
+  test('sidebar navigation between pages', async ({ page }) => {
     const layout = new MainLayout(page)
 
     await layout.clickUsers()
     await page.waitForURL('**/users')
+    await expect(layout.usersLink).toHaveClass(/sidebar-link--active/)
 
-    await layout.clickDashboard()
-    await page.waitForURL(/\/$/)
-
-    await expect(layout.dashboardLink).toHaveClass(/sidebar-link--active/)
-    await expect(page.getByRole('heading', { name: '儀表板' })).toBeVisible()
+    await layout.clickProductionPlan()
+    await page.waitForURL('**/production-plan')
+    await expect(layout.productionPlanLink).toHaveClass(/sidebar-link--active/)
+    await expect(page.getByRole('heading', { name: /生產計畫/ })).toBeVisible()
   })
 
   test('logout clears auth and redirects to login', async ({ page }) => {

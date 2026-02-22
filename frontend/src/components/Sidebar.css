@@ -84,3 +84,10 @@
   background-color: #475569;
   color: #f8fafc;
 }
+
+.sidebar-version {
+  margin-top: 10px;
+  font-size: 0.75rem;
+  color: #64748b;
+  text-align: center;
+}

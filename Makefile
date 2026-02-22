@@ -2,6 +2,10 @@
 dev-up:
 	docker compose up -d --build
 
+# Rebuild only backend + frontend (db stays as-is, no volume wipe)
+dev-build:
+	docker compose up -d --build backend frontend
+
 dev-down:
 	docker compose down -v
 
@@ -70,6 +74,7 @@ help:
 	@echo ""
 	@echo "Development:"
 	@echo "  make dev-up           - Start all services (build + run)"
+	@echo "  make dev-build        - Rebuild only backend + frontend (keeps DB data)"
 	@echo "  make dev-down         - Stop and remove all services (⚠️  deletes data)"
 	@echo ""
 	@echo "Testing:"
@@ -88,4 +93,4 @@ help:
 	@echo ""
 	@echo "Documentation: See docs/ folder"
 
-.PHONY: dev-up dev-down test-compose test-down db-info db-shell db-migrate coverage-backend coverage-frontend coverage help
+.PHONY: dev-up dev-build dev-down test-compose test-down db-info db-shell db-migrate coverage-backend coverage-frontend coverage help

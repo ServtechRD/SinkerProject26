@@ -5,6 +5,7 @@ import com.sinker.app.dto.auth.LoginResponse;
 import com.sinker.app.entity.User;
 import com.sinker.app.exception.AccountInactiveException;
 import com.sinker.app.exception.AccountLockedException;
+import com.sinker.app.repository.PermissionRepository;
 import com.sinker.app.repository.UserRepository;
 import com.sinker.app.security.JwtTokenProvider;
 import org.slf4j.Logger;
@@ -17,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -29,15 +31,18 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider tokenProvider;
     private final LoginLogService loginLogService;
+    private final PermissionRepository permissionRepository;
 
     public AuthService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
                        JwtTokenProvider tokenProvider,
-                       LoginLogService loginLogService) {
+                       LoginLogService loginLogService,
+                       PermissionRepository permissionRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.tokenProvider = tokenProvider;
         this.loginLogService = loginLogService;
+        this.permissionRepository = permissionRepository;
     }
 
     @Transactional(noRollbackFor = {BadCredentialsException.class, AccountLockedException.class,
@@ -107,12 +112,16 @@ public class AuthService {
         String token = tokenProvider.generateToken(
                 user.getId(), user.getUsername(), user.getRole().getCode());
 
+        String roleCode = user.getRole().getCode();
+        List<String> permissionCodes = permissionRepository.findPermissionCodesByRoleCode(roleCode);
+
         LoginResponse.UserInfo userInfo = new LoginResponse.UserInfo(
                 user.getId(),
                 user.getUsername(),
                 user.getEmail(),
                 user.getFullName(),
-                user.getRole().getCode());
+                roleCode,
+                permissionCodes);
 
         log.info("Login successful for user '{}'", user.getUsername());
 

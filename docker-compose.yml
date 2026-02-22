@@ -7,7 +7,9 @@ services:
       MARIADB_USER: app
       MARIADB_PASSWORD: app
       MARIADB_ROOT_PASSWORD: root
-    
+
+    volumes:
+      - app_db_data:/var/lib/mysql
     ports:
       - "3306:3306"
     healthcheck:
@@ -46,3 +48,6 @@ services:
 networks:
   appnet:
     driver: bridge
+
+volumes:
+  app_db_data:

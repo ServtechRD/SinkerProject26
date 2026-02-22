@@ -106,7 +106,7 @@ export default function RoleEditPage() {
       await updateRole(id, {
         name: name.trim(),
         description: description.trim() || null,
-        permissionIds: [...selectedIds],
+        permissionIds: Array.from(selectedIds).map((pid) => Number(pid)),
       })
       toast.success('角色已更新')
       navigate('/roles')

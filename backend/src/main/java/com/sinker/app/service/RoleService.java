@@ -8,6 +8,7 @@ import com.sinker.app.exception.ResourceNotFoundException;
 import com.sinker.app.repository.PermissionRepository;
 import com.sinker.app.repository.RolePermissionRepository;
 import com.sinker.app.repository.RoleRepository;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -44,8 +45,9 @@ public class RoleService {
         Role role = roleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Role not found with id: " + id));
 
-        List<Permission> permissions = permissionRepository.findByRoleId(id);
-        return buildRoleDetail(role, permissions);
+        List<Permission> rolePermissions = permissionRepository.findByRoleId(id);
+        List<Permission> allPermissions = permissionRepository.findAll(Sort.by("module", "code"));
+        return buildRoleDetail(role, rolePermissions, allPermissions);
     }
 
     @Transactional
@@ -79,6 +81,7 @@ public class RoleService {
             }
 
             rolePermissionRepository.deleteByRoleId(id);
+            rolePermissionRepository.flush();
             for (Long permId : requestedIds) {
                 rolePermissionRepository.save(new RolePermission(id, permId));
             }
@@ -87,20 +90,25 @@ public class RoleService {
         role.setUpdatedAt(LocalDateTime.now());
         roleRepository.save(role);
 
-        List<Permission> permissions = permissionRepository.findByRoleId(id);
-        return buildRoleDetail(role, permissions);
+        List<Permission> rolePermissions = permissionRepository.findByRoleId(id);
+        List<Permission> allPermissions = permissionRepository.findAll(Sort.by("module", "code"));
+        return buildRoleDetail(role, rolePermissions, allPermissions);
     }
 
-    private RoleDetailDTO buildRoleDetail(Role role, List<Permission> permissions) {
-        List<PermissionDTO> permDtos = permissions.stream()
+    private RoleDetailDTO buildRoleDetail(Role role, List<Permission> rolePermissions, List<Permission> allPermissions) {
+        List<PermissionDTO> rolePermDtos = rolePermissions.stream()
+                .map(PermissionDTO::fromEntity)
+                .toList();
+
+        List<PermissionDTO> allPermDtos = allPermissions.stream()
                 .map(PermissionDTO::fromEntity)
                 .toList();
 
         Map<String, List<PermissionDTO>> byModule = new LinkedHashMap<>();
-        for (PermissionDTO dto : permDtos) {
+        for (PermissionDTO dto : allPermDtos) {
             byModule.computeIfAbsent(dto.getModule(), k -> new ArrayList<>()).add(dto);
         }
 
-        return RoleDetailDTO.fromEntity(role, permDtos, byModule);
+        return RoleDetailDTO.fromEntity(role, rolePermDtos, byModule);
     }
 }

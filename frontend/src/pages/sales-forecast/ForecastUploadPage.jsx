@@ -22,11 +22,7 @@ const VALID_CHANNELS = [
 ]
 
 function hasPermission(user, perm) {
-  if (user?.permissions && Array.isArray(user.permissions)) {
-    return user.permissions.includes(perm)
-  }
-  if (user?.roleCode === 'admin') return true
-  return false
+  return Boolean(user?.permissions && Array.isArray(user.permissions) && user.permissions.includes(perm))
 }
 
 function formatMonth(monthStr) {
@@ -71,8 +67,8 @@ export default function ForecastUploadPage() {
   const canUpload = hasPermission(user, 'sales_forecast.upload')
 
   const userChannels = user?.channels || []
-  const isAdmin = user?.roleCode === 'admin'
-  const availableChannels = isAdmin ? VALID_CHANNELS : VALID_CHANNELS.filter((ch) => userChannels.includes(ch))
+  const canViewAllChannels = hasPermission(user, 'sales_forecast.view')
+  const availableChannels = canViewAllChannels ? VALID_CHANNELS : VALID_CHANNELS.filter((ch) => userChannels.includes(ch))
 
   const fetchConfigs = useCallback(async () => {
     setLoading(true)

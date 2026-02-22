@@ -1,5 +1,7 @@
 package com.sinker.app.dto.auth;
 
+import java.util.List;
+
 public class LoginResponse {
 
     private String token;
@@ -28,6 +30,7 @@ public class LoginResponse {
         private String email;
         private String fullName;
         private String roleCode;
+        private List<String> permissions;
 
         public UserInfo() {}
 
@@ -37,6 +40,16 @@ public class LoginResponse {
             this.email = email;
             this.fullName = fullName;
             this.roleCode = roleCode;
+            this.permissions = null;
+        }
+
+        public UserInfo(Long id, String username, String email, String fullName, String roleCode, List<String> permissions) {
+            this.id = id;
+            this.username = username;
+            this.email = email;
+            this.fullName = fullName;
+            this.roleCode = roleCode;
+            this.permissions = permissions != null ? List.copyOf(permissions) : null;
         }
 
         public Long getId() { return id; }
@@ -53,5 +66,8 @@ public class LoginResponse {
 
         public String getRoleCode() { return roleCode; }
         public void setRoleCode(String roleCode) { this.roleCode = roleCode; }
+
+        public List<String> getPermissions() { return permissions; }
+        public void setPermissions(List<String> permissions) { this.permissions = permissions != null ? List.copyOf(permissions) : null; }
     }
 }

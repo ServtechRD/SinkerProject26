@@ -25,7 +25,7 @@ public class CreateForecastRequest {
     private String warehouseLocation;
 
     @NotNull(message = "quantity is required")
-    @DecimalMin(value = "0.01", message = "quantity must be positive")
+    @DecimalMin(value = "0", message = "quantity must be >= 0")
     private BigDecimal quantity;
 
     public String getMonth() { return month; }

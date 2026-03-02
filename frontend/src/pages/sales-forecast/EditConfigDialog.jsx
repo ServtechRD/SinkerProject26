@@ -22,7 +22,7 @@ export default function EditConfigDialog({ open, config, onClose, onSuccess }) {
 
   const dayNum = parseInt(autoCloseDay, 10)
   const dayValid = autoCloseDay !== '' && !isNaN(dayNum) && dayNum >= 1 && dayNum <= 31
-  const dayError = autoCloseDay !== '' && !dayValid ? '自動關帳日需為 1-31' : ''
+  const dayError = autoCloseDay !== '' && !dayValid ? '自動結束新增設定日期需為 1-31' : ''
 
   const hasChanges =
     (dayValid && dayNum !== config.autoCloseDay) || isClosed !== !!config.isClosed
@@ -70,11 +70,11 @@ export default function EditConfigDialog({ open, config, onClose, onSuccess }) {
         onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: '480px' }}
       >
-        <h3 id="edit-dialog-title" className="dialog-title">編輯設定</h3>
+        <h3 id="edit-dialog-title" className="dialog-title">編輯填寫月份</h3>
         {error && <div className="fc-dialog-api-error" role="alert">{error}</div>}
         <form onSubmit={handleSubmit}>
           <div className="fc-dialog-field">
-            <label htmlFor="editMonth">月份</label>
+            <label htmlFor="editMonth">填寫月份</label>
             <input
               id="editMonth"
               className="form-input"
@@ -85,7 +85,7 @@ export default function EditConfigDialog({ open, config, onClose, onSuccess }) {
             />
           </div>
           <div className="fc-dialog-field">
-            <label htmlFor="editAutoCloseDay">自動關帳日</label>
+            <label htmlFor="editAutoCloseDay">自動結束新增設定日期</label>
             <input
               id="editAutoCloseDay"
               className={`form-input${dayError ? ' error' : ''}`}
@@ -100,7 +100,7 @@ export default function EditConfigDialog({ open, config, onClose, onSuccess }) {
             <div className="form-hint">輸入 1-31 的數字</div>
           </div>
           <div className="fc-switch-row">
-            <label htmlFor="editIsClosed">已關帳</label>
+            <label htmlFor="editIsClosed">結束新增設定</label>
             <label className="fc-switch">
               <input
                 id="editIsClosed"

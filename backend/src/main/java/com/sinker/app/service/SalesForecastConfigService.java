@@ -31,13 +31,16 @@ public class SalesForecastConfigService {
     }
 
     @Transactional
-    public CreateMonthsResponse batchCreateMonths(String startMonth, String endMonth) {
+    public CreateMonthsResponse batchCreateMonths(String startMonth, String endMonth, Integer autoCloseDay) {
         YearMonth start = parseMonth(startMonth);
         YearMonth end = parseMonth(endMonth);
 
         if (start.isAfter(end)) {
             throw new IllegalArgumentException("start_month must not be after end_month");
         }
+
+        int day = (autoCloseDay != null && autoCloseDay >= 1 && autoCloseDay <= 31)
+                ? autoCloseDay : 10;
 
         List<String> createdMonths = new ArrayList<>();
         List<String> skippedMonths = new ArrayList<>();
@@ -51,7 +54,7 @@ public class SalesForecastConfigService {
             } else {
                 SalesForecastConfig config = new SalesForecastConfig();
                 config.setMonth(monthStr);
-                config.setAutoCloseDay(10);
+                config.setAutoCloseDay(day);
                 config.setIsClosed(false);
                 config.setCreatedAt(LocalDateTime.now());
                 config.setUpdatedAt(LocalDateTime.now());

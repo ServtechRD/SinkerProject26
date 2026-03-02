@@ -134,10 +134,13 @@ export default function ForecastListPage() {
       setLoadingVersions(true)
       try {
         const data = await getForecastVersions(month, channel)
-        setVersions(data)
+        const versionStrings = (Array.isArray(data) ? data : []).map((item) =>
+          typeof item === 'string' ? item : item?.version
+        ).filter(Boolean)
+        setVersions(versionStrings)
 
-        if (data.length > 0) {
-          setSelectedVersion(data[0])
+        if (versionStrings.length > 0) {
+          setSelectedVersion(versionStrings[0])
         } else {
           setSelectedVersion('')
         }
@@ -402,7 +405,7 @@ export default function ForecastListPage() {
                   <tbody>
                     {forecastData.map((item) => {
                       const isEditing = editingId === item.id
-                      const isModified = item.isModified === true
+                      const isModified = (item.is_modified ?? item.isModified) === true
 
                       return (
                         <tr key={item.id} className={isModified ? 'row-modified' : ''}>

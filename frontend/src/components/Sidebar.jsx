@@ -6,7 +6,7 @@ import './Sidebar.css'
 const navItems = [
   { to: '/users', label: '使用者', permission: 'user.view' },
   { to: '/roles', label: '角色管理', permission: 'role.view' },
-  { to: '/sales-forecast/config', label: '預測設定', permission: 'sales_forecast_config.view' },
+  { to: '/sales-forecast/config', label: '銷售預估量-表單設定', permission: 'sales_forecast_config.view' },
   { to: '/sales-forecast/upload', label: '預測上傳', permission: 'sales_forecast.upload' },
   { to: '/sales-forecast', label: '銷售預測', permission: ['sales_forecast.view', 'sales_forecast.view_own'] },
   { to: '/inventory-integration', label: '庫存整合', permission: 'inventory.view' },

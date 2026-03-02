@@ -86,6 +86,36 @@
   color: #64748b;
 }
 
+/* Pagination */
+.forecast-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.forecast-pagination-info {
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.forecast-pagination-buttons {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.forecast-pagination-page {
+  font-size: 0.875rem;
+  color: #475569;
+  min-width: 80px;
+  text-align: center;
+}
+
 /* --- Dialog styles --- */
 
 .fc-dialog-field {
@@ -129,6 +159,22 @@
   color: #dc2626;
   font-size: 0.78rem;
   margin-top: 4px;
+}
+
+.fc-dialog-field-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.fc-dialog-field-row .form-select {
+  width: auto;
+  min-width: 80px;
+}
+
+.fc-dialog-hint {
+  font-size: 0.85rem;
+  color: #64748b;
 }
 
 .fc-dialog-field .form-hint {

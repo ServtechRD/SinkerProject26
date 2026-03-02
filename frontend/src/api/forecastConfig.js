@@ -4,9 +4,9 @@ export function listConfigs() {
   return api.get('/api/sales-forecast/config').then((r) => r.data)
 }
 
-export function createMonths(startMonth, endMonth) {
+export function createMonths(startMonth, endMonth, autoCloseDay) {
   return api
-    .post('/api/sales-forecast/config', { startMonth, endMonth })
+    .post('/api/sales-forecast/config', { startMonth, endMonth, autoCloseDay })
     .then((r) => r.data)
 }
 

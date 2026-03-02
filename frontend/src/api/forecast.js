@@ -46,6 +46,38 @@ export function getForecastVersions(month, channel) {
 export function getForecastList(month, channel, version) {
   return api
     .get('/api/sales-forecast', {
+      params: { month, channel, version: version || undefined },
+    })
+    .then((r) => r.data)
+}
+
+export function copyVersion(month, channel) {
+  return api
+    .post('/api/sales-forecast/copy-version', null, {
+      params: { month, channel },
+    })
+    .then((r) => r.data)
+}
+
+export function saveVersionReason(month, channel, version, changeReason) {
+  return api
+    .put('/api/sales-forecast/versions/reason', { changeReason }, {
+      params: { month, channel, version },
+    })
+    .then(() => {})
+}
+
+export function deleteVersion(month, channel, version) {
+  return api
+    .delete('/api/sales-forecast/versions', {
+      params: { month, channel, version },
+    })
+    .then(() => {})
+}
+
+export function getVersionDiff(month, channel, version) {
+  return api
+    .get('/api/sales-forecast/versions/diff', {
       params: { month, channel, version },
     })
     .then((r) => r.data)

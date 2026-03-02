@@ -1,14 +1,18 @@
 package com.sinker.app.service;
 
+import com.sinker.app.dto.forecast.CopyVersionResponse;
 import com.sinker.app.dto.forecast.CreateForecastRequest;
 import com.sinker.app.dto.forecast.ForecastResponse;
 import com.sinker.app.dto.forecast.UpdateForecastRequest;
+import com.sinker.app.dto.forecast.VersionDiffItemDTO;
 import com.sinker.app.dto.forecast.VersionInfo;
 import com.sinker.app.entity.SalesForecast;
 import com.sinker.app.entity.SalesForecastConfig;
+import com.sinker.app.entity.SalesForecastVersionReason;
 import com.sinker.app.exception.ResourceNotFoundException;
 import com.sinker.app.repository.SalesForecastConfigRepository;
 import com.sinker.app.repository.SalesForecastRepository;
+import com.sinker.app.repository.SalesForecastVersionReasonRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -16,10 +20,13 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -32,31 +39,31 @@ public class SalesForecastService {
 
     private final SalesForecastRepository forecastRepository;
     private final SalesForecastConfigRepository configRepository;
+    private final SalesForecastVersionReasonRepository versionReasonRepository;
     private final ErpProductService erpProductService;
     private final JdbcTemplate jdbcTemplate;
 
     public SalesForecastService(SalesForecastRepository forecastRepository,
                                SalesForecastConfigRepository configRepository,
+                               SalesForecastVersionReasonRepository versionReasonRepository,
                                ErpProductService erpProductService,
                                JdbcTemplate jdbcTemplate) {
         this.forecastRepository = forecastRepository;
         this.configRepository = configRepository;
+        this.versionReasonRepository = versionReasonRepository;
         this.erpProductService = erpProductService;
         this.jdbcTemplate = jdbcTemplate;
     }
 
     @Transactional
-    public ForecastResponse createForecast(CreateForecastRequest request, Long userId, String roleCode) {
+    public ForecastResponse createForecast(CreateForecastRequest request, Long userId, String roleCode, Set<String> authorities) {
         log.info("Creating forecast: user={}, month={}, channel={}, productCode={}",
                 userId, request.getMonth(), request.getChannel(), request.getProductCode());
 
-        // Validate month format
         validateMonthFormat(request.getMonth());
-
-        // Check month is open
-        validateMonthOpen(request.getMonth());
-
-        // Check channel ownership
+        if (!Boolean.TRUE.equals(authorities != null && authorities.contains("sales_forecast.update_after_closed"))) {
+            validateMonthOpen(request.getMonth());
+        }
         checkChannelOwnership(userId, request.getChannel(), roleCode);
 
         // Validate product via ERP
@@ -72,9 +79,13 @@ public class SalesForecastService {
                             + request.getMonth() + " and channel " + request.getChannel());
         }
 
-        // Generate version string
         LocalDateTime now = LocalDateTime.now();
-        String version = now.format(VERSION_FORMATTER) + "(" + request.getChannel() + ")";
+        // Use existing version for this month+channel so new row appears in same version list (不加版次)
+        List<String> versions = forecastRepository.findDistinctVersionsByMonthAndChannel(
+                request.getMonth(), request.getChannel());
+        String version = (versions != null && !versions.isEmpty())
+                ? versions.get(0)
+                : now.format(VERSION_FORMATTER) + "(" + request.getChannel() + ")";
 
         // Create entity
         SalesForecast forecast = new SalesForecast();
@@ -100,32 +111,27 @@ public class SalesForecastService {
 
     @Transactional
     public ForecastResponse updateForecast(Integer id, UpdateForecastRequest request,
-                                          Long userId, String roleCode) {
+                                          Long userId, String roleCode, Set<String> authorities) {
         log.info("Updating forecast: id={}, user={}, quantity={}", id, userId, request.getQuantity());
 
-        // Find existing forecast
         SalesForecast forecast = forecastRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Forecast not found with id: " + id));
 
-        // Check month is open
-        validateMonthOpen(forecast.getMonth());
-
-        // Check channel ownership
+        if (!Boolean.TRUE.equals(authorities != null && authorities.contains("sales_forecast.update_after_closed"))) {
+            validateMonthOpen(forecast.getMonth());
+        }
         checkChannelOwnership(userId, forecast.getChannel(), roleCode);
 
-        // Generate new version string
         LocalDateTime now = LocalDateTime.now();
-        String version = now.format(VERSION_FORMATTER) + "(" + forecast.getChannel() + ")";
 
-        // Update fields
+        // Update fields only; keep existing version so row stays in same version list
         forecast.setQuantity(request.getQuantity());
-        forecast.setVersion(version);
         forecast.setIsModified(true);
         forecast.setUpdatedAt(now);
 
         SalesForecast saved = forecastRepository.save(forecast);
-        log.info("Updated forecast: id={}, user={}, newQuantity={}, newVersion={}",
-                id, userId, request.getQuantity(), version);
+        log.info("Updated forecast: id={}, user={}, newQuantity={}",
+                id, userId, request.getQuantity());
 
         return ForecastResponse.fromEntity(saved);
     }
@@ -253,6 +259,110 @@ public class SalesForecastService {
 
         // No valid permission
         throw new AccessDeniedException("Missing required permission: sales_forecast.view or sales_forecast.view_own");
+    }
+
+    /** Copy latest version to a new version (yyyy/MM/dd HH:mm:ss(channel)). Requires update_after_closed. */
+    @Transactional
+    public CopyVersionResponse copyLatestToNewVersion(String month, String channel, Long userId, String roleCode) {
+        log.info("Copying latest to new version: user={}, month={}, channel={}", userId, month, channel);
+        validateMonthFormat(month);
+        checkChannelOwnership(userId, channel, roleCode);
+
+        List<SalesForecast> latest = forecastRepository.findLatestByMonthAndChannel(month, channel);
+        if (latest.isEmpty()) {
+            throw new IllegalArgumentException("No data to copy for month=" + month + ", channel=" + channel);
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        String newVersion = now.format(VERSION_FORMATTER) + "(" + channel + ")";
+
+        for (SalesForecast src : latest) {
+            SalesForecast copy = new SalesForecast();
+            copy.setMonth(src.getMonth());
+            copy.setChannel(src.getChannel());
+            copy.setCategory(src.getCategory());
+            copy.setSpec(src.getSpec());
+            copy.setProductCode(src.getProductCode());
+            copy.setProductName(src.getProductName());
+            copy.setWarehouseLocation(src.getWarehouseLocation());
+            copy.setQuantity(src.getQuantity());
+            copy.setVersion(newVersion);
+            copy.setIsModified(false);
+            copy.setCreatedAt(now);
+            copy.setUpdatedAt(now);
+            forecastRepository.save(copy);
+        }
+        log.info("Created new version: {} with {} rows", newVersion, latest.size());
+        return new CopyVersionResponse(newVersion);
+    }
+
+    /** Save change reason for a version. */
+    @Transactional
+    public void saveVersionReason(String month, String channel, String version, String changeReason) {
+        SalesForecastVersionReason entity = versionReasonRepository
+                .findByMonthAndChannelAndVersion(month, channel, version)
+                .orElseGet(() -> {
+                    SalesForecastVersionReason e = new SalesForecastVersionReason();
+                    e.setMonth(month);
+                    e.setChannel(channel);
+                    e.setVersion(version);
+                    e.setCreatedAt(LocalDateTime.now());
+                    return e;
+                });
+        entity.setChangeReason(changeReason);
+        entity.setUpdatedAt(LocalDateTime.now());
+        versionReasonRepository.save(entity);
+    }
+
+    /** Delete all forecast rows for a version (cancel new version). */
+    @Transactional
+    public void deleteVersion(String month, String channel, String version, Long userId, String roleCode) {
+        log.info("Deleting version: user={}, month={}, channel={}, version={}", userId, month, channel, version);
+        validateMonthFormat(month);
+        checkChannelOwnership(userId, channel, roleCode);
+        forecastRepository.deleteByMonthAndChannelAndVersion(month, channel, version);
+        versionReasonRepository.findByMonthAndChannelAndVersion(month, channel, version)
+                .ifPresent(versionReasonRepository::delete);
+    }
+
+    /** Diff current version vs previous version: rows where quantity differs. */
+    @Transactional(readOnly = true)
+    public List<VersionDiffItemDTO> getVersionDiff(String month, String channel, String version,
+                                                    Long userId, Set<String> authorities) {
+        validateMonthFormat(month);
+        checkQueryPermission(userId, channel, authorities);
+
+        List<String> versions = forecastRepository.findDistinctVersionsByMonthAndChannel(month, channel);
+        int idx = versions.indexOf(version);
+        if (idx < 0 || idx + 1 >= versions.size()) {
+            return List.of();
+        }
+        String previousVersion = versions.get(idx + 1);
+
+        List<SalesForecast> currentRows = forecastRepository
+                .findByMonthAndChannelAndVersionOrderByCategoryAscSpecAscProductCodeAsc(month, channel, version);
+        List<SalesForecast> previousRows = forecastRepository
+                .findByMonthAndChannelAndVersionOrderByCategoryAscSpecAscProductCodeAsc(month, channel, previousVersion);
+
+        Map<String, BigDecimal> prevQtyByProduct = previousRows.stream()
+                .collect(Collectors.toMap(SalesForecast::getProductCode, SalesForecast::getQuantity, (a, b) -> a, LinkedHashMap::new));
+
+        List<VersionDiffItemDTO> result = new ArrayList<>();
+        for (SalesForecast row : currentRows) {
+            BigDecimal prevQty = prevQtyByProduct.get(row.getProductCode());
+            if (prevQty == null || row.getQuantity().compareTo(prevQty) != 0) {
+                VersionDiffItemDTO dto = new VersionDiffItemDTO();
+                dto.setCategory(row.getCategory());
+                dto.setSpec(row.getSpec());
+                dto.setProductCode(row.getProductCode());
+                dto.setProductName(row.getProductName());
+                dto.setWarehouseLocation(row.getWarehouseLocation());
+                dto.setCurrentQuantity(row.getQuantity());
+                dto.setPreviousQuantity(prevQty != null ? prevQty : BigDecimal.ZERO);
+                result.add(dto);
+            }
+        }
+        return result;
     }
 
     public static class DuplicateEntryException extends RuntimeException {

@@ -17,6 +17,10 @@ public interface SalesForecastRepository extends JpaRepository<SalesForecast, In
     @Query("DELETE FROM SalesForecast sf WHERE sf.month = :month AND sf.channel = :channel")
     void deleteByMonthAndChannel(@Param("month") String month, @Param("channel") String channel);
 
+    @Modifying
+    @Query("DELETE FROM SalesForecast sf WHERE sf.month = :month AND sf.channel = :channel AND sf.version = :version")
+    void deleteByMonthAndChannelAndVersion(@Param("month") String month, @Param("channel") String channel, @Param("version") String version);
+
     int countByMonthAndChannel(String month, String channel);
 
     Optional<SalesForecast> findByMonthAndChannelAndProductCode(String month, String channel, String productCode);

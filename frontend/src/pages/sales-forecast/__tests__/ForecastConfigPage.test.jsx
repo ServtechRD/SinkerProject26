@@ -77,7 +77,7 @@ describe('ForecastConfigPage', () => {
     expect(screen.getByText('10')).toBeInTheDocument()
     expect(screen.getByText('15')).toBeInTheDocument()
     expect(screen.getByText('開放')).toBeInTheDocument()
-    expect(screen.getByText('已關帳')).toBeInTheDocument()
+    expect(screen.getByText('已結束新增設定')).toBeInTheDocument()
   })
 
   it('displays open status with correct badge', async () => {
@@ -96,9 +96,9 @@ describe('ForecastConfigPage', () => {
     renderPage({ permissions: ['sales_forecast_config.view'] })
 
     await waitFor(() => {
-      expect(screen.getByText('已關帳')).toBeInTheDocument()
+      expect(screen.getByText('已結束新增設定')).toBeInTheDocument()
     })
-    const badge = screen.getByText('已關帳')
+    const badge = screen.getByText('已結束新增設定')
     expect(badge.className).toContain('badge--closed')
   })
 
@@ -107,7 +107,7 @@ describe('ForecastConfigPage', () => {
     renderPage({ permissions: ['sales_forecast_config.view', 'sales_forecast_config.edit'] })
 
     await waitFor(() => {
-      expect(screen.getByText('建立月份')).toBeInTheDocument()
+      expect(screen.getByText('新增填寫月份')).toBeInTheDocument()
     })
   })
 
@@ -118,7 +118,7 @@ describe('ForecastConfigPage', () => {
     await waitFor(() => {
       expect(screen.queryByText('載入中...')).not.toBeInTheDocument()
     })
-    expect(screen.queryByText('建立月份')).not.toBeInTheDocument()
+    expect(screen.queryByText('新增填寫月份')).not.toBeInTheDocument()
   })
 
   it('hides edit buttons without edit permission', async () => {

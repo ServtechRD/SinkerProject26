@@ -4,6 +4,7 @@ import { useToast } from '../../components/Toast'
 import './ForecastConfig.css'
 
 const MONTH_PATTERN = /^\d{6}$/
+const DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => i + 1)
 
 function isValidMonth(val) {
   if (!MONTH_PATTERN.test(val)) return false
@@ -15,6 +16,7 @@ export default function CreateMonthsDialog({ open, onClose, onSuccess }) {
   const toast = useToast()
   const [startMonth, setStartMonth] = useState('')
   const [endMonth, setEndMonth] = useState('')
+  const [autoCloseDay, setAutoCloseDay] = useState(10)
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState({})
 
@@ -44,10 +46,11 @@ export default function CreateMonthsDialog({ open, onClose, onSuccess }) {
     }
     setLoading(true)
     try {
-      const result = await createMonths(startMonth, endMonth)
+      const result = await createMonths(startMonth, endMonth, autoCloseDay)
       toast.success(`已成功建立 ${result.createdCount} 個月份`)
       setStartMonth('')
       setEndMonth('')
+      setAutoCloseDay(10)
       setErrors({})
       onSuccess()
     } catch (err) {
@@ -68,6 +71,7 @@ export default function CreateMonthsDialog({ open, onClose, onSuccess }) {
   function handleClose() {
     setStartMonth('')
     setEndMonth('')
+    setAutoCloseDay(10)
     setErrors({})
     onClose()
   }
@@ -82,7 +86,7 @@ export default function CreateMonthsDialog({ open, onClose, onSuccess }) {
         onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: '480px' }}
       >
-        <h3 id="create-dialog-title" className="dialog-title">建立月份</h3>
+        <h3 id="create-dialog-title" className="dialog-title">新增填寫月份</h3>
         <form onSubmit={handleSubmit}>
           <div className="fc-dialog-field">
             <label htmlFor="startMonth">起始月份</label>
@@ -117,6 +121,23 @@ export default function CreateMonthsDialog({ open, onClose, onSuccess }) {
               disabled={loading}
             />
             {errors.endMonth && <div className="form-error">{errors.endMonth}</div>}
+          </div>
+          <div className="fc-dialog-field">
+            <label htmlFor="autoCloseDay">系統自動結束新增設定時間</label>
+            <div className="fc-dialog-field-row">
+              <select
+                id="autoCloseDay"
+                className="form-input form-select"
+                value={autoCloseDay}
+                onChange={(e) => setAutoCloseDay(Number(e.target.value))}
+                disabled={loading}
+              >
+                {DAY_OPTIONS.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+              <span className="fc-dialog-hint">每月 {String(autoCloseDay).padStart(2, '0')} 日 00:00:00</span>
+            </div>
           </div>
           <div className="dialog-actions">
             <button

@@ -44,54 +44,54 @@ describe('EditConfigDialog', () => {
   it('displays current config values', () => {
     renderDialog()
 
-    expect(screen.getByLabelText('月份')).toHaveValue('202601')
-    expect(screen.getByLabelText('自動關帳日')).toHaveValue(10)
-    expect(screen.getByLabelText('已關帳')).not.toBeChecked()
+    expect(screen.getByLabelText('填寫月份')).toHaveValue('202601')
+    expect(screen.getByLabelText('自動結束新增設定日期')).toHaveValue(10)
+    expect(screen.getByLabelText('結束新增設定')).not.toBeChecked()
   })
 
   it('month field is disabled (read-only)', () => {
     renderDialog()
-    expect(screen.getByLabelText('月份')).toBeDisabled()
+    expect(screen.getByLabelText('填寫月份')).toBeDisabled()
   })
 
   it('shows validation error for auto_close_day > 31', async () => {
     const user = userEvent.setup()
     renderDialog()
 
-    const input = screen.getByLabelText('自動關帳日')
+    const input = screen.getByLabelText('自動結束新增設定日期')
     await user.clear(input)
     await user.type(input, '32')
 
-    expect(screen.getByText('自動關帳日需為 1-31')).toBeInTheDocument()
+    expect(screen.getByText('自動結束新增設定日期需為 1-31')).toBeInTheDocument()
   })
 
   it('shows validation error for auto_close_day < 1', async () => {
     const user = userEvent.setup()
     renderDialog()
 
-    const input = screen.getByLabelText('自動關帳日')
+    const input = screen.getByLabelText('自動結束新增設定日期')
     await user.clear(input)
     await user.type(input, '0')
 
-    expect(screen.getByText('自動關帳日需為 1-31')).toBeInTheDocument()
+    expect(screen.getByText('自動結束新增設定日期需為 1-31')).toBeInTheDocument()
   })
 
   it('no validation error for valid auto_close_day', async () => {
     const user = userEvent.setup()
     renderDialog()
 
-    const input = screen.getByLabelText('自動關帳日')
+    const input = screen.getByLabelText('自動結束新增設定日期')
     await user.clear(input)
     await user.type(input, '15')
 
-    expect(screen.queryByText('自動關帳日需為 1-31')).not.toBeInTheDocument()
+    expect(screen.queryByText('自動結束新增設定日期需為 1-31')).not.toBeInTheDocument()
   })
 
   it('toggle changes is_closed state', async () => {
     const user = userEvent.setup()
     renderDialog()
 
-    const toggle = screen.getByLabelText('已關帳')
+    const toggle = screen.getByLabelText('結束新增設定')
     expect(toggle).not.toBeChecked()
 
     await user.click(toggle)
@@ -107,7 +107,7 @@ describe('EditConfigDialog', () => {
     const user = userEvent.setup()
     renderDialog()
 
-    const input = screen.getByLabelText('自動關帳日')
+    const input = screen.getByLabelText('自動結束新增設定日期')
     await user.clear(input)
     await user.type(input, '20')
 
@@ -119,7 +119,7 @@ describe('EditConfigDialog', () => {
     const user = userEvent.setup()
     const { props } = renderDialog()
 
-    const input = screen.getByLabelText('自動關帳日')
+    const input = screen.getByLabelText('自動結束新增設定日期')
     await user.clear(input)
     await user.type(input, '20')
     await user.click(screen.getByRole('button', { name: '儲存' }))
@@ -139,7 +139,7 @@ describe('EditConfigDialog', () => {
     const user = userEvent.setup()
     renderDialog()
 
-    const input = screen.getByLabelText('自動關帳日')
+    const input = screen.getByLabelText('自動結束新增設定日期')
     await user.clear(input)
     await user.type(input, '20')
     await user.click(screen.getByRole('button', { name: '儲存' }))
@@ -153,7 +153,7 @@ describe('EditConfigDialog', () => {
 
   it('does not render when not open', () => {
     renderDialog({ open: false })
-    expect(screen.queryByText('編輯設定')).not.toBeInTheDocument()
+    expect(screen.queryByText('編輯填寫月份')).not.toBeInTheDocument()
   })
 
   it('calls onClose when cancel clicked', async () => {

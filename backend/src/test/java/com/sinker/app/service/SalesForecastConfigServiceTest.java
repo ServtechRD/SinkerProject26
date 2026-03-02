@@ -58,7 +58,7 @@ class SalesForecastConfigServiceTest {
             return c;
         });
 
-        CreateMonthsResponse response = service.batchCreateMonths("202501", "202503");
+        CreateMonthsResponse response = service.batchCreateMonths("202501", "202503", 10);
 
         assertEquals(3, response.getCreatedCount());
         assertEquals(List.of("202501", "202502", "202503"), response.getMonths());
@@ -82,7 +82,7 @@ class SalesForecastConfigServiceTest {
             return c;
         });
 
-        CreateMonthsResponse response = service.batchCreateMonths("202501", "202501");
+        CreateMonthsResponse response = service.batchCreateMonths("202501", "202501", 10);
 
         assertEquals(1, response.getCreatedCount());
         assertEquals(List.of("202501"), response.getMonths());
@@ -91,7 +91,7 @@ class SalesForecastConfigServiceTest {
     @Test
     void testBatchCreateMonths_InvalidRange() {
         assertThrows(IllegalArgumentException.class,
-                () -> service.batchCreateMonths("202503", "202501"));
+                () -> service.batchCreateMonths("202503", "202501", null));
     }
 
     @Test
@@ -101,7 +101,7 @@ class SalesForecastConfigServiceTest {
         when(repository.existsByMonth("202503")).thenReturn(true);
 
         assertThrows(SalesForecastConfigService.DuplicateMonthException.class,
-                () -> service.batchCreateMonths("202501", "202503"));
+                () -> service.batchCreateMonths("202501", "202503", 10));
     }
 
     @Test
@@ -115,7 +115,7 @@ class SalesForecastConfigServiceTest {
             return c;
         });
 
-        CreateMonthsResponse response = service.batchCreateMonths("202501", "202503");
+        CreateMonthsResponse response = service.batchCreateMonths("202501", "202503", 10);
 
         assertEquals(2, response.getCreatedCount());
         assertEquals(List.of("202502", "202503"), response.getMonths());
@@ -124,7 +124,7 @@ class SalesForecastConfigServiceTest {
     @Test
     void testBatchCreateMonths_InvalidMonthFormat() {
         assertThrows(IllegalArgumentException.class,
-                () -> service.batchCreateMonths("20251", "202503"));
+                () -> service.batchCreateMonths("20251", "202503", 10));
     }
 
     @Test
@@ -136,10 +136,34 @@ class SalesForecastConfigServiceTest {
             return c;
         });
 
-        CreateMonthsResponse response = service.batchCreateMonths("202511", "202602");
+        CreateMonthsResponse response = service.batchCreateMonths("202511", "202602", 15);
 
         assertEquals(4, response.getCreatedCount());
         assertEquals(List.of("202511", "202512", "202601", "202602"), response.getMonths());
+        ArgumentCaptor<SalesForecastConfig> captor =
+                ArgumentCaptor.forClass(SalesForecastConfig.class);
+        verify(repository, times(4)).save(captor.capture());
+        for (SalesForecastConfig saved : captor.getAllValues()) {
+            assertEquals(15, saved.getAutoCloseDay());
+        }
+    }
+
+    @Test
+    void testBatchCreateMonths_CustomAutoCloseDay() {
+        when(repository.existsByMonth(anyString())).thenReturn(false);
+        when(repository.save(any(SalesForecastConfig.class))).thenAnswer(inv -> {
+            SalesForecastConfig c = inv.getArgument(0);
+            c.setId(1);
+            return c;
+        });
+
+        CreateMonthsResponse response = service.batchCreateMonths("202501", "202501", 25);
+
+        assertEquals(1, response.getCreatedCount());
+        ArgumentCaptor<SalesForecastConfig> captor =
+                ArgumentCaptor.forClass(SalesForecastConfig.class);
+        verify(repository).save(captor.capture());
+        assertEquals(25, captor.getValue().getAutoCloseDay());
     }
 
     // --- Update Config ---

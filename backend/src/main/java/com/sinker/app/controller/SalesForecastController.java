@@ -1,9 +1,12 @@
 package com.sinker.app.controller;
 
+import com.sinker.app.dto.forecast.CopyVersionResponse;
 import com.sinker.app.dto.forecast.CreateForecastRequest;
 import com.sinker.app.dto.forecast.ForecastResponse;
 import com.sinker.app.dto.forecast.IntegrationRowDTO;
+import com.sinker.app.dto.forecast.SaveVersionReasonRequest;
 import com.sinker.app.dto.forecast.UpdateForecastRequest;
+import com.sinker.app.dto.forecast.VersionDiffItemDTO;
 import com.sinker.app.dto.forecast.VersionInfo;
 import com.sinker.app.exception.ResourceNotFoundException;
 import com.sinker.app.security.JwtUserPrincipal;
@@ -74,6 +77,85 @@ public class SalesForecastController {
         return ResponseEntity.ok(forecasts);
     }
 
+    @PostMapping("/copy-version")
+    @PreAuthorize("hasAuthority('sales_forecast.update_after_closed')")
+    public ResponseEntity<CopyVersionResponse> copyLatestToNewVersion(
+            @RequestParam String month,
+            @RequestParam String channel,
+            @AuthenticationPrincipal JwtUserPrincipal principal) {
+
+        log.info("POST /api/sales-forecast/copy-version - user={}, month={}, channel={}",
+                principal.getUserId(), month, channel);
+
+        if (month == null || month.isEmpty() || channel == null || channel.isEmpty()) {
+            throw new IllegalArgumentException("Missing month or channel");
+        }
+
+        CopyVersionResponse response = forecastService.copyLatestToNewVersion(
+                month, channel, principal.getUserId(), principal.getRoleCode());
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
+    }
+
+    @PutMapping("/versions/reason")
+    @PreAuthorize("hasAuthority('sales_forecast.update_after_closed')")
+    public ResponseEntity<Void> saveVersionReason(
+            @RequestParam String month,
+            @RequestParam String channel,
+            @RequestParam String version,
+            @Valid @RequestBody SaveVersionReasonRequest request,
+            @AuthenticationPrincipal JwtUserPrincipal principal) {
+
+        log.info("PUT /api/sales-forecast/versions/reason - user={}, version={}", principal.getUserId(), version);
+
+        if (month == null || month.isEmpty() || channel == null || channel.isEmpty() || version == null || version.isEmpty()) {
+            throw new IllegalArgumentException("Missing month, channel or version");
+        }
+
+        forecastService.saveVersionReason(month, channel, version, request.getChangeReason());
+        return ResponseEntity.noContent().build();
+    }
+
+    @DeleteMapping("/versions")
+    @PreAuthorize("hasAuthority('sales_forecast.update_after_closed')")
+    public ResponseEntity<Void> deleteVersion(
+            @RequestParam String month,
+            @RequestParam String channel,
+            @RequestParam String version,
+            @AuthenticationPrincipal JwtUserPrincipal principal) {
+
+        log.info("DELETE /api/sales-forecast/versions - user={}, version={}", principal.getUserId(), version);
+
+        if (month == null || month.isEmpty() || channel == null || channel.isEmpty() || version == null || version.isEmpty()) {
+            throw new IllegalArgumentException("Missing month, channel or version");
+        }
+
+        forecastService.deleteVersion(month, channel, version, principal.getUserId(), principal.getRoleCode());
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/versions/diff")
+    @PreAuthorize("hasAnyAuthority('sales_forecast.view', 'sales_forecast.view_own')")
+    public ResponseEntity<List<VersionDiffItemDTO>> getVersionDiff(
+            @RequestParam String month,
+            @RequestParam String channel,
+            @RequestParam String version,
+            @AuthenticationPrincipal JwtUserPrincipal principal,
+            Authentication authentication) {
+
+        log.info("GET /api/sales-forecast/versions/diff - user={}, version={}", principal.getUserId(), version);
+
+        if (month == null || month.isEmpty() || channel == null || channel.isEmpty() || version == null || version.isEmpty()) {
+            throw new IllegalArgumentException("Missing month, channel or version");
+        }
+
+        Set<String> authorities = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toSet());
+        List<VersionDiffItemDTO> diff = forecastService.getVersionDiff(
+                month, channel, version, principal.getUserId(), authorities);
+        return ResponseEntity.ok(diff);
+    }
+
     @GetMapping("/versions")
     @PreAuthorize("hasAnyAuthority('sales_forecast.view', 'sales_forecast.view_own')")
     public ResponseEntity<List<VersionInfo>> queryVersions(
@@ -128,13 +210,17 @@ public class SalesForecastController {
     @PreAuthorize("hasAuthority('sales_forecast.create')")
     public ResponseEntity<ForecastResponse> createForecast(
             @Valid @RequestBody CreateForecastRequest request,
-            @AuthenticationPrincipal JwtUserPrincipal principal) {
+            @AuthenticationPrincipal JwtUserPrincipal principal,
+            Authentication authentication) {
 
         log.info("POST /api/sales-forecast - user={}, month={}, channel={}, productCode={}",
                 principal.getUserId(), request.getMonth(), request.getChannel(), request.getProductCode());
 
+        Set<String> authorities = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toSet());
         ForecastResponse response = forecastService.createForecast(
-                request, principal.getUserId(), principal.getRoleCode());
+                request, principal.getUserId(), principal.getRoleCode(), authorities);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
@@ -144,13 +230,17 @@ public class SalesForecastController {
     public ResponseEntity<ForecastResponse> updateForecast(
             @PathVariable Integer id,
             @Valid @RequestBody UpdateForecastRequest request,
-            @AuthenticationPrincipal JwtUserPrincipal principal) {
+            @AuthenticationPrincipal JwtUserPrincipal principal,
+            Authentication authentication) {
 
         log.info("PUT /api/sales-forecast/{} - user={}, quantity={}",
                 id, principal.getUserId(), request.getQuantity());
 
+        Set<String> authorities = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(Collectors.toSet());
         ForecastResponse response = forecastService.updateForecast(
-                id, request, principal.getUserId(), principal.getRoleCode());
+                id, request, principal.getUserId(), principal.getRoleCode(), authorities);
 
         return ResponseEntity.ok(response);
     }

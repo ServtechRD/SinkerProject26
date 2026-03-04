@@ -3,6 +3,7 @@ package com.sinker.app.controller;
 import com.sinker.app.dto.forecast.CopyVersionResponse;
 import com.sinker.app.dto.forecast.CreateForecastRequest;
 import com.sinker.app.dto.forecast.ForecastResponse;
+import com.sinker.app.dto.forecast.FormSummaryResponse;
 import com.sinker.app.dto.forecast.IntegrationRowDTO;
 import com.sinker.app.dto.forecast.SaveVersionReasonRequest;
 import com.sinker.app.dto.forecast.UpdateForecastRequest;
@@ -11,6 +12,7 @@ import com.sinker.app.dto.forecast.VersionInfo;
 import com.sinker.app.exception.ResourceNotFoundException;
 import com.sinker.app.security.JwtUserPrincipal;
 import com.sinker.app.service.ForecastIntegrationService;
+import com.sinker.app.service.FormSummaryService;
 import com.sinker.app.service.SalesForecastService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -39,11 +41,14 @@ public class SalesForecastController {
 
     private final SalesForecastService forecastService;
     private final ForecastIntegrationService integrationService;
+    private final FormSummaryService formSummaryService;
 
     public SalesForecastController(SalesForecastService forecastService,
-                                    ForecastIntegrationService integrationService) {
+                                    ForecastIntegrationService integrationService,
+                                    FormSummaryService formSummaryService) {
         this.forecastService = forecastService;
         this.integrationService = integrationService;
+        this.formSummaryService = formSummaryService;
     }
 
     @GetMapping
@@ -75,6 +80,22 @@ public class SalesForecastController {
                 month, channel, version, principal.getUserId(), authorities);
 
         return ResponseEntity.ok(forecasts);
+    }
+
+    @GetMapping("/form-summary")
+    @PreAuthorize("hasAuthority('sales_forecast.update_after_closed')")
+    public ResponseEntity<FormSummaryResponse> getFormSummary(
+            @RequestParam String month,
+            @AuthenticationPrincipal JwtUserPrincipal principal) {
+
+        log.info("GET /api/sales-forecast/form-summary - user={}, month={}", principal.getUserId(), month);
+
+        if (month == null || month.isEmpty()) {
+            throw new IllegalArgumentException("Missing required parameter: month");
+        }
+
+        FormSummaryResponse response = formSummaryService.getFormSummary(month);
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/copy-version")

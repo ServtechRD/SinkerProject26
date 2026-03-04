@@ -5,7 +5,7 @@ export class MainLayout {
     this.usersLink = page.getByRole('link', { name: '使用者' })
     this.forecastConfigLink = page.getByRole('link', { name: '預測設定' })
     this.forecastUploadLink = page.getByRole('link', { name: '預測上傳' })
-    this.productionPlanLink = page.getByRole('link', { name: '生產計畫' })
+    this.productionPlanLink = page.getByRole('link', { name: '生產表單' })
     this.logoutButton = page.getByRole('button', { name: '登出' })
   }
 

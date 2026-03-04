@@ -37,7 +37,7 @@ public class InventoryIntegrationController {
     @GetMapping
     @PreAuthorize("hasAuthority('inventory.view')")
     public ResponseEntity<List<InventoryIntegrationDTO>> queryInventoryIntegration(
-            @RequestParam String month,
+            @RequestParam(required = false) String month,
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate,
             @RequestParam(required = false) String version,
@@ -46,15 +46,34 @@ public class InventoryIntegrationController {
         log.info("GET /api/inventory-integration - user={}, month={}, startDate={}, endDate={}, version={}",
                 principal.getUserId(), month, startDate, endDate, version);
 
-        // Validate required parameters
-        if (month == null || month.isEmpty()) {
-            throw new IllegalArgumentException("month parameter is required");
-        }
-
         List<InventoryIntegrationDTO> results = inventoryIntegrationService.queryInventoryIntegration(
                 month, startDate, endDate, version);
 
         return ResponseEntity.ok(results);
+    }
+
+    @GetMapping("/versions")
+    @PreAuthorize("hasAuthority('inventory.view')")
+    public ResponseEntity<List<String>> getVersions(
+            @RequestParam(required = false) String month,
+            @AuthenticationPrincipal JwtUserPrincipal principal) {
+        log.info("GET /api/inventory-integration/versions - user={}, month={}", principal.getUserId(), month);
+        List<String> versions = inventoryIntegrationService.getVersions(month);
+        return ResponseEntity.ok(versions);
+    }
+
+    @PostMapping("/copy-version")
+    @PreAuthorize("hasAuthority('inventory.edit')")
+    public ResponseEntity<Map<String, String>> copyVersion(
+            @RequestParam String version,
+            @AuthenticationPrincipal JwtUserPrincipal principal) {
+        log.info("POST /api/inventory-integration/copy-version - user={}, version={}",
+                principal.getUserId(), version);
+        if (version == null || version.isEmpty()) {
+            throw new IllegalArgumentException("version parameter is required");
+        }
+        String newVersion = inventoryIntegrationService.copyVersion(version);
+        return ResponseEntity.ok(Map.of("version", newVersion));
     }
 
     @PutMapping("/{id}")

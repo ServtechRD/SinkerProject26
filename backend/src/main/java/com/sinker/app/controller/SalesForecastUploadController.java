@@ -57,14 +57,15 @@ public class SalesForecastUploadController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/template/{channel}")
-    @PreAuthorize("hasAuthority('sales_forecast.upload')")
-    public ResponseEntity<byte[]> downloadTemplate(@PathVariable String channel) {
-        log.info("GET /api/sales-forecast/template/{}", channel);
+    @GetMapping("/template")
+    @PreAuthorize("hasAnyAuthority('sales_forecast.upload', 'sales_forecast.view')")
+    public ResponseEntity<byte[]> downloadTemplate(@RequestParam("channel") String channel) {
+        log.info("GET /api/sales-forecast/template?channel={}", channel);
 
         byte[] excelBytes = templateService.generateTemplate(channel);
 
-        String filename = "sales_forecast_template_" + channel + ".xlsx";
+        String safeChannel = channel != null ? channel.replace("/", "_") : "channel";
+        String filename = "sales_forecast_template_" + safeChannel + ".xlsx";
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.parseMediaType(
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));

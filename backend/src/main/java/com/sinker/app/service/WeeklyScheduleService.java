@@ -24,6 +24,7 @@ import java.util.stream.Collectors;
 public class WeeklyScheduleService {
 
     private static final Logger log = LoggerFactory.getLogger(WeeklyScheduleService.class);
+    private static final java.util.List<String> FACTORIES = java.util.List.of("一廠", "二廠", "三廠");
 
     private final WeeklyScheduleRepository repository;
     private final WeeklyScheduleExcelParser excelParser;
@@ -95,6 +96,14 @@ public class WeeklyScheduleService {
                 weekStart,
                 factory
         );
+    }
+
+    public java.util.List<String> getFactories() {
+        return new java.util.ArrayList<>(FACTORIES);
+    }
+
+    public byte[] generateTemplate(String factory) {
+        return WeeklyScheduleTemplateService.generateTemplate();
     }
 
     public List<WeeklyScheduleDTO> getSchedules(String weekStartStr, String factory) {

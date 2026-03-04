@@ -38,9 +38,22 @@ public class InventoryIntegrationService {
     }
 
     /**
+     * Normalize month to YYYYMM (sales_forecast uses YYYYMM).
+     * Accepts YYYY-MM or YYYYMM.
+     */
+    private static String normalizeMonth(String month) {
+        if (month == null || month.isEmpty()) return month;
+        if (month.matches("\\d{6}")) return month;
+        if (month.matches("\\d{4}-\\d{2}")) {
+            return month.replace("-", "");
+        }
+        return month;
+    }
+
+    /**
      * Query inventory integration data
-     * If version is provided, retrieve saved data
-     * If version is null, perform real-time query and save results
+     * If version is provided, retrieve saved data (month optional when querying by version).
+     * If version is null, perform real-time query based on sales forecast and save results.
      */
     @Transactional
     public List<InventoryIntegrationDTO> queryInventoryIntegration(
@@ -54,63 +67,98 @@ public class InventoryIntegrationService {
             return loadSavedData(month, version);
         }
 
-        // Real-time query mode: aggregate and save
-        return performRealTimeQuery(month, startDate, endDate);
+        // Real-time query mode: month required, aggregate from sales forecast and save
+        if (month == null || month.isEmpty()) {
+            throw new IllegalArgumentException("month parameter is required when not querying by version");
+        }
+        String normalizedMonth = normalizeMonth(month);
+        return performRealTimeQuery(normalizedMonth, startDate, endDate);
     }
 
     /**
-     * Update modified subtotal by creating a new version
-     * This preserves the audit trail by not modifying the original record
+     * Update modified subtotal in place for the given record.
      */
     @Transactional
     public InventoryIntegrationDTO updateModifiedSubtotal(Integer id, BigDecimal modifiedSubtotal) {
         log.info("updateModifiedSubtotal: id={}, modifiedSubtotal={}", id, modifiedSubtotal);
 
-        // Load existing record
-        InventorySalesForecast original = inventoryForecastRepository.findById(id)
+        InventorySalesForecast entity = inventoryForecastRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Inventory integration record with ID " + id + " not found"));
 
-        // Create new record with all fields copied from original
-        InventorySalesForecast newRecord = new InventorySalesForecast();
-        newRecord.setMonth(original.getMonth());
-        newRecord.setProductCode(original.getProductCode());
-        newRecord.setProductName(original.getProductName());
-        newRecord.setCategory(original.getCategory());
-        newRecord.setSpec(original.getSpec());
-        newRecord.setWarehouseLocation(original.getWarehouseLocation());
-        newRecord.setSalesQuantity(original.getSalesQuantity());
-        newRecord.setInventoryBalance(original.getInventoryBalance());
-        newRecord.setForecastQuantity(original.getForecastQuantity());
-        newRecord.setProductionSubtotal(original.getProductionSubtotal());
-        newRecord.setModifiedSubtotal(modifiedSubtotal);
-        newRecord.setQueryStartDate(original.getQueryStartDate());
-        newRecord.setQueryEndDate(original.getQueryEndDate());
-
-        // Generate new version
-        String newVersion = generateVersion();
-        newRecord.setVersion(newVersion);
-
-        // Save new record (original remains unchanged)
-        InventorySalesForecast savedRecord = inventoryForecastRepository.save(newRecord);
-
-        log.info("Created new version: oldId={}, newId={}, newVersion={}",
-                id, savedRecord.getId(), newVersion);
-
-        return toDTO(savedRecord);
+        entity.setModifiedSubtotal(modifiedSubtotal);
+        InventorySalesForecast saved = inventoryForecastRepository.save(entity);
+        return toDTO(saved);
     }
 
     /**
-     * Load saved data from database by version
+     * List distinct versions. If month is provided, filter by month (newest first); otherwise return all versions.
+     */
+    public List<String> getVersions(String month) {
+        if (month != null && !month.isEmpty()) {
+            return inventoryForecastRepository.findDistinctVersionsByMonth(normalizeMonth(month));
+        }
+        return inventoryForecastRepository.findDistinctVersionsOrderByVersionDesc();
+    }
+
+    /**
+     * Copy all records of the given version to a new version. Month is taken from the source records.
+     */
+    @Transactional
+    public String copyVersion(String version) {
+        log.info("copyVersion: version={}", version);
+
+        List<InventorySalesForecast> source = inventoryForecastRepository
+                .findByVersionOrderByProductCodeAsc(version);
+
+        if (source.isEmpty()) {
+            throw new ResourceNotFoundException("No data found for version=" + version);
+        }
+
+        String month = source.get(0).getMonth();
+        String newVersion = generateVersion();
+        List<InventorySalesForecast> copies = new ArrayList<>();
+
+        for (InventorySalesForecast orig : source) {
+            InventorySalesForecast copy = new InventorySalesForecast();
+            copy.setMonth(orig.getMonth());
+            copy.setProductCode(orig.getProductCode());
+            copy.setProductName(orig.getProductName());
+            copy.setCategory(orig.getCategory());
+            copy.setSpec(orig.getSpec());
+            copy.setWarehouseLocation(orig.getWarehouseLocation());
+            copy.setSalesQuantity(orig.getSalesQuantity());
+            copy.setInventoryBalance(orig.getInventoryBalance());
+            copy.setForecastQuantity(orig.getForecastQuantity());
+            copy.setProductionSubtotal(orig.getProductionSubtotal());
+            copy.setModifiedSubtotal(orig.getModifiedSubtotal());
+            copy.setQueryStartDate(orig.getQueryStartDate());
+            copy.setQueryEndDate(orig.getQueryEndDate());
+            copy.setVersion(newVersion);
+            copies.add(copy);
+        }
+
+        inventoryForecastRepository.saveAll(copies);
+        log.info("Copied {} records to new version {} (month={})", copies.size(), newVersion, month);
+        return newVersion;
+    }
+
+    /**
+     * Load saved data from database by version. If month is null or empty, load by version only.
      */
     private List<InventoryIntegrationDTO> loadSavedData(String month, String version) {
         log.info("Loading saved data for month={}, version={}", month, version);
 
-        List<InventorySalesForecast> entities = inventoryForecastRepository
-                .findByMonthAndVersionOrderByProductCodeAsc(month, version);
+        List<InventorySalesForecast> entities;
+        if (month != null && !month.isEmpty()) {
+            entities = inventoryForecastRepository
+                    .findByMonthAndVersionOrderByProductCodeAsc(normalizeMonth(month), version);
+        } else {
+            entities = inventoryForecastRepository.findByVersionOrderByProductCodeAsc(version);
+        }
 
         if (entities.isEmpty()) {
-            log.info("No saved data found for month={}, version={}", month, version);
+            log.info("No saved data found for version={}", version);
             return Collections.emptyList();
         }
 
@@ -120,28 +168,29 @@ public class InventoryIntegrationService {
     }
 
     /**
-     * Perform real-time query: aggregate forecast, call ERP, calculate, and save
+     * Perform real-time query: aggregate from sales forecast (base data), call ERP for 銷貨/結存, calculate, and save.
+     * Month must be YYYYMM (normalized before call).
      */
     private List<InventoryIntegrationDTO> performRealTimeQuery(String month, String startDate, String endDate) {
-        log.info("Performing real-time query for month={}", month);
+        log.info("Performing real-time query for month={} (sales forecast as base)", month);
 
-        // Determine date range for sales query
+        // Determine date range for ERP/sales query
         String[] dateRange = determineDateRange(month, startDate, endDate);
         String queryStartDate = dateRange[0];
         String queryEndDate = dateRange[1];
 
         log.info("Query date range: {} to {}", queryStartDate, queryEndDate);
 
-        // Step 1: Get latest version of forecast data for the month
+        // Step 1: Get latest version of sales forecast for the month (data source)
         String forecastVersion = getLatestForecastVersion(month);
         if (forecastVersion == null) {
-            log.warn("No forecast data found for month={}", month);
+            log.warn("No sales forecast data found for month={}", month);
             return Collections.emptyList();
         }
 
-        log.info("Using forecast version: {}", forecastVersion);
+        log.info("Using sales forecast version: {}", forecastVersion);
 
-        // Step 2: Aggregate forecast data (sum all 12 channels per product)
+        // Step 2: Aggregate forecast data (sum all channels per product) - this is the base set of products
         List<SalesForecast> forecasts = salesForecastRepository.findByMonthAndVersion(month, forecastVersion);
         Map<ProductKey, AggregatedProduct> aggregatedProducts = aggregateForecasts(forecasts);
 
@@ -225,18 +274,19 @@ public class InventoryIntegrationService {
     }
 
     /**
-     * Determine date range for sales query
-     * If startDate/endDate not provided, use month boundaries
+     * Determine date range for ERP/sales query.
+     * If startDate/endDate not provided, use month boundaries (month is YYYYMM).
      */
     private String[] determineDateRange(String month, String startDate, String endDate) {
         String start = startDate;
         String end = endDate;
 
         if (start == null || start.isEmpty() || end == null || end.isEmpty()) {
-            // Use month boundaries
-            LocalDate monthStart = LocalDate.parse(month + "-01", DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+            // month is YYYYMM
+            int y = Integer.parseInt(month.substring(0, 4));
+            int m = Integer.parseInt(month.substring(4, 6));
+            LocalDate monthStart = LocalDate.of(y, m, 1);
             LocalDate monthEnd = monthStart.plusMonths(1).minusDays(1);
-
             start = monthStart.format(DATE_FORMATTER);
             end = monthEnd.format(DATE_FORMATTER);
         }
@@ -245,11 +295,10 @@ public class InventoryIntegrationService {
     }
 
     /**
-     * Generate unique version identifier
+     * Generate version string, same format as sales forecast: yyyy-MM-dd HH:mm:ss
      */
     private String generateVersion() {
-        String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"));
-        return "v" + timestamp;
+        return LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
     }
 
     /**

@@ -1,31 +1,13 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { listConfigs } from '../../api/forecastConfig'
-import {
-  getForecastVersions,
-  getForecastList,
-  updateForecastItem,
-  deleteForecastItem,
-} from '../../api/forecast'
+import { getFormSummary } from '../../api/forecast'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../components/Toast'
-import AddItemDialog from '../../components/forecast/AddItemDialog'
-import ConfirmDialog from '../../components/ConfirmDialog'
 import './ForecastList.css'
 
-const VALID_CHANNELS = [
-  'PX/大全聯',
-  '家樂福',
-  '7-11',
-  '全家',
-  '萊爾富',
-  'OK超商',
-  '美廉社',
-  '愛買',
-  '大潤發',
-  '好市多',
-  '頂好',
-  '楓康',
-]
+const PAGE_SIZE_OPTIONS = [10, 20, 50]
+const DEFAULT_SORT_KEY = 'category'
+const DEFAULT_SORT_ASC = true
 
 function hasPermission(user, perm) {
   return Boolean(user?.permissions && Array.isArray(user.permissions) && user.permissions.includes(perm))
@@ -36,22 +18,29 @@ function formatMonth(monthStr) {
   const year = monthStr.substring(0, 4)
   const month = monthStr.substring(4, 6)
   const monthNames = [
-    'January',
-    'February',
-    'March',
-    'April',
-    'May',
-    'June',
-    'July',
-    'August',
-    'September',
-    'October',
-    'November',
-    'December',
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
   ]
   const monthIndex = parseInt(month, 10) - 1
   const monthName = monthNames[monthIndex] || ''
   return `${monthStr} (${monthName} ${year})`
+}
+
+function getRowValue(row, key) {
+  switch (key) {
+    case 'warehouse_location':
+      return row.warehouse_location ?? row.warehouseLocation ?? ''
+    case 'category':
+      return row.category ?? ''
+    case 'spec':
+      return row.spec ?? ''
+    case 'product_name':
+      return row.product_name ?? row.productName ?? ''
+    case 'product_code':
+      return row.product_code ?? row.productCode ?? ''
+    default:
+      return ''
+  }
 }
 
 export default function ForecastListPage() {
@@ -63,47 +52,19 @@ export default function ForecastListPage() {
   const [accessDenied, setAccessDenied] = useState(false)
 
   const [selectedMonth, setSelectedMonth] = useState('')
-  const [selectedChannel, setSelectedChannel] = useState('')
-  const [selectedVersion, setSelectedVersion] = useState('')
+  const [queryClicked, setQueryClicked] = useState(false)
+  const [loadingQuery, setLoadingQuery] = useState(false)
+  const [channelVersions, setChannelVersions] = useState([])
+  const [channelOrder, setChannelOrder] = useState([])
+  const [rows, setRows] = useState([])
 
-  const [versions, setVersions] = useState([])
-  const [loadingVersions, setLoadingVersions] = useState(false)
+  const [sortKey, setSortKey] = useState(DEFAULT_SORT_KEY)
+  const [sortAsc, setSortAsc] = useState(DEFAULT_SORT_ASC)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
+  const [remarkModal, setRemarkModal] = useState(null) // { parts: string[] }
 
-  const [forecastData, setForecastData] = useState([])
-  const [loadingData, setLoadingData] = useState(false)
-
-  const [editingId, setEditingId] = useState(null)
-  const [editingValue, setEditingValue] = useState('')
-
-  const [showAddDialog, setShowAddDialog] = useState(false)
-
-  const [deleteTarget, setDeleteTarget] = useState(null)
-  const [deleting, setDeleting] = useState(false)
-
-  const editInputRef = useRef(null)
-
-  const canView = hasPermission(user, 'sales_forecast.view') || hasPermission(user, 'sales_forecast.view_own')
-  const canCreate = hasPermission(user, 'sales_forecast.create')
-  const canEdit = hasPermission(user, 'sales_forecast.edit')
-  const canDelete = hasPermission(user, 'sales_forecast.delete')
-
-  const userChannels = user?.channels || []
-  const canViewAllChannels = hasPermission(user, 'sales_forecast.view')
-  const availableChannels = canViewAllChannels
-    ? VALID_CHANNELS
-    : VALID_CHANNELS.filter((ch) => userChannels.includes(ch))
-
-  const selectedConfig = configs.find((c) => c.month === selectedMonth)
-  const isMonthClosed = selectedConfig?.isClosed || false
-  const canEditWhenClosed = hasPermission(user, 'sales_forecast.edit_closed')
-
-  const isReadOnly = isMonthClosed && !canEditWhenClosed
-
-  const canPerformActions = {
-    create: canCreate && !isReadOnly,
-    edit: canEdit && !isReadOnly,
-    delete: canDelete && !isReadOnly,
-  }
+  const canView = hasPermission(user, 'sales_forecast.update_after_closed')
 
   const fetchConfigs = useCallback(async () => {
     setLoading(true)
@@ -113,11 +74,8 @@ export default function ForecastListPage() {
       setConfigs(sorted)
       setAccessDenied(false)
     } catch (err) {
-      if (err.response?.status === 403) {
-        setAccessDenied(true)
-      } else {
-        toast.error('無法載入月份設定')
-      }
+      if (err.response?.status === 403) setAccessDenied(true)
+      else toast.error('無法載入月份設定')
     } finally {
       setLoading(false)
     }
@@ -127,165 +85,62 @@ export default function ForecastListPage() {
     fetchConfigs()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const fetchVersions = useCallback(
-    async (month, channel) => {
-      if (!month || !channel) return
-
-      setLoadingVersions(true)
-      try {
-        const data = await getForecastVersions(month, channel)
-        const versionStrings = (Array.isArray(data) ? data : []).map((item) =>
-          typeof item === 'string' ? item : item?.version
-        ).filter(Boolean)
-        setVersions(versionStrings)
-
-        if (versionStrings.length > 0) {
-          setSelectedVersion(versionStrings[0])
-        } else {
-          setSelectedVersion('')
-        }
-      } catch (err) {
-        toast.error('無法載入版本資料')
-        setVersions([])
-        setSelectedVersion('')
-      } finally {
-        setLoadingVersions(false)
-      }
-    },
-    [toast]
-  )
-
-  useEffect(() => {
-    if (selectedMonth && selectedChannel) {
-      fetchVersions(selectedMonth, selectedChannel)
-    } else {
-      setVersions([])
-      setSelectedVersion('')
-    }
-  }, [selectedMonth, selectedChannel]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const fetchData = useCallback(
-    async (month, channel, version) => {
-      if (!month || !channel || !version) return
-
-      setLoadingData(true)
-      try {
-        const data = await getForecastList(month, channel, version)
-        setForecastData(data)
-      } catch (err) {
-        if (err.response?.status === 403) {
-          toast.error('您沒有權限檢視此資料')
-        } else {
-          toast.error('無法載入預測資料')
-        }
-        setForecastData([])
-      } finally {
-        setLoadingData(false)
-      }
-    },
-    [toast]
-  )
-
-  useEffect(() => {
-    if (selectedMonth && selectedChannel && selectedVersion) {
-      fetchData(selectedMonth, selectedChannel, selectedVersion)
-    } else {
-      setForecastData([])
-    }
-  }, [selectedMonth, selectedChannel, selectedVersion]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleMonthChange = (month) => {
-    setSelectedMonth(month)
-    setSelectedChannel('')
-    setSelectedVersion('')
-    setVersions([])
-    setForecastData([])
-  }
-
-  const handleChannelChange = (channel) => {
-    setSelectedChannel(channel)
-    setSelectedVersion('')
-    setVersions([])
-    setForecastData([])
-  }
-
-  const handleVersionChange = (version) => {
-    setSelectedVersion(version)
-  }
-
-  const startEditing = (item) => {
-    if (!canPerformActions.edit) return
-    setEditingId(item.id)
-    setEditingValue(String(item.quantity))
-    setTimeout(() => editInputRef.current?.focus(), 0)
-  }
-
-  const cancelEditing = () => {
-    setEditingId(null)
-    setEditingValue('')
-  }
-
-  const saveEdit = async (id) => {
-    const numValue = Number(editingValue)
-
-    if (isNaN(numValue) || numValue < 0) {
-      toast.error('數量必須為正數')
-      return
-    }
-
+  const runQuery = useCallback(async () => {
+    if (!selectedMonth) return
+    setQueryClicked(true)
+    setLoadingQuery(true)
+    setChannelVersions([])
+    setChannelOrder([])
+    setRows([])
+    setPage(1)
     try {
-      await updateForecastItem(id, { quantity: numValue })
-      toast.success('數量已更新')
-      await fetchData(selectedMonth, selectedChannel, selectedVersion)
-      cancelEditing()
+      const data = await getFormSummary(selectedMonth)
+      setChannelVersions(data.channel_versions ?? data.channelVersions ?? [])
+      setChannelOrder(data.channel_order ?? data.channelOrder ?? [])
+      setRows(data.rows ?? [])
     } catch (err) {
-      if (err.response?.data?.error) {
-        toast.error(err.response.data.error)
-      } else {
-        toast.error('更新失敗，請重試')
-      }
-    }
-  }
-
-  const handleEditKeyDown = (e, id) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      saveEdit(id)
-    } else if (e.key === 'Escape') {
-      cancelEditing()
-    }
-  }
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return
-
-    setDeleting(true)
-    try {
-      await deleteForecastItem(deleteTarget.id)
-      toast.success('項目已刪除')
-      setDeleteTarget(null)
-      await fetchData(selectedMonth, selectedChannel, selectedVersion)
-    } catch (err) {
-      if (err.response?.data?.error) {
-        toast.error(err.response.data.error)
-      } else {
-        toast.error('刪除失敗，請重試')
-      }
+      if (err.response?.status === 403) toast.error('您沒有權限檢視此資料')
+      else toast.error('無法載入表單摘要')
+      setRows([])
     } finally {
-      setDeleting(false)
+      setLoadingQuery(false)
     }
+  }, [selectedMonth, toast])
+
+  const sortedRows = useMemo(() => {
+    const key = sortKey
+    const asc = sortAsc
+    return [...rows].sort((a, b) => {
+      const va = getRowValue(a, key)
+      const vb = getRowValue(b, key)
+      const cmp = String(va).localeCompare(String(vb), 'zh-TW')
+      return asc ? cmp : -cmp
+    })
+  }, [rows, sortKey, sortAsc])
+
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize))
+  const pageRows = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return sortedRows.slice(start, start + pageSize)
+  }, [sortedRows, page, pageSize])
+
+  const handleSort = (key) => {
+    if (sortKey === key) setSortAsc((a) => !a)
+    else {
+      setSortKey(key)
+      setSortAsc(true)
+    }
+    setPage(1)
   }
 
-  const handleAddSuccess = async () => {
-    toast.success('項目已新增')
-    setShowAddDialog(false)
-    await fetchData(selectedMonth, selectedChannel, selectedVersion)
-  }
+  useEffect(() => {
+    if (page > totalPages && totalPages >= 1) setPage(totalPages)
+  }, [page, totalPages])
 
   if (accessDenied || (!loading && !canView)) {
     return (
       <div className="forecast-list-page">
-        <h1>銷售預測</h1>
+        <h1>銷售預估量表單</h1>
         <div className="forecast-access-denied" role="alert">
           您沒有權限檢視此頁面
         </div>
@@ -293,29 +148,14 @@ export default function ForecastListPage() {
     )
   }
 
-  const latestVersion = versions.length > 0 ? versions[0] : null
-
   return (
     <div className="forecast-list-page">
       <div className="forecast-page-header">
-        <h1>銷售預測</h1>
-        {canPerformActions.create && selectedMonth && selectedChannel && (
-          <button className="btn btn--primary" onClick={() => setShowAddDialog(true)}>
-            新增項目
-          </button>
-        )}
+        <h1>銷售預估量表單</h1>
       </div>
 
-      {isReadOnly && (
-        <div className="forecast-banner forecast-banner--readonly" role="alert">
-          月份已關帳，資料為唯讀
-        </div>
-      )}
-
       {loading ? (
-        <div className="forecast-loading" role="status">
-          載入中...
-        </div>
+        <div className="forecast-loading" role="status">載入中...</div>
       ) : (
         <>
           <div className="forecast-filters">
@@ -325,7 +165,10 @@ export default function ForecastListPage() {
                 id="month-select"
                 className="form-select"
                 value={selectedMonth}
-                onChange={(e) => handleMonthChange(e.target.value)}
+                onChange={(e) => {
+                  setSelectedMonth(e.target.value)
+                  setQueryClicked(false)
+                }}
               >
                 <option value="">請選擇月份</option>
                 {configs.map((c) => (
@@ -335,149 +178,206 @@ export default function ForecastListPage() {
                 ))}
               </select>
             </div>
-
-            <div className="filter-field">
-              <label htmlFor="channel-select">通路</label>
-              <select
-                id="channel-select"
-                className="form-select"
-                value={selectedChannel}
-                onChange={(e) => handleChannelChange(e.target.value)}
-                disabled={!selectedMonth}
+            <div className="filter-field filter-field--button">
+              <label>&nbsp;</label>
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={runQuery}
+                disabled={!selectedMonth || loadingQuery}
               >
-                <option value="">請選擇通路</option>
-                {availableChannels.map((ch) => (
-                  <option key={ch} value={ch}>
-                    {ch}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div className="filter-field">
-              <label htmlFor="version-select">版本</label>
-              <select
-                id="version-select"
-                className="form-select"
-                value={selectedVersion}
-                onChange={(e) => handleVersionChange(e.target.value)}
-                disabled={!selectedMonth || !selectedChannel || loadingVersions}
-              >
-                <option value="">請選擇版本</option>
-                {versions.map((v) => (
-                  <option key={v} value={v}>
-                    {v} {v === latestVersion ? '(Latest)' : ''}
-                  </option>
-                ))}
-              </select>
+                {loadingQuery ? '查詢中...' : '查詢'}
+              </button>
             </div>
           </div>
 
-          {selectedVersion && (
-            <div className="forecast-info">
-              版本: {selectedVersion} | 項目數: {forecastData.length}
-            </div>
+          {queryClicked && (
+            <>
+              {loadingQuery ? (
+                <div className="forecast-loading" role="status">載入中...</div>
+              ) : (
+                <>
+                  {channelVersions.length > 0 && (
+                    <div className="forecast-form-summary-versions">
+                      <strong>各通路最新版號：</strong>
+                      {channelVersions.map((cv) => (
+                        <span key={cv.channel} className="forecast-version-tag">
+                          {cv.channel}: {cv.latest_version ?? cv.latestVersion ?? '-'}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {rows.length === 0 ? (
+                    <div className="forecast-empty">該月份尚無預估資料</div>
+                  ) : (
+                    <>
+                      <div className="forecast-table-wrap forecast-table-wrap--summary">
+                        <table className="forecast-table forecast-table--summary">
+                          <thead>
+                            <tr>
+                              <th
+                                className={sortKey === 'warehouse_location' ? 'sortable sort-active' : 'sortable'}
+                                onClick={() => handleSort('warehouse_location')}
+                              >
+                                庫位 {sortKey === 'warehouse_location' && (sortAsc ? '↑' : '↓')}
+                              </th>
+                              <th
+                                className={sortKey === 'category' ? 'sortable sort-active' : 'sortable'}
+                                onClick={() => handleSort('category')}
+                              >
+                                中類名稱 {sortKey === 'category' && (sortAsc ? '↑' : '↓')}
+                              </th>
+                              <th
+                                className={sortKey === 'spec' ? 'sortable sort-active' : 'sortable'}
+                                onClick={() => handleSort('spec')}
+                              >
+                                貨品規格 {sortKey === 'spec' && (sortAsc ? '↑' : '↓')}
+                              </th>
+                              <th
+                                className={sortKey === 'product_name' ? 'sortable sort-active' : 'sortable'}
+                                onClick={() => handleSort('product_name')}
+                              >
+                                品名 {sortKey === 'product_name' && (sortAsc ? '↑' : '↓')}
+                              </th>
+                              <th
+                                className={sortKey === 'product_code' ? 'sortable sort-active' : 'sortable'}
+                                onClick={() => handleSort('product_code')}
+                              >
+                                品號 {sortKey === 'product_code' && (sortAsc ? '↑' : '↓')}
+                              </th>
+                              {channelOrder.map((ch) => (
+                                <th key={ch} className="align-right channel-value-header">
+                                  {ch}
+                                </th>
+                              ))}
+                              <th className="align-right">原小計</th>
+                              <th className="align-right">小計</th>
+                              <th className="align-right">差異數</th>
+                              <th>備註</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {pageRows.map((row, idx) => {
+                              const cells = row.channel_cells ?? row.channelCells ?? []
+                              const prevSum = cells.reduce((s, c) => s + (Number(c.previous_qty ?? c.previousQty) || 0), 0)
+                              const currSum = cells.reduce((s, c) => s + (Number(c.current_qty ?? c.currentQty) || 0), 0)
+                              const remarkParts = (channelOrder || []).map((ch, i) => {
+                                const cell = cells[i]
+                                const r = cell?.remark ?? ''
+                                if (r == null || String(r).trim() === '') return null
+                                return `${ch}: ${String(r).trim()}`
+                              }).filter(Boolean)
+                              return (
+                                <tr key={idx}>
+                                  <td>{row.warehouse_location ?? row.warehouseLocation ?? '-'}</td>
+                                  <td>{row.category ?? '-'}</td>
+                                  <td>{row.spec ?? '-'}</td>
+                                  <td>{row.product_name ?? row.productName ?? '-'}</td>
+                                  <td>{row.product_code ?? row.productCode ?? '-'}</td>
+                                  {cells.map((cell, i) => (
+                                    <td key={i} className="align-right">
+                                      {cell.current_qty ?? cell.currentQty ?? '-'}
+                                    </td>
+                                  ))}
+                                  <td className="align-right">{prevSum}</td>
+                                  <td className="align-right">{currSum}</td>
+                                  <td className="align-right">{prevSum - currSum}</td>
+                                  <td className="forecast-remark-cell">
+                                    {remarkParts.length > 0 ? (
+                                      <button
+                                        type="button"
+                                        className="btn btn--small btn--outline forecast-remark-btn"
+                                        onClick={() => setRemarkModal({ parts: remarkParts })}
+                                      >
+                                        備註
+                                      </button>
+                                    ) : (
+                                      '-'
+                                    )}
+                                  </td>
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {sortedRows.length > pageSize && (
+                        <div className="forecast-pagination">
+                          <span className="forecast-pagination-info">
+                            第 {(page - 1) * pageSize + 1}–{Math.min(page * pageSize, sortedRows.length)} 筆，共 {sortedRows.length} 筆
+                          </span>
+                          <div className="forecast-pagination-buttons">
+                            <button
+                              type="button"
+                              className="btn btn--small btn--outline"
+                              disabled={page <= 1}
+                              onClick={() => setPage((p) => Math.max(1, p - 1))}
+                            >
+                              上一頁
+                            </button>
+                            <span className="forecast-pagination-page">
+                              第 {page} / {totalPages} 頁
+                            </span>
+                            <button
+                              type="button"
+                              className="btn btn--small btn--outline"
+                              disabled={page >= totalPages}
+                              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                            >
+                              下一頁
+                            </button>
+                          </div>
+                          <div className="forecast-pagination-size">
+                            <label htmlFor="page-size">每頁</label>
+                            <select
+                              id="page-size"
+                              className="form-select form-select--sm"
+                              value={pageSize}
+                              onChange={(e) => {
+                                setPageSize(Number(e.target.value))
+                                setPage(1)
+                              }}
+                            >
+                              {PAGE_SIZE_OPTIONS.map((n) => (
+                                <option key={n} value={n}>{n}</option>
+                              ))}
+                            </select>
+                            筆
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
+            </>
           )}
 
-          {loadingData ? (
-            <div className="forecast-loading" role="status">
-              載入中...
-            </div>
-          ) : selectedMonth && selectedChannel && selectedVersion ? (
-            forecastData.length === 0 ? (
-              <div className="forecast-empty">所選月份與通路無預測資料</div>
-            ) : (
-              <div className="forecast-table-wrap">
-                <table className="forecast-table">
-                  <thead>
-                    <tr>
-                      <th>類別</th>
-                      <th>規格</th>
-                      <th>產品代碼</th>
-                      <th>產品名稱</th>
-                      <th>倉儲位置</th>
-                      <th className="align-right">數量</th>
-                      {(canPerformActions.edit || canPerformActions.delete) && (
-                        <th className="actions-cell">操作</th>
-                      )}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {forecastData.map((item) => {
-                      const isEditing = editingId === item.id
-                      const isModified = (item.is_modified ?? item.isModified) === true
+          {!queryClicked && selectedMonth && (
+            <p className="forecast-hint">請選擇月份後點擊「查詢」顯示表單摘要。</p>
+          )}
 
-                      return (
-                        <tr key={item.id} className={isModified ? 'row-modified' : ''}>
-                          <td>{item.category || '-'}</td>
-                          <td>{item.spec || '-'}</td>
-                          <td>{item.productCode}</td>
-                          <td>{item.productName}</td>
-                          <td>{item.warehouseLocation || '-'}</td>
-                          <td className="align-right">
-                            {isEditing ? (
-                              <input
-                                ref={editInputRef}
-                                type="number"
-                                className="quantity-input"
-                                value={editingValue}
-                                onChange={(e) => setEditingValue(e.target.value)}
-                                onBlur={() => saveEdit(item.id)}
-                                onKeyDown={(e) => handleEditKeyDown(e, item.id)}
-                                min="0"
-                              />
-                            ) : (
-                              <span
-                                className={canPerformActions.edit ? 'quantity-editable' : ''}
-                                onClick={() => startEditing(item)}
-                                role={canPerformActions.edit ? 'button' : undefined}
-                                tabIndex={canPerformActions.edit ? 0 : undefined}
-                              >
-                                {item.quantity}
-                              </span>
-                            )}
-                          </td>
-                          {(canPerformActions.edit || canPerformActions.delete) && (
-                            <td className="actions-cell">
-                              {canPerformActions.delete && (
-                                <button
-                                  className="btn btn--small btn--danger"
-                                  onClick={() => setDeleteTarget(item)}
-                                >
-                                  刪除
-                                </button>
-                              )}
-                            </td>
-                          )}
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+          {remarkModal && (
+            <div className="forecast-remark-modal-overlay" onClick={() => setRemarkModal(null)} role="presentation">
+              <div className="forecast-remark-modal" onClick={(e) => e.stopPropagation()}>
+                <div className="forecast-remark-modal-header">
+                  <h3>各通路修改原因</h3>
+                  <button type="button" className="forecast-remark-modal-close" onClick={() => setRemarkModal(null)} aria-label="關閉">
+                    ×
+                  </button>
+                </div>
+                <ul className="forecast-remark-modal-list">
+                  {remarkModal.parts.map((line, i) => (
+                    <li key={i}>{line}</li>
+                  ))}
+                </ul>
               </div>
-            )
-          ) : (
-            <div className="forecast-empty">請選擇月份、通路與版本以檢視資料</div>
+            </div>
           )}
         </>
       )}
-
-      <AddItemDialog
-        open={showAddDialog}
-        month={selectedMonth}
-        channel={selectedChannel}
-        onClose={() => setShowAddDialog(false)}
-        onSuccess={handleAddSuccess}
-      />
-
-      <ConfirmDialog
-        open={!!deleteTarget}
-        title="刪除確認"
-        message={`確定要刪除 ${deleteTarget?.productName} 嗎？`}
-        onConfirm={handleDelete}
-        onCancel={() => setDeleteTarget(null)}
-        loading={deleting}
-      />
     </div>
   )
 }

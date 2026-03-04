@@ -1,7 +1,11 @@
 package com.sinker.app.service;
 
+import com.sinker.app.dto.forecast.ChannelCellDTO;
+import com.sinker.app.dto.forecast.ChannelVersionInfoDTO;
 import com.sinker.app.dto.forecast.CopyVersionResponse;
 import com.sinker.app.dto.forecast.CreateForecastRequest;
+import com.sinker.app.dto.forecast.FormSummaryResponse;
+import com.sinker.app.dto.forecast.FormSummaryRowDTO;
 import com.sinker.app.dto.forecast.ForecastResponse;
 import com.sinker.app.dto.forecast.UpdateForecastRequest;
 import com.sinker.app.dto.forecast.VersionDiffItemDTO;
@@ -28,6 +32,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 @Service
@@ -36,6 +41,10 @@ public class SalesForecastService {
     private static final Logger log = LoggerFactory.getLogger(SalesForecastService.class);
     private static final DateTimeFormatter VERSION_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
+
+    private static final List<String> FORM_SUMMARY_CHANNEL_ORDER = List.of(
+            "PX/大全聯", "家樂福", "7-11", "全家", "萊爾富", "OK超商",
+            "美廉社", "愛買", "大潤發", "好市多", "頂好", "楓康");
 
     private final SalesForecastRepository forecastRepository;
     private final SalesForecastConfigRepository configRepository;

@@ -16,8 +16,11 @@ import InventoryIntegrationPage from './pages/inventory/InventoryIntegrationPage
 import ProductionPlanPage from './pages/production/ProductionPlanPage'
 import WeeklySchedulePage from './pages/schedule/WeeklySchedulePage'
 import SemiProductPage from './pages/semiProduct/SemiProductPage'
+import SemiProductImportPage from './pages/semiProduct/SemiProductImportPage'
 import MaterialDemandPage from './pages/material/MaterialDemandPage'
+import MaterialDemandFormPage from './pages/material/MaterialDemandFormPage'
 import MaterialPurchasePage from './pages/material/MaterialPurchasePage'
+import MaterialPurchaseFormPage from './pages/material/MaterialPurchaseFormPage'
 
 export default function AppRoutes() {
   return (
@@ -44,8 +47,11 @@ export default function AppRoutes() {
         <Route path="production-plan" element={<ProductionPlanPage />} />
         <Route path="weekly-schedule" element={<WeeklySchedulePage />} />
         <Route path="semi-product" element={<SemiProductPage />} />
+        <Route path="semi-product/import" element={<SemiProductImportPage />} />
         <Route path="material-demand" element={<MaterialDemandPage />} />
+        <Route path="material-demand/form" element={<MaterialDemandFormPage />} />
         <Route path="material-purchase" element={<MaterialPurchasePage />} />
+        <Route path="material-purchase/form" element={<MaterialPurchaseFormPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

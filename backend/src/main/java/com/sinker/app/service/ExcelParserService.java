@@ -8,8 +8,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -58,7 +61,7 @@ public class ExcelParserService {
     }
 
     public List<SalesForecastRow> parse(MultipartFile file) {
-        validateFileFormat(file);
+        validateExcelFormat(file);
 
         try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
             Sheet sheet = workbook.getSheetAt(0);
@@ -71,7 +74,7 @@ public class ExcelParserService {
         }
     }
 
-    private void validateFileFormat(MultipartFile file) {
+    private void validateExcelFormat(MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new ExcelParseException("File is empty");
         }
@@ -83,6 +86,96 @@ public class ExcelParserService {
         if (contentType != null && !contentType.contains("spreadsheet") && !contentType.contains("octet-stream")) {
             throw new ExcelParseException("Invalid file content type: " + contentType);
         }
+    }
+
+    /**
+     * Parse CSV with headers: 中類名稱, 貨品規格, 品號, 品名, 庫位, 箱數小計.
+     */
+    public List<SalesForecastRow> parseCsv(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new ExcelParseException("File is empty");
+        }
+        String filename = file.getOriginalFilename();
+        if (filename == null || !filename.toLowerCase().endsWith(".csv")) {
+            throw new ExcelParseException("Invalid file format. Only .csv files are accepted");
+        }
+        List<SalesForecastRow> rows = new ArrayList<>();
+        List<String> errors = new ArrayList<>();
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
+            String line;
+            int lineNum = 0;
+            while ((line = reader.readLine()) != null) {
+                lineNum++;
+                line = stripBom(line);
+                if (lineNum == 1 && (line.isEmpty() || line.startsWith("中類名稱") || line.contains("品號"))) {
+                    continue; // skip header
+                }
+                if (line.trim().isEmpty()) continue;
+                String[] parts = parseCsvLine(line);
+                if (parts.length < MIN_COLUMNS) continue;
+                try {
+                    String category = parts[0] != null ? parts[0].trim() : null;
+                    String spec = parts[1] != null ? parts[1].trim() : null;
+                    String productCode = parts[2] != null ? parts[2].trim() : null;
+                    String productName = parts[3] != null ? parts[3].trim() : null;
+                    String warehouseLocation = parts[4] != null ? parts[4].trim() : null;
+                    if (productCode == null || productCode.isEmpty()) continue;
+                    BigDecimal quantity = BigDecimal.ZERO;
+                    if (parts.length > 5 && parts[5] != null && !parts[5].trim().isEmpty()) {
+                        try {
+                            quantity = new BigDecimal(parts[5].trim().replace(",", ""));
+                        } catch (NumberFormatException e) {
+                            errors.add("第" + lineNum + "列: 箱數小計必須為數字");
+                            continue;
+                        }
+                    }
+                    if (quantity.compareTo(BigDecimal.ZERO) < 0) {
+                        errors.add("第" + lineNum + "列: 箱數小計不可為負數");
+                        continue;
+                    }
+                    rows.add(new SalesForecastRow(category, spec, productCode, productName,
+                            warehouseLocation, quantity, lineNum));
+                } catch (Exception e) {
+                    errors.add("第" + lineNum + "列: " + e.getMessage());
+                }
+            }
+        } catch (IOException e) {
+            throw new ExcelParseException("Failed to read CSV file: " + e.getMessage());
+        }
+        if (!errors.isEmpty()) {
+            throw new ExcelParseException(errors);
+        }
+        if (rows.isEmpty()) {
+            throw new ExcelParseException("CSV file contains no valid data rows");
+        }
+        return rows;
+    }
+
+    private static String stripBom(String line) {
+        if (line != null && line.startsWith("\uFEFF")) {
+            return line.substring(1);
+        }
+        return line;
+    }
+
+    private static String[] parseCsvLine(String line) {
+        List<String> result = new ArrayList<>();
+        boolean inQuotes = false;
+        StringBuilder cell = new StringBuilder();
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (c == '"') {
+                inQuotes = !inQuotes;
+            } else if (c == ',' && !inQuotes) {
+                result.add(cell.toString());
+                cell = new StringBuilder();
+            } else {
+                cell.append(c);
+            }
+        }
+        result.add(cell.toString());
+        return result.toArray(new String[0]);
     }
 
     private List<SalesForecastRow> parseSheet(Sheet sheet) {

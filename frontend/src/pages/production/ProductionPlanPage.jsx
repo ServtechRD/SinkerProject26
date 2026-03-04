@@ -1,41 +1,29 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { getProductionPlan, updateProductionPlanItem } from '../../api/productionPlan'
+import { useState, useCallback, useRef, Fragment } from 'react'
+import {
+  getProductionPlan,
+  updateProductionPlanBuffer,
+} from '../../api/productionPlan'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../components/Toast'
 import './ProductionPlan.css'
 
+const MONTH_KEYS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
+const MONTH_LABELS = Object.fromEntries(
+  MONTH_KEYS.map((k) => [k, `${parseInt(k, 10)}月`])
+)
+
 function hasPermission(user, perm) {
-  return Boolean(user?.permissions && Array.isArray(user.permissions) && user.permissions.includes(perm))
+  return Boolean(
+    user?.permissions &&
+      Array.isArray(user.permissions) &&
+      user.permissions.includes(perm)
+  )
 }
 
-const MONTHS = [
-  { key: '2', label: 'Feb' },
-  { key: '3', label: 'Mar' },
-  { key: '4', label: 'Apr' },
-  { key: '5', label: 'May' },
-  { key: '6', label: 'Jun' },
-  { key: '7', label: 'Jul' },
-  { key: '8', label: 'Aug' },
-  { key: '9', label: 'Sep' },
-  { key: '10', label: 'Oct' },
-  { key: '11', label: 'Nov' },
-  { key: '12', label: 'Dec' },
-]
-
-function calculateTotal(row) {
-  let sum = 0
-  MONTHS.forEach((m) => {
-    const val = row.monthlyAllocations?.[m.key] || 0
-    sum += Number(val)
-  })
-  sum += Number(row.buffer || 0)
-  return sum
-}
-
-function calculateDifference(row) {
-  const total = calculateTotal(row)
-  const forecast = Number(row.forecast || 0)
-  return total - forecast
+function num(v) {
+  if (v == null) return 0
+  const n = Number(v)
+  return Number.isFinite(n) ? n : 0
 }
 
 export default function ProductionPlanPage() {
@@ -46,10 +34,9 @@ export default function ProductionPlanPage() {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
   const [accessDenied, setAccessDenied] = useState(false)
-  const [modifiedRows, setModifiedRows] = useState(new Map())
   const [saving, setSaving] = useState(false)
 
-  const [editingCell, setEditingCell] = useState(null)
+  const [editingRowId, setEditingRowId] = useState(null)
   const [editingValue, setEditingValue] = useState('')
   const editInputRef = useRef(null)
 
@@ -58,18 +45,16 @@ export default function ProductionPlanPage() {
 
   const fetchData = useCallback(async () => {
     if (!year) return
-
     setLoading(true)
     setAccessDenied(false)
     try {
       const result = await getProductionPlan(year)
-      setData(result)
-      setModifiedRows(new Map())
+      setData(Array.isArray(result) ? result : [])
     } catch (err) {
       if (err.response?.status === 403) {
         setAccessDenied(true)
       } else {
-        toast.error('無法載入生產計畫資料')
+        toast.error('無法載入生產表單資料')
       }
       setData([])
     } finally {
@@ -77,174 +62,157 @@ export default function ProductionPlanPage() {
     }
   }, [year, toast])
 
-  const handleLoad = () => {
-    if (modifiedRows.size > 0) {
-      if (!window.confirm('您有未儲存的變更，確定要載入新資料嗎？')) {
-        return
-      }
-    }
+  const handleQuery = () => {
     fetchData()
   }
 
-  const startEditing = (rowId, field) => {
+  const getRowId = (row) => {
+    return row.production_form_id ?? row.product_code ?? `${row.warehouse_location}-${row.product_code}`
+  }
+
+  const startEditBuffer = (row) => {
     if (!canEdit) return
-
-    const row = data.find((r) => r.id === rowId)
-    if (!row) return
-
-    let value = ''
-    if (field === 'buffer') {
-      value = String(row.buffer || 0)
-    } else if (field === 'remarks') {
-      value = row.remarks || ''
-    } else if (field.startsWith('month_')) {
-      const monthKey = field.replace('month_', '')
-      value = String(row.monthlyAllocations?.[monthKey] || 0)
-    }
-
-    setEditingCell({ rowId, field })
-    setEditingValue(value)
+    const id = getRowId(row)
+    const buf = row.buffer_quantity ?? row.bufferQuantity ?? 0
+    setEditingRowId(id)
+    setEditingValue(String(num(buf)))
     setTimeout(() => editInputRef.current?.focus(), 0)
   }
 
-  const cancelEditing = () => {
-    setEditingCell(null)
+  const cancelEdit = () => {
+    setEditingRowId(null)
     setEditingValue('')
   }
 
-  const saveEdit = () => {
-    if (!editingCell) return
-
-    const { rowId, field } = editingCell
-    const row = data.find((r) => r.id === rowId)
-    if (!row) return
-
-    let isValid = true
-    let newValue = editingValue
-
-    if (field !== 'remarks') {
-      const numValue = Number(editingValue)
-      if (isNaN(numValue) || numValue < 0) {
-        toast.error('請輸入有效的數值')
-        return
-      }
-      if (editingValue.includes('.')) {
-        const parts = editingValue.split('.')
-        if (parts[1] && parts[1].length > 2) {
-          toast.error('最多只能有兩位小數')
-          return
-        }
-      }
-      const totalDigits = editingValue.replace('.', '').length
-      if (totalDigits > 10) {
-        toast.error('數字太大（最多10位數字）')
-        return
-      }
-      newValue = numValue
+  const saveBuffer = async (row) => {
+    const productCode = row.product_code ?? row.productCode
+    const newVal = editingValue === '' ? 0 : parseFloat(editingValue)
+    if (Number.isNaN(newVal) || newVal < 0) {
+      toast.error('請輸入有效的緩衝量（≥0）')
+      return
     }
-
-    const updatedRow = { ...row }
-
-    if (field === 'buffer') {
-      updatedRow.buffer = newValue
-    } else if (field === 'remarks') {
-      updatedRow.remarks = newValue
-    } else if (field.startsWith('month_')) {
-      const monthKey = field.replace('month_', '')
-      updatedRow.monthlyAllocations = { ...updatedRow.monthlyAllocations, [monthKey]: newValue }
+    setSaving(true)
+    try {
+      await updateProductionPlanBuffer(year, productCode, newVal)
+      setData((prev) =>
+        prev.map((r) =>
+          (r.product_code ?? r.productCode) === productCode
+            ? {
+                ...r,
+                buffer_quantity: newVal,
+                bufferQuantity: newVal,
+                aggregate_total:
+                  num(r.aggregate_total ?? r.aggregateTotal) -
+                  num(r.buffer_quantity ?? r.bufferQuantity) +
+                  newVal,
+                aggregateTotal:
+                  num(r.aggregate_total ?? r.aggregateTotal) -
+                  num(r.buffer_quantity ?? r.bufferQuantity) +
+                  newVal,
+                difference:
+                  num(r.original_forecast ?? r.originalForecast) -
+                  (num(r.aggregate_total ?? r.aggregateTotal) -
+                    num(r.buffer_quantity ?? r.bufferQuantity) +
+                    newVal),
+              }
+            : r
+        )
+      )
+      toast.success('已儲存緩衝量')
+      cancelEdit()
+    } catch (err) {
+      toast.error(err.response?.data?.message || '儲存失敗')
+    } finally {
+      setSaving(false)
     }
-
-    const newData = data.map((r) => (r.id === rowId ? updatedRow : r))
-    setData(newData)
-
-    const newModified = new Map(modifiedRows)
-    newModified.set(rowId, updatedRow)
-    setModifiedRows(newModified)
-
-    cancelEditing()
   }
 
-  const handleEditKeyDown = (e) => {
+  const handleEditKeyDown = (e, row) => {
     if (e.key === 'Enter') {
       e.preventDefault()
-      saveEdit()
+      saveBuffer(row)
     } else if (e.key === 'Escape') {
-      cancelEditing()
-    } else if (e.key === 'Tab') {
-      e.preventDefault()
-      saveEdit()
-      // Tab navigation could be enhanced here
+      cancelEdit()
     }
   }
 
-  const handleSave = async () => {
-    if (modifiedRows.size === 0) return
-
-    setSaving(true)
-    const rowsToSave = Array.from(modifiedRows.values())
-
-    let successCount = 0
-    let failCount = 0
-
-    for (const row of rowsToSave) {
-      try {
-        await updateProductionPlanItem(row.id, {
-          monthlyAllocations: row.monthlyAllocations,
-          buffer: row.buffer,
-          remarks: row.remarks,
-        })
-        successCount++
-      } catch (err) {
-        failCount++
-        console.error('Failed to save row:', row.id, err)
-      }
+  const exportExcel = () => {
+    if (data.length === 0) {
+      toast.error('尚無資料可匯出')
+      return
     }
-
-    setSaving(false)
-
-    if (failCount === 0) {
-      toast.success(`成功儲存 ${successCount} 筆記錄`)
-      setModifiedRows(new Map())
-      fetchData()
-    } else if (successCount === 0) {
-      toast.error('儲存失敗，請重試')
-    } else {
-      toast.error(`部分儲存失敗：成功 ${successCount} 筆，失敗 ${failCount} 筆`)
-      // Refresh to get consistent state
-      fetchData()
-    }
+    const channelOrder =
+      data[0]?.channel_data?.map((c) => c.channel) ?? []
+    const headers = [
+      '庫位',
+      '中類名稱',
+      '貨品規格',
+      '品名',
+      '品號',
+      ...channelOrder.flatMap((ch) => [
+        ...MONTH_KEYS.map((k) => `${ch}-${MONTH_LABELS[k]}`),
+        `${ch}-Total`,
+      ]),
+      ...MONTH_KEYS.map((k) => `合計-${MONTH_LABELS[k]}`),
+      '緩衝量',
+      '合計-Total',
+      '原始預估',
+      '差異',
+      '備註',
+    ]
+    const rows = data.map((row) => {
+      const cd = row.channel_data ?? []
+      const channelCells = channelOrder.map((ch) => {
+        const c = cd.find((x) => x.channel === ch) ?? {}
+        const months = c.months ?? {}
+        const total = num(c.total)
+        return [
+          ...MONTH_KEYS.map((k) => num(months[k])),
+          total,
+        ]
+      }).flat()
+      const agg = row.aggregate_months ?? row.aggregateMonths ?? {}
+      const aggMonths = MONTH_KEYS.map((k) => num(agg[k]))
+      const buf = num(row.buffer_quantity ?? row.bufferQuantity)
+      const aggTotal = num(row.aggregate_total ?? row.aggregateTotal)
+      const orig = num(row.original_forecast ?? row.originalForecast)
+      const diff = num(row.difference)
+      return [
+        row.warehouse_location ?? row.warehouseLocation ?? '',
+        row.category ?? '',
+        row.spec ?? '',
+        row.product_name ?? row.productName ?? '',
+        row.product_code ?? row.productCode ?? '',
+        ...channelCells,
+        ...aggMonths,
+        buf,
+        aggTotal,
+        orig,
+        diff,
+        row.remarks ?? '',
+      ]
+    })
+    const csvContent = [
+      headers.join(','),
+      ...rows.map((r) =>
+        r.map((c) => (typeof c === 'string' && (c.includes(',') || c.includes('"') || c.includes('\n')) ? `"${String(c).replace(/"/g, '""')}"` : c)).join(',')
+      ),
+    ].join('\n')
+    const BOM = '\uFEFF'
+    const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `生產表單_${year}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    toast.success('已匯出 CSV')
   }
-
-  const handleCancel = () => {
-    if (modifiedRows.size > 5) {
-      if (!window.confirm(`確定要取消 ${modifiedRows.size} 筆變更嗎？`)) {
-        return
-      }
-    } else if (modifiedRows.size > 0) {
-      if (!window.confirm('確定要取消變更嗎？')) {
-        return
-      }
-    }
-    fetchData()
-  }
-
-  useEffect(() => {
-    const handleBeforeUnload = (e) => {
-      if (modifiedRows.size > 0) {
-        e.preventDefault()
-        e.returnValue = `您有 ${modifiedRows.size} 筆未儲存的變更`
-        return e.returnValue
-      }
-    }
-
-    window.addEventListener('beforeunload', handleBeforeUnload)
-    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
-  }, [modifiedRows])
 
   if (accessDenied || (!loading && !canView)) {
     return (
       <div className="production-plan-page">
-        <h1>生產計畫</h1>
+        <h1>生產表單</h1>
         <div className="production-access-denied" role="alert">
           您沒有權限檢視此頁面
         </div>
@@ -253,37 +221,28 @@ export default function ProductionPlanPage() {
   }
 
   const yearOptions = []
-  for (let y = 2020; y <= 2030; y++) {
-    yearOptions.push(y)
-  }
+  for (let y = 2020; y <= 2030; y++) yearOptions.push(y)
+
+  const channelOrder = data[0]?.channel_data?.map((c) => c.channel) ?? []
 
   return (
     <div className="production-plan-page">
       <div className="production-page-header">
-        <h1>生產計畫 - {year}</h1>
-        {modifiedRows.size > 0 && (
-          <div className="production-actions">
-            <button
-              className="btn btn--primary"
-              onClick={handleSave}
-              disabled={saving}
-            >
-              {saving ? '儲存中...' : `儲存 (${modifiedRows.size})`}
-            </button>
-            <button
-              className="btn btn--secondary"
-              onClick={handleCancel}
-              disabled={saving}
-            >
-              取消
-            </button>
-          </div>
+        <h1>生產表單</h1>
+        {data.length > 0 && canView && (
+          <button
+            type="button"
+            className="btn btn--outline"
+            onClick={exportExcel}
+          >
+            Excel 匯出
+          </button>
         )}
       </div>
 
       <div className="production-controls">
         <div className="control-group">
-          <label htmlFor="year-select">年度</label>
+          <label htmlFor="year-select">年份</label>
           <select
             id="year-select"
             className="form-select"
@@ -298,17 +257,16 @@ export default function ProductionPlanPage() {
             ))}
           </select>
           <button
+            type="button"
             className="btn btn--primary"
-            onClick={handleLoad}
+            onClick={handleQuery}
             disabled={loading}
           >
-            {loading ? '載入中...' : '載入'}
+            {loading ? '查詢中...' : '查詢'}
           </button>
         </div>
         {data.length > 0 && (
-          <div className="production-info">
-            總計: {data.length} 產品/通路組合
-          </div>
+          <div className="production-info">共 {data.length} 筆</div>
         )}
       </div>
 
@@ -317,127 +275,134 @@ export default function ProductionPlanPage() {
           載入中...
         </div>
       ) : data.length === 0 ? (
-        <div className="production-empty">所選年度無生產計畫資料</div>
+        <div className="production-empty">
+          請選擇年份並按「查詢」取得生產表單資料
+        </div>
       ) : (
         <div className="production-grid-wrap">
-          <table className="production-grid">
+          <table className="production-grid production-form-table">
             <thead>
               <tr>
-                <th className="frozen-col frozen-col-1">產品代碼</th>
-                <th className="frozen-col frozen-col-2">產品名稱</th>
-                <th>類別</th>
-                <th>規格</th>
-                <th>倉儲位置</th>
-                <th>通路</th>
-                {MONTHS.map((m) => (
-                  <th key={m.key} className="month-col">
-                    {m.label}
+                <th className="frozen-col frozen-col-1">庫位</th>
+                <th className="frozen-col frozen-col-2">中類名稱</th>
+                <th className="frozen-col frozen-col-3">貨品規格</th>
+                <th>品名</th>
+                <th>品號</th>
+                {channelOrder.map((ch) => (
+                  <th key={ch} colSpan={MONTH_KEYS.length + 1} className="channel-group">
+                    {ch}
                   </th>
                 ))}
-                <th className="numeric-col">Buffer</th>
+                <th colSpan={MONTH_KEYS.length + 2} className="aggregate-group">
+                  合計
+                </th>
+                <th className="numeric-col">原始預估</th>
+                <th className="numeric-col">差異</th>
+                <th>備註</th>
+              </tr>
+              <tr>
+                <th className="frozen-col frozen-col-1" />
+                <th className="frozen-col frozen-col-2" />
+                <th className="frozen-col frozen-col-3" />
+                <th />
+                <th />
+                {channelOrder.map((ch) => (
+                  <Fragment key={ch}>
+                    {MONTH_KEYS.map((k) => (
+                      <th key={`${ch}-${k}`} className="month-col">
+                        {MONTH_LABELS[k]}
+                      </th>
+                    ))}
+                    <th className="numeric-col">Total</th>
+                  </Fragment>
+                ))}
+                {MONTH_KEYS.map((k) => (
+                  <th key={`agg-${k}`} className="month-col">
+                    {MONTH_LABELS[k]}
+                  </th>
+                ))}
+                <th className="numeric-col">緩衝量{canEdit && <span className="edit-hint">(可點擊編輯)</span>}</th>
                 <th className="numeric-col">Total</th>
-                <th className="numeric-col">Forecast</th>
-                <th className="numeric-col">Diff</th>
-                <th>Remarks</th>
+                <th className="numeric-col" />
+                <th className="numeric-col" />
+                <th />
               </tr>
             </thead>
             <tbody>
-              {data.map((row) => {
-                const isModified = modifiedRows.has(row.id)
-                const total = calculateTotal(row)
-                const diff = calculateDifference(row)
+              {data.map((row, idx) => {
+                const rowId = getRowId(row)
+                const isEditing = editingRowId === rowId
+                const cd = row.channel_data ?? []
+                const agg = row.aggregate_months ?? row.aggregateMonths ?? {}
+                const buf = row.buffer_quantity ?? row.bufferQuantity
+                const aggTotal = row.aggregate_total ?? row.aggregateTotal
+                const orig = row.original_forecast ?? row.originalForecast
+                const diff = num(row.difference)
 
                 return (
-                  <tr key={row.id} className={isModified ? 'row-modified' : ''}>
-                    <td className="frozen-col frozen-col-1">{row.productCode}</td>
-                    <td className="frozen-col frozen-col-2">{row.productName}</td>
-                    <td>{row.category || '-'}</td>
-                    <td>{row.spec || '-'}</td>
-                    <td>{row.warehouseLocation || '-'}</td>
-                    <td>{row.channel}</td>
-                    {MONTHS.map((m) => {
-                      const field = `month_${m.key}`
-                      const isEditing =
-                        editingCell?.rowId === row.id && editingCell?.field === field
-                      const value = row.monthlyAllocations?.[m.key] || 0
-
+                  <tr key={rowId}>
+                    <td className="frozen-col frozen-col-1">
+                      {row.warehouse_location ?? row.warehouseLocation ?? '-'}
+                    </td>
+                    <td className="frozen-col frozen-col-2">
+                      {row.category ?? '-'}
+                    </td>
+                    <td className="frozen-col frozen-col-3">{row.spec ?? '-'}</td>
+                    <td>{row.product_name ?? row.productName ?? '-'}</td>
+                    <td>{row.product_code ?? row.productCode ?? '-'}</td>
+                    {channelOrder.map((ch) => {
+                      const c = cd.find((x) => x.channel === ch) ?? {}
+                      const months = c.months ?? {}
                       return (
-                        <td key={m.key} className="numeric-col editable-cell">
-                          {isEditing ? (
-                            <input
-                              ref={editInputRef}
-                              type="text"
-                              className="cell-input"
-                              value={editingValue}
-                              onChange={(e) => setEditingValue(e.target.value)}
-                              onBlur={saveEdit}
-                              onKeyDown={handleEditKeyDown}
-                            />
-                          ) : (
-                            <span
-                              className={canEdit ? 'editable' : ''}
-                              onClick={() => startEditing(row.id, field)}
-                              role={canEdit ? 'button' : undefined}
-                              tabIndex={canEdit ? 0 : undefined}
-                            >
-                              {Number(value).toFixed(2)}
-                            </span>
-                          )}
-                        </td>
+                        <Fragment key={ch}>
+                          {MONTH_KEYS.map((k) => (
+                            <td key={`${ch}-${k}`} className="numeric-col">
+                              {num(months[k])}
+                            </td>
+                          ))}
+                          <td className="numeric-col">{num(c.total)}</td>
+                        </Fragment>
                       )
                     })}
+                    {MONTH_KEYS.map((k) => (
+                      <td key={`agg-${k}`} className="numeric-col">
+                        {num(agg[k])}
+                      </td>
+                    ))}
                     <td className="numeric-col editable-cell">
-                      {editingCell?.rowId === row.id && editingCell?.field === 'buffer' ? (
+                      {isEditing ? (
                         <input
                           ref={editInputRef}
                           type="text"
                           className="cell-input"
                           value={editingValue}
                           onChange={(e) => setEditingValue(e.target.value)}
-                          onBlur={saveEdit}
-                          onKeyDown={handleEditKeyDown}
+                          onBlur={() => saveBuffer(row)}
+                          onKeyDown={(e) => handleEditKeyDown(e, row)}
                         />
                       ) : (
                         <span
                           className={canEdit ? 'editable' : ''}
-                          onClick={() => startEditing(row.id, 'buffer')}
+                          onClick={() => startEditBuffer(row)}
                           role={canEdit ? 'button' : undefined}
                           tabIndex={canEdit ? 0 : undefined}
+                          title={canEdit ? '點擊編輯緩衝量' : undefined}
                         >
-                          {Number(row.buffer || 0).toFixed(2)}
+                          {num(buf)}
                         </span>
                       )}
                     </td>
-                    <td className="numeric-col">{total.toFixed(2)}</td>
-                    <td className="numeric-col">{Number(row.forecast || 0).toFixed(2)}</td>
+                    <td className="numeric-col">{num(aggTotal)}</td>
+                    <td className="numeric-col">{num(orig)}</td>
                     <td
-                      className={`numeric-col ${diff > 0 ? 'diff-positive' : diff < 0 ? 'diff-negative' : ''}`}
+                      className={`numeric-col ${
+                        diff > 0 ? 'diff-positive' : diff < 0 ? 'diff-negative' : ''
+                      }`}
                     >
                       {diff > 0 ? '+' : ''}
-                      {diff.toFixed(2)}
+                      {diff}
                     </td>
-                    <td className="editable-cell remarks-cell">
-                      {editingCell?.rowId === row.id && editingCell?.field === 'remarks' ? (
-                        <input
-                          ref={editInputRef}
-                          type="text"
-                          className="cell-input"
-                          value={editingValue}
-                          onChange={(e) => setEditingValue(e.target.value)}
-                          onBlur={saveEdit}
-                          onKeyDown={handleEditKeyDown}
-                        />
-                      ) : (
-                        <span
-                          className={canEdit ? 'editable' : ''}
-                          onClick={() => startEditing(row.id, 'remarks')}
-                          role={canEdit ? 'button' : undefined}
-                          tabIndex={canEdit ? 0 : undefined}
-                        >
-                          {row.remarks || '-'}
-                        </span>
-                      )}
-                    </td>
+                    <td className="remarks-cell">{row.remarks ?? '-'}</td>
                   </tr>
                 )
               })}

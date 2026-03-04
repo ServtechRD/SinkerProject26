@@ -62,6 +62,21 @@ function escapeCsvCell(val) {
   return s
 }
 
+function downloadDefaultForecastTemplate(channel) {
+  const BOM = '\uFEFF'
+  const headers = ['中類名稱', '貨品規格', '品號', '品名', '庫位', '箱數小計']
+  const csv = BOM + headers.join(',') + '\r\n'
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = `銷售預估量範本_${channel || 'channel'}.csv`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.URL.revokeObjectURL(url)
+}
+
 function downloadForecastCsv(data, filename) {
   const headers = ['中類名稱', '貨品規格', '品號', '品名', '庫位', '箱數小計']
   const rows = data.map((item) => [
@@ -245,8 +260,9 @@ export default function ForecastUploadPage() {
       setSelectedFile(null)
       return
     }
-    if (!file.name.toLowerCase().endsWith('.xlsx')) {
-      setFileError('請上傳有效的 Excel 檔案 (.xlsx)')
+    const ext = file.name.toLowerCase()
+    if (!ext.endsWith('.xlsx') && !ext.endsWith('.csv')) {
+      setFileError('請上傳 Excel (.xlsx) 或 CSV 檔案')
       return
     }
     const maxSize = 10 * 1024 * 1024
@@ -262,8 +278,18 @@ export default function ForecastUploadPage() {
     setDownloadingTemplate(true)
     try {
       await downloadTemplate(selectedChannel)
+      toast.success('範本下載成功')
     } catch (err) {
-      toast.error('下載範本失敗')
+      let msg = err?.message || '下載範本失敗'
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text()
+          const body = JSON.parse(text)
+          if (Array.isArray(body.details)) msg = body.details.join('; ')
+          else if (body.message) msg = body.message
+        } catch (_) {}
+      }
+      toast.error(msg)
     } finally {
       setDownloadingTemplate(false)
     }
@@ -427,7 +453,7 @@ export default function ForecastUploadPage() {
   if (accessDenied || (!loading && !canUpload && !canUpdateAfterClosed)) {
     return (
       <div className="forecast-upload-page">
-        <h1>預測上傳</h1>
+        <h1>銷售預估量-共同編輯界面</h1>
         <div className="forecast-access-denied" role="alert">
           您沒有權限檢視此頁面
         </div>
@@ -437,7 +463,7 @@ export default function ForecastUploadPage() {
 
   return (
     <div className="forecast-upload-page">
-      <h1>預測上傳</h1>
+      <h1>銷售預估量-共同編輯界面</h1>
 
       {loading ? (
         <div className="forecast-loading" role="status">載入中...</div>
@@ -530,6 +556,8 @@ export default function ForecastUploadPage() {
                   onFileChange={handleFileChange}
                   error={fileError}
                   disabled={uploading || !canUploadSection}
+                  accept=".xlsx,.csv"
+                  acceptHint="支援 .xlsx、.csv，檔案大小上限 10MB"
                 />
               </div>
               <div className="upload-form-actions">
@@ -539,7 +567,15 @@ export default function ForecastUploadPage() {
                   onClick={handleDownloadTemplate}
                   disabled={!selectedChannel || downloadingTemplate}
                 >
-                  {downloadingTemplate ? '下載中...' : '下載範本'}
+                  {downloadingTemplate ? '下載中...' : '下載 Excel 範本'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--outline"
+                  onClick={() => selectedChannel && downloadDefaultForecastTemplate(selectedChannel)}
+                  disabled={!selectedChannel}
+                >
+                  下載 CSV 範本
                 </button>
                 <button
                   type="button"

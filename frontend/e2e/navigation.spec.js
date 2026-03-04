@@ -53,7 +53,7 @@ test.describe('Navigation', () => {
 
     expect(page.url()).toContain('/production-plan')
     await expect(layout.productionPlanLink).toHaveClass(/sidebar-link--active/)
-    await expect(page.getByRole('heading', { name: /生產計畫/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /生產表單/ })).toBeVisible()
   })
 
   test('sidebar navigation between pages', async ({ page }) => {
@@ -66,7 +66,7 @@ test.describe('Navigation', () => {
     await layout.clickProductionPlan()
     await page.waitForURL('**/production-plan')
     await expect(layout.productionPlanLink).toHaveClass(/sidebar-link--active/)
-    await expect(page.getByRole('heading', { name: /生產計畫/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: /生產表單/ })).toBeVisible()
   })
 
   test('logout clears auth and redirects to login', async ({ page }) => {

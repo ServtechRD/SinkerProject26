@@ -8,7 +8,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,6 +43,69 @@ public class SemiProductExcelParser {
         public String getProductName() { return productName; }
         public Integer getAdvanceDays() { return advanceDays; }
         public int getRowNumber() { return rowNumber; }
+    }
+
+    /** Parse CSV: 品號,品名,提前日數 (header optional). */
+    public List<SemiProductRow> parseCsv(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new ExcelParseException("File is empty");
+        }
+        String filename = file.getOriginalFilename();
+        if (filename == null || !filename.toLowerCase().endsWith(".csv")) {
+            throw new ExcelParseException("Invalid file format. Only .csv files are accepted");
+        }
+        List<SemiProductRow> rows = new ArrayList<>();
+        List<String> errors = new ArrayList<>();
+        try (BufferedReader reader = new BufferedReader(
+                new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
+            String line;
+            int lineNum = 0;
+            while ((line = reader.readLine()) != null) {
+                lineNum++;
+                line = line.trim();
+                if (line.isEmpty()) continue;
+                String[] parts = line.split(",", -1);
+                if (parts.length < MIN_COLUMNS) {
+                    errors.add("Row " + lineNum + ": expected 3 columns (品號,品名,提前日數)");
+                    continue;
+                }
+                String productCode = parts[COL_PRODUCT_CODE].trim();
+                String productName = parts[COL_PRODUCT_NAME].trim();
+                String advanceStr = parts[COL_ADVANCE_DAYS].trim();
+                if (lineNum == 1 && productCode.equals("品號") && productName.equals("品名") && advanceStr.equals("提前日數")) {
+                    continue;
+                }
+                if (productCode.isEmpty()) {
+                    errors.add("Row " + lineNum + ": product_code is required");
+                    continue;
+                }
+                if (productName.isEmpty()) {
+                    errors.add("Row " + lineNum + ": product_name is required");
+                    continue;
+                }
+                int advanceDays;
+                try {
+                    advanceDays = Integer.parseInt(advanceStr);
+                } catch (NumberFormatException e) {
+                    errors.add("Row " + lineNum + ": advance_days must be a valid integer");
+                    continue;
+                }
+                if (advanceDays <= 0) {
+                    errors.add("Row " + lineNum + ": advance_days must be positive");
+                    continue;
+                }
+                rows.add(new SemiProductRow(productCode, productName, advanceDays, lineNum));
+            }
+        } catch (IOException e) {
+            throw new ExcelParseException("Failed to read CSV file: " + e.getMessage());
+        }
+        if (!errors.isEmpty()) {
+            throw new ExcelParseException(errors);
+        }
+        if (rows.isEmpty()) {
+            throw new ExcelParseException("CSV file contains no valid data rows");
+        }
+        return rows;
     }
 
     public List<SemiProductRow> parse(MultipartFile file) {

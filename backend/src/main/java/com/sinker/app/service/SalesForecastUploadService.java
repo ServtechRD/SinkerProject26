@@ -80,11 +80,18 @@ public class SalesForecastUploadService {
             checkChannelOwnership(userId, channel);
         }
 
-        // 5. Parse Excel
-        List<SalesForecastRow> rows = excelParserService.parse(file);
+        // 5. Parse file (Excel or CSV)
+        String filename = file.getOriginalFilename();
+        if (filename == null || (!filename.toLowerCase().endsWith(".csv") && !filename.toLowerCase().endsWith(".xlsx"))) {
+            throw new IllegalArgumentException("Only .csv or .xlsx files are accepted");
+        }
+        boolean isCsv = filename.toLowerCase().endsWith(".csv");
+        List<SalesForecastRow> rows = isCsv
+                ? excelParserService.parseCsv(file)
+                : excelParserService.parse(file);
 
         if (rows.isEmpty()) {
-            throw new ExcelParseException("Excel file has no data rows");
+            throw new ExcelParseException(isCsv ? "CSV file has no data rows" : "Excel file has no data rows");
         }
 
         // 6. Validate each row against ERP

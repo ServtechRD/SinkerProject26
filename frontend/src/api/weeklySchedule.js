@@ -1,5 +1,9 @@
 import api from './axios'
 
+export function getWeeklyScheduleFactories() {
+  return api.get('/api/weekly-schedule/factories').then((r) => r.data)
+}
+
 export function uploadWeeklySchedule(file, weekStart, factory) {
   const formData = new FormData()
   formData.append('file', file)
@@ -17,10 +21,21 @@ export function uploadWeeklySchedule(file, weekStart, factory) {
 
 export function downloadWeeklyScheduleTemplate(factory) {
   return api
-    .get(`/api/weekly-schedule/template/${factory}`, {
+    .get(`/api/weekly-schedule/template/${encodeURIComponent(factory)}`, {
       responseType: 'blob',
     })
     .then((r) => {
+      const contentType = r.headers?.['content-type'] || ''
+      if (contentType.includes('application/json')) {
+        return r.data.text().then((text) => {
+          let msg = '下載範本失敗'
+          try {
+            const body = JSON.parse(text)
+            if (body.message) msg = body.message
+          } catch (_) {}
+          throw new Error(msg)
+        })
+      }
       const blob = new Blob([r.data], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       })

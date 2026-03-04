@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import './FileDropzone.css'
 
-export default function FileDropzone({ file, onFileChange, error, disabled }) {
+export default function FileDropzone({ file, onFileChange, error, disabled, accept = '.xlsx', acceptHint }) {
   const [dragging, setDragging] = useState(false)
 
   const handleDragOver = (e) => {
@@ -70,12 +70,12 @@ export default function FileDropzone({ file, onFileChange, error, disabled }) {
               />
             </svg>
           </div>
-          <div className="file-dropzone-text">拖放 Excel 檔案到此處，或點擊瀏覽</div>
-          <div className="file-dropzone-hint">僅支援 .xlsx 檔案，檔案大小上限 10MB</div>
+          <div className="file-dropzone-text">拖放檔案到此處，或點擊瀏覽</div>
+          <div className="file-dropzone-hint">{acceptHint ?? '僅支援 .xlsx 檔案，檔案大小上限 10MB'}</div>
           <input
             id="file-input"
             type="file"
-            accept=".xlsx"
+            accept={accept}
             onChange={handleFileInput}
             style={{ display: 'none' }}
             disabled={disabled}

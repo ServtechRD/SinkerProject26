@@ -3,15 +3,19 @@ package com.sinker.app.service;
 import com.sinker.app.dto.erp.ErpOrderRequest;
 import com.sinker.app.dto.erp.ErpOrderResponse;
 import com.sinker.app.dto.materialpurchase.MaterialPurchaseDTO;
+import com.sinker.app.dto.materialpurchase.MaterialPurchaseUpdateDTO;
 import com.sinker.app.entity.MaterialPurchase;
 import com.sinker.app.exception.AlreadyTriggeredErpException;
 import com.sinker.app.exception.ResourceNotFoundException;
 import com.sinker.app.repository.MaterialPurchaseRepository;
+import com.sinker.app.util.MaterialPurchaseExcelParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -24,11 +28,14 @@ public class MaterialPurchaseService {
 
     private final MaterialPurchaseRepository materialPurchaseRepository;
     private final ErpPurchaseService erpPurchaseService;
+    private final MaterialPurchaseExcelParser excelParser;
 
     public MaterialPurchaseService(MaterialPurchaseRepository materialPurchaseRepository,
-                                   ErpPurchaseService erpPurchaseService) {
+                                   ErpPurchaseService erpPurchaseService,
+                                   MaterialPurchaseExcelParser excelParser) {
         this.materialPurchaseRepository = materialPurchaseRepository;
         this.erpPurchaseService = erpPurchaseService;
+        this.excelParser = excelParser;
     }
 
     @Transactional(readOnly = true)
@@ -86,5 +93,76 @@ public class MaterialPurchaseService {
                 id, savedPurchase.getErpOrderNo());
 
         return MaterialPurchaseDTO.fromEntity(savedPurchase);
+    }
+
+    @Transactional
+    public MaterialPurchaseDTO update(Integer id, MaterialPurchaseUpdateDTO dto) {
+        MaterialPurchase entity = materialPurchaseRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Material purchase not found with id: " + id));
+        if (dto.getKgPerBox() != null) {
+            if (dto.getKgPerBox().compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("公斤/箱 must be >= 0");
+            }
+            entity.setKgPerBox(dto.getKgPerBox());
+        }
+        if (dto.getBasketQuantity() != null) {
+            if (dto.getBasketQuantity().compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("籃數 must be >= 0");
+            }
+            entity.setBasketQuantity(dto.getBasketQuantity());
+        }
+        if (dto.getBoxesPerBarrel() != null) {
+            if (dto.getBoxesPerBarrel().compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("箱/桶 must be >= 0");
+            }
+            entity.setBoxesPerBarrel(dto.getBoxesPerBarrel());
+        }
+        if (dto.getRequiredBarrels() != null) {
+            if (dto.getRequiredBarrels().compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("所需桶數 must be >= 0");
+            }
+            entity.setRequiredBarrels(dto.getRequiredBarrels());
+        }
+        entity.setUpdatedAt(LocalDateTime.now());
+        MaterialPurchase saved = materialPurchaseRepository.save(entity);
+        log.info("Updated material purchase id={}", id);
+        return MaterialPurchaseDTO.fromEntity(saved);
+    }
+
+    @Transactional
+    public int upload(MultipartFile file, LocalDate weekStart, String factory) {
+        log.info("Upload material purchase: weekStart={}, factory={}", weekStart, factory);
+        if (factory == null || factory.trim().isEmpty()) {
+            throw new IllegalArgumentException("factory is required");
+        }
+        List<MaterialPurchaseExcelParser.MaterialPurchaseRow> rows = excelParser.parse(file);
+        materialPurchaseRepository.deleteByWeekStartAndFactory(weekStart, factory);
+        LocalDateTime now = LocalDateTime.now();
+        List<MaterialPurchase> entities = rows.stream().map(row -> {
+            MaterialPurchase p = new MaterialPurchase();
+            p.setWeekStart(weekStart);
+            p.setFactory(factory);
+            p.setProductCode(row.getProductCode());
+            p.setProductName(row.getProductName());
+            p.setQuantity(row.getQuantity());
+            p.setSemiProductName(row.getSemiProductName());
+            p.setSemiProductCode(row.getSemiProductCode());
+            p.setKgPerBox(row.getKgPerBox());
+            p.setBasketQuantity(row.getBasketQuantity());
+            p.setBoxesPerBarrel(row.getBoxesPerBarrel());
+            p.setRequiredBarrels(row.getRequiredBarrels());
+            p.setIsErpTriggered(false);
+            p.setErpOrderNo(null);
+            p.setCreatedAt(now);
+            p.setUpdatedAt(now);
+            return p;
+        }).collect(Collectors.toList());
+        materialPurchaseRepository.saveAll(entities);
+        log.info("Saved {} material purchase records", entities.size());
+        return entities.size();
+    }
+
+    public byte[] generateTemplate(String factory) {
+        return MaterialPurchaseTemplateService.generateTemplate();
     }
 }

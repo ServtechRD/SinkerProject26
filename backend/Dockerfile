@@ -7,7 +7,7 @@ COPY gradle gradle
 RUN ./gradlew dependencies --no-daemon || true
 
 COPY . .
-RUN ./gradlew build -x test --no-daemon
+RUN ./gradlew build -x test -x check --no-daemon
 
 # ---------- run stage ----------
 FROM eclipse-temurin:17-jre

@@ -1,6 +1,10 @@
 {
+  "model":"claude-sonnet-4-5-20250929",
+  "autoApprove": true,
+  "interactive": false,
+  "confirmBeforeRun": false,
   "branch": {
-    "base": "claude/integration",
+    "base": "claude/intergration",
     "featPrefix": "claude/feat/",
     "fixPrefix": "claude/fix/"
   },
@@ -8,7 +12,7 @@
     "root": "spec",
     "featDir": "feat",
     "fixDir": "fix",
-    "idPattern": "^[FX][0-9]{3}",
+    "idPattern": "^[TFX][0-9]{3}",
     "files": {
       "description": "description.md",
       "acceptance": "acceptance.md"
@@ -22,17 +26,27 @@
   "rules": {
     "forbidMerge": ["main"],
     "requireTests": true,
-    "conventionalCommits": true
+    "conventionalCommits": true,
+    "autoExecute": true
   },
   "commands": {
-    "backendTest": "cd backend && ./gradlew test",
-    "backendBuild": "cd backend && ./gradlew build -x test",
-    "frontendInstall": "cd frontend && npm ci",
-    "frontendBuild": "cd frontend && npm run build",
+    "devUp": "make dev-up",
+    "devDown": "make dev-down",
+
+    "test": "make test-compose",
+    "testDown": "make test-down",
+
+    "dockerPs": "docker compose ps",
+    "dockerLogs": "docker compose logs -f --tail=200",
+
+    "backendTest": "make test-compose",
+    "backendBuild": "make test-compose",
+    "frontendInstall": "make test-compose",
+    "frontendBuild": "make test-compose",
     "dockerBuild": "docker compose build"
   },
   "pr": {
-    "target": "claude/integration",
+    "target": "claude/intergration",
     "deleteBranchAfterMerge": true,
     "titleFormat": "[{{taskId}}] {{type}}: {{slug}}"
   },

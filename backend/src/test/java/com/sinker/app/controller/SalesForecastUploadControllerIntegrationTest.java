@@ -454,7 +454,7 @@ class SalesForecastUploadControllerIntegrationTest {
 
     @Test
     void testTemplateDownload_Success() throws Exception {
-        mockMvc.perform(get("/api/sales-forecast/template/大全聯")
+        mockMvc.perform(get("/api/sales-forecast/template").param("channel", "大全聯")
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andExpect(header().string("Content-Type",
@@ -465,13 +465,13 @@ class SalesForecastUploadControllerIntegrationTest {
 
     @Test
     void testTemplateDownload_Unauthorized() throws Exception {
-        mockMvc.perform(get("/api/sales-forecast/template/大全聯"))
+        mockMvc.perform(get("/api/sales-forecast/template").param("channel", "大全聯"))
                 .andExpect(status().isUnauthorized());
     }
 
     @Test
     void testTemplateDownload_ValidExcelContent() throws Exception {
-        byte[] responseBytes = mockMvc.perform(get("/api/sales-forecast/template/家樂福")
+        byte[] responseBytes = mockMvc.perform(get("/api/sales-forecast/template").param("channel", "家樂福")
                         .header("Authorization", "Bearer " + adminToken))
                 .andExpect(status().isOk())
                 .andReturn()

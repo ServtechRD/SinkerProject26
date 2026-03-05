@@ -22,7 +22,7 @@ test.describe('Forecast Config Page', () => {
     await layout.clickForecastConfig()
     await page.waitForURL('**/sales-forecast/config')
 
-    await expect(page.getByRole('heading', { name: '預測設定' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: '銷售預估量-表單設定' })).toBeVisible()
 
     // Wait for loading to finish
     await expect(page.getByText('載入中...')).not.toBeVisible({ timeout: 10000 })
@@ -33,11 +33,11 @@ test.describe('Forecast Config Page', () => {
     expect(hasTable || hasEmpty).toBeTruthy()
 
     // Create months
-    const createBtn = page.getByRole('button', { name: '建立月份' })
+    const createBtn = page.getByRole('button', { name: '新增填寫月份' })
     await expect(createBtn).toBeVisible()
     await createBtn.click()
 
-    await expect(page.getByText('建立月份').last()).toBeVisible()
+    await expect(page.getByText('新增填寫月份').last()).toBeVisible()
 
     const startInput = page.getByLabel('起始月份')
     const endInput = page.getByLabel('結束月份')
@@ -60,9 +60,9 @@ test.describe('Forecast Config Page', () => {
     const editBtns = page.getByRole('button', { name: '編輯' })
     await editBtns.first().click()
 
-    await expect(page.getByText('編輯設定')).toBeVisible()
+    await expect(page.getByText('編輯填寫月份')).toBeVisible()
 
-    const dayInput = page.getByLabel('自動關帳日')
+    const dayInput = page.getByLabel('自動結束新增設定日期')
     await dayInput.clear()
     await dayInput.fill('25')
 
@@ -71,7 +71,7 @@ test.describe('Forecast Config Page', () => {
     await saveBtn.click()
 
     // Wait for dialog to close
-    await expect(page.getByText('編輯設定')).not.toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('編輯填寫月份')).not.toBeVisible({ timeout: 10000 })
   })
 
   test('validation - create button disabled when start > end', async ({ page }) => {
@@ -85,8 +85,8 @@ test.describe('Forecast Config Page', () => {
     await page.waitForURL('**/sales-forecast/config')
     await expect(page.getByText('載入中...')).not.toBeVisible({ timeout: 10000 })
 
-    await page.getByRole('button', { name: '建立月份' }).click()
-    await expect(page.getByText('建立月份').last()).toBeVisible()
+    await page.getByRole('button', { name: '新增填寫月份' }).click()
+    await expect(page.getByText('新增填寫月份').last()).toBeVisible()
 
     await page.getByLabel('起始月份').fill('202705')
     await page.getByLabel('結束月份').fill('202703')
@@ -118,13 +118,13 @@ test.describe('Forecast Config Page', () => {
     }
 
     await editBtns.first().click()
-    await expect(page.getByText('編輯設定')).toBeVisible()
+    await expect(page.getByText('編輯填寫月份')).toBeVisible()
 
-    const dayInput = page.getByLabel('自動關帳日')
+    const dayInput = page.getByLabel('自動結束新增設定日期')
     await dayInput.clear()
     await dayInput.fill('50')
 
-    await expect(page.getByText('自動關帳日需為 1-31')).toBeVisible()
+    await expect(page.getByText('自動結束新增設定日期需為 1-31')).toBeVisible()
     await expect(page.getByRole('button', { name: '儲存' })).toBeDisabled()
 
     await page.getByRole('button', { name: '取消' }).click()

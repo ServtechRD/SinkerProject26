@@ -129,6 +129,8 @@ class UserControllerIntegrationTest {
     void getUserByIdSuccess() throws Exception {
         Long adminId = jdbc.queryForObject(
                 "SELECT id FROM users WHERE username = 'admin'", Long.class);
+        String adminRoleName = jdbc.queryForObject(
+                "SELECT name FROM roles WHERE code = 'admin'", String.class);
 
         mockMvc.perform(get("/api/users/" + adminId)
                         .header("Authorization", "Bearer " + adminToken))
@@ -138,7 +140,7 @@ class UserControllerIntegrationTest {
                 .andExpect(jsonPath("$.email").value("admin@sinker.local"))
                 .andExpect(jsonPath("$.role.code").value("admin"))
                 .andExpect(jsonPath("$.role.id").isNumber())
-                .andExpect(jsonPath("$.role.name").value("Administrator"))
+                .andExpect(jsonPath("$.role.name").value(adminRoleName))
                 .andExpect(jsonPath("$.hashedPassword").doesNotExist());
     }
 

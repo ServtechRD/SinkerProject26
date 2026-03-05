@@ -9,13 +9,17 @@ import com.sinker.app.service.WeeklyScheduleService;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +34,30 @@ public class WeeklyScheduleController {
 
     public WeeklyScheduleController(WeeklyScheduleService service) {
         this.service = service;
+    }
+
+    @GetMapping("/factories")
+    @PreAuthorize("hasAuthority('weekly_schedule.view')")
+    public ResponseEntity<List<String>> getFactories() {
+        log.info("GET /api/weekly-schedule/factories");
+        return ResponseEntity.ok(service.getFactories());
+    }
+
+    @GetMapping("/template/{factory}")
+    @PreAuthorize("hasAuthority('weekly_schedule.view')")
+    public ResponseEntity<byte[]> downloadTemplate(@PathVariable String factory) {
+        log.info("GET /api/weekly-schedule/template/{}", factory);
+        byte[] excelBytes = service.generateTemplate(factory);
+        String filename = "weekly_schedule_template_" + factory + ".xlsx";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.setContentDisposition(
+                ContentDisposition.attachment()
+                        .filename(filename, StandardCharsets.UTF_8)
+                        .build());
+        headers.setContentLength(excelBytes.length);
+        return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
     }
 
     @PostMapping("/upload")

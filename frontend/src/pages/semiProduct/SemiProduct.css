@@ -11,12 +11,32 @@
   color: #1a1a1a;
 }
 
-.semi-product-upload-section {
+.semi-product-upload-section,
+.semi-product-result-section {
   background: #fff;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
   padding: 1.5rem;
   margin-bottom: 2rem;
+}
+
+.semi-product-upload-section h2,
+.semi-product-result-section h2 {
+  font-size: 1.15rem;
+  margin-bottom: 0.75rem;
+  color: #333;
+}
+
+.semi-product-upload-hint {
+  margin-bottom: 1rem;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.semi-product-result-toolbar {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
 }
 
 .upload-area {
@@ -161,6 +181,37 @@
   border-radius: 4px;
   white-space: nowrap;
   z-index: 10;
+}
+
+.semi-product-page .btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+}
+
+.semi-product-page .btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.semi-product-page .btn--primary {
+  background: #1976d2;
+  color: #fff;
+}
+
+.semi-product-page .btn--outline {
+  background: #fff;
+  color: #1976d2;
+  border: 1px solid #1976d2;
+  margin-right: 4px;
+}
+
+.semi-product-page .btn-sm {
+  padding: 4px 10px;
+  font-size: 0.85rem;
 }
 
 /* Responsive design */

@@ -34,14 +34,14 @@ describe('CreateMonthsDialog', () => {
 
   it('renders dialog when open', () => {
     renderDialog()
-    expect(screen.getByText('建立月份')).toBeInTheDocument()
+    expect(screen.getByText('新增填寫月份')).toBeInTheDocument()
     expect(screen.getByLabelText('起始月份')).toBeInTheDocument()
     expect(screen.getByLabelText('結束月份')).toBeInTheDocument()
   })
 
   it('does not render when not open', () => {
     renderDialog({ open: false })
-    expect(screen.queryByText('建立月份')).not.toBeInTheDocument()
+    expect(screen.queryByText('新增填寫月份')).not.toBeInTheDocument()
   })
 
   it('calls onClose when cancel clicked', async () => {

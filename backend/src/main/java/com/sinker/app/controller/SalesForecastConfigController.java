@@ -35,10 +35,10 @@ public class SalesForecastConfigController {
     @PreAuthorize("hasAuthority('sales_forecast_config.edit')")
     public ResponseEntity<CreateMonthsResponse> createMonths(
             @Valid @RequestBody CreateMonthsRequest request) {
-        log.info("POST /api/sales-forecast/config - Creating months from {} to {}",
-                request.getStartMonth(), request.getEndMonth());
+        log.info("POST /api/sales-forecast/config - Creating months from {} to {}, autoCloseDay={}",
+                request.getStartMonth(), request.getEndMonth(), request.getAutoCloseDay());
         CreateMonthsResponse response = service.batchCreateMonths(
-                request.getStartMonth(), request.getEndMonth());
+                request.getStartMonth(), request.getEndMonth(), request.getAutoCloseDay());
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

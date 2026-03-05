@@ -35,9 +35,12 @@ public class SemiProductService {
     public SemiProductUploadResponse upload(MultipartFile file) {
         log.info("Starting semi-product upload, filename={}", file.getOriginalFilename());
 
-        // Parse Excel file
-        List<SemiProductExcelParser.SemiProductRow> rows = excelParser.parse(file);
-        log.info("Parsed {} rows from Excel", rows.size());
+        String filename = file.getOriginalFilename();
+        boolean isCsv = filename != null && filename.toLowerCase().endsWith(".csv");
+        List<SemiProductExcelParser.SemiProductRow> rows = isCsv
+                ? excelParser.parseCsv(file)
+                : excelParser.parse(file);
+        log.info("Parsed {} rows from {}", rows.size(), isCsv ? "CSV" : "Excel");
 
         // Perform TRUNCATE + bulk insert in single transaction
         repository.truncateTable();

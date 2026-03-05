@@ -11,4 +11,6 @@ import java.util.List;
 public interface MaterialPurchaseRepository extends JpaRepository<MaterialPurchase, Integer> {
 
     List<MaterialPurchase> findByWeekStartAndFactoryOrderByProductCodeAsc(LocalDate weekStart, String factory);
+
+    void deleteByWeekStartAndFactory(LocalDate weekStart, String factory);
 }

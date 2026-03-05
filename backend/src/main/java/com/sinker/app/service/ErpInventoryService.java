@@ -17,74 +17,27 @@ public class ErpInventoryService {
     private static final Logger log = LoggerFactory.getLogger(ErpInventoryService.class);
 
     /**
-     * Get inventory balance for a product at the end of a month
-     * @param productCode Product code
-     * @param month Month in YYYY-MM format
-     * @return Inventory balance quantity
+     * Get inventory balance for a product at the end of a month.
+     * Placeholder: returns 100 until ERP API is integrated.
      */
     public BigDecimal getInventoryBalance(String productCode, String month) {
         log.debug("ERP stub: getInventoryBalance(productCode={}, month={})", productCode, month);
-
-        try {
-            // Stub logic: Return mock data based on product code patterns
-            if (productCode == null || productCode.isEmpty()) {
-                return BigDecimal.ZERO;
-            }
-
-            // Pattern-based mock data
-            if (productCode.startsWith("PROD001")) {
-                return new BigDecimal("250.00");
-            } else if (productCode.startsWith("PROD002")) {
-                return new BigDecimal("150.00");
-            } else if (productCode.startsWith("PROD")) {
-                // Generic product: return a value based on hash
-                int hash = Math.abs(productCode.hashCode());
-                return new BigDecimal(100 + (hash % 200));
-            }
-
-            // Default: return zero for unknown products
-            return BigDecimal.ZERO;
-
-        } catch (Exception e) {
-            log.error("ERP stub error in getInventoryBalance: {}", e.getMessage(), e);
+        if (productCode == null || productCode.isEmpty()) {
             return BigDecimal.ZERO;
         }
+        return new BigDecimal("100");
     }
 
     /**
-     * Get sales quantity for a product within a date range
-     * @param productCode Product code
-     * @param startDate Start date in YYYY-MM-DD format
-     * @param endDate End date in YYYY-MM-DD format
-     * @return Sales quantity
+     * Get sales quantity for a product within a date range.
+     * Placeholder: returns 50 until ERP API is integrated.
      */
     public BigDecimal getSalesQuantity(String productCode, String startDate, String endDate) {
         log.debug("ERP stub: getSalesQuantity(productCode={}, startDate={}, endDate={})",
                 productCode, startDate, endDate);
-
-        try {
-            // Stub logic: Return mock data based on product code patterns
-            if (productCode == null || productCode.isEmpty()) {
-                return BigDecimal.ZERO;
-            }
-
-            // Pattern-based mock data
-            if (productCode.startsWith("PROD001")) {
-                return new BigDecimal("100.00");
-            } else if (productCode.startsWith("PROD002")) {
-                return new BigDecimal("75.00");
-            } else if (productCode.startsWith("PROD")) {
-                // Generic product: return a value based on hash
-                int hash = Math.abs(productCode.hashCode());
-                return new BigDecimal(50 + (hash % 100));
-            }
-
-            // Default: return zero for unknown products
-            return BigDecimal.ZERO;
-
-        } catch (Exception e) {
-            log.error("ERP stub error in getSalesQuantity: {}", e.getMessage(), e);
+        if (productCode == null || productCode.isEmpty()) {
             return BigDecimal.ZERO;
         }
+        return new BigDecimal("50");
     }
 }

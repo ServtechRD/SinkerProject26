@@ -6,6 +6,17 @@ dev-up:
 dev-build:
 	docker compose up -d --build backend frontend
 
+# Rebuild only backend
+dev-build-backend:
+	docker compose build backend
+	docker compose up -d backend
+
+# Rebuild only frontend
+dev-build-frontend:
+	docker compose build frontend
+	docker compose up -d frontend
+
+
 dev-down:
 	docker compose down -v
 
@@ -45,6 +56,18 @@ db-migrate:
 	@echo "Waiting for migrations to complete..."
 	@sleep 5
 	@docker compose logs backend | grep -i flyway | tail -20
+
+# Test data generation
+gen-test-excels:
+	@echo "🚀 Generating test Excel files..."
+	@mkdir -p testdata
+	@docker run --rm \
+		-v $(PWD)/scripts:/scripts \
+		-v $(PWD)/testdata:/output \
+		python:3.11-slim \
+		bash -c "pip install -q openpyxl && python /scripts/generate_upload_excels.py"
+	@echo "✅ Test Excel files generated in testdata/"
+	@ls -lh testdata/*.xlsx
 
 # Coverage reports
 coverage-backend:
@@ -91,6 +114,9 @@ help:
 	@echo "  make coverage-frontend- Generate frontend coverage (Vitest)"
 	@echo "  make coverage         - Generate both coverage reports"
 	@echo ""
+	@echo "Test Data:"
+	@echo "  make gen-test-excels  - Generate test Excel files for upload"
+	@echo ""
 	@echo "Documentation: See docs/ folder"
 
-.PHONY: dev-up dev-build dev-down test-compose test-down db-info db-shell db-migrate coverage-backend coverage-frontend coverage help
+.PHONY: dev-up dev-build dev-down test-compose test-down db-info db-shell db-migrate gen-test-excels coverage-backend coverage-frontend coverage help

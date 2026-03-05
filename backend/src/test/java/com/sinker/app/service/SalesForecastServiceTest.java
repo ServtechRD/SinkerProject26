@@ -9,6 +9,7 @@ import com.sinker.app.entity.SalesForecastConfig;
 import com.sinker.app.exception.ResourceNotFoundException;
 import com.sinker.app.repository.SalesForecastConfigRepository;
 import com.sinker.app.repository.SalesForecastRepository;
+import com.sinker.app.repository.SalesForecastVersionReasonRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -34,6 +35,9 @@ class SalesForecastServiceTest {
 
     @Mock
     private SalesForecastConfigRepository configRepository;
+
+    @Mock
+    private SalesForecastVersionReasonRepository versionReasonRepository;
 
     @Mock
     private ErpProductService erpProductService;
@@ -76,6 +80,8 @@ class SalesForecastServiceTest {
         when(erpProductService.validateProduct("P001")).thenReturn(true);
         when(forecastRepository.findByMonthAndChannelAndProductCode("202601", "大全聯", "P001"))
                 .thenReturn(Optional.empty());
+        when(forecastRepository.findDistinctVersionsByMonthAndChannel("202601", "大全聯"))
+                .thenReturn(List.of("2026/01/15 14:30:00(大全聯)"));
 
         SalesForecast savedForecast = new SalesForecast();
         savedForecast.setId(1);
@@ -94,7 +100,7 @@ class SalesForecastServiceTest {
 
         when(forecastRepository.save(any(SalesForecast.class))).thenReturn(savedForecast);
 
-        ForecastResponse response = service.createForecast(request, 1L, "user");
+        ForecastResponse response = service.createForecast(request, 1L, "user", Set.of());
 
         assertNotNull(response);
         assertEquals(1, response.getId());
@@ -121,7 +127,7 @@ class SalesForecastServiceTest {
         when(erpProductService.validateProduct("INVALID")).thenReturn(false);
 
         assertThrows(IllegalArgumentException.class, () ->
-                service.createForecast(request, 1L, "user"));
+                service.createForecast(request, 1L, "user", Set.of()));
 
         verify(forecastRepository, never()).save(any());
     }
@@ -142,7 +148,7 @@ class SalesForecastServiceTest {
                 .thenReturn(Optional.of(new SalesForecast()));
 
         assertThrows(SalesForecastService.DuplicateEntryException.class, () ->
-                service.createForecast(request, 1L, "user"));
+                service.createForecast(request, 1L, "user", Set.of()));
 
         verify(forecastRepository, never()).save(any());
     }
@@ -158,7 +164,7 @@ class SalesForecastServiceTest {
         when(configRepository.findByMonth("202512")).thenReturn(Optional.of(closedConfig));
 
         assertThrows(AccessDeniedException.class, () ->
-                service.createForecast(request, 1L, "user"));
+                service.createForecast(request, 1L, "user", Set.of()));
 
         verify(forecastRepository, never()).save(any());
     }
@@ -176,7 +182,7 @@ class SalesForecastServiceTest {
                 .thenReturn(0);
 
         assertThrows(AccessDeniedException.class, () ->
-                service.createForecast(request, 1L, "user"));
+                service.createForecast(request, 1L, "user", Set.of()));
 
         verify(forecastRepository, never()).save(any());
     }
@@ -201,7 +207,7 @@ class SalesForecastServiceTest {
                 .thenReturn(1);
         when(forecastRepository.save(any(SalesForecast.class))).thenReturn(existingForecast);
 
-        ForecastResponse response = service.updateForecast(1, request, 1L, "user");
+        ForecastResponse response = service.updateForecast(1, request, 1L, "user", Set.of());
 
         assertNotNull(response);
         verify(forecastRepository).save(argThat(forecast ->
@@ -218,7 +224,7 @@ class SalesForecastServiceTest {
         when(forecastRepository.findById(999)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () ->
-                service.updateForecast(999, request, 1L, "user"));
+                service.updateForecast(999, request, 1L, "user", Set.of()));
 
         verify(forecastRepository, never()).save(any());
     }
@@ -263,6 +269,8 @@ class SalesForecastServiceTest {
         when(erpProductService.validateProduct("P001")).thenReturn(true);
         when(forecastRepository.findByMonthAndChannelAndProductCode("202601", "大全聯", "P001"))
                 .thenReturn(Optional.empty());
+        when(forecastRepository.findDistinctVersionsByMonthAndChannel("202601", "大全聯"))
+                .thenReturn(List.of("2026/01/15 14:30:00(大全聯)"));
 
         SalesForecast savedForecast = new SalesForecast();
         savedForecast.setId(1);
@@ -277,7 +285,7 @@ class SalesForecastServiceTest {
 
         when(forecastRepository.save(any(SalesForecast.class))).thenReturn(savedForecast);
 
-        ForecastResponse response = service.createForecast(request, 1L, "admin");
+        ForecastResponse response = service.createForecast(request, 1L, "admin", Set.of());
 
         assertNotNull(response);
         verify(jdbcTemplate, never()).queryForObject(anyString(), eq(Integer.class), anyLong(), anyString());

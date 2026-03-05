@@ -11,6 +11,17 @@ export function getInventoryIntegration(month, startDate, endDate, version) {
     .then((r) => r.data)
 }
 
+export function getInventoryVersions(month) {
+  const params = month ? { month } : {}
+  return api.get('/api/inventory-integration/versions', { params }).then((r) => r.data)
+}
+
+export function copyInventoryVersion(version) {
+  return api
+    .post('/api/inventory-integration/copy-version', null, { params: { version } })
+    .then((r) => r.data)
+}
+
 export function updateModifiedSubtotal(id, modifiedSubtotal) {
   return api
     .put(`/api/inventory-integration/${id}`, { modifiedSubtotal })

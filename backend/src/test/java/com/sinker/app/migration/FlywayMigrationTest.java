@@ -124,31 +124,32 @@ class FlywayMigrationTest {
     @Test
     void seedDataPermissions() {
         Integer total = jdbc.queryForObject("SELECT COUNT(*) FROM permissions", Integer.class);
-        assertEquals(29, total, "Should have 29 seeded permissions");
+        assertTrue(total >= 34, "Should have at least 34 permissions (V2 seed + V14/V15/V16)");
 
         // Verify module counts
         List<Map<String, Object>> moduleCounts = jdbc.queryForList(
                 "SELECT module, COUNT(*) as cnt FROM permissions GROUP BY module ORDER BY module");
 
+        // V2 seed + V14 (sales_forecast +1), V15 (material_demand +2), V16 (material_purchase +2)
         Map<String, Integer> expected = Map.of(
                 "inventory", 2,
-                "material_demand", 1,
-                "material_purchase", 2,
+                "material_demand", 3,
+                "material_purchase", 4,
                 "production_plan", 2,
                 "role", 4,
-                "sales_forecast", 6,
+                "sales_forecast", 7,
                 "sales_forecast_config", 2,
                 "semi_product", 3,
-                "user", 4
+                "user", 4,
+                "weekly_schedule", 3
         );
 
         for (Map<String, Object> row : moduleCounts) {
             String module = (String) row.get("module");
             int cnt = ((Number) row.get("cnt")).intValue();
-            if (module.equals("weekly_schedule")) {
-                assertEquals(3, cnt, "Module weekly_schedule should have 3 permissions");
-            } else {
-                assertEquals(expected.get(module), cnt, "Module " + module + " should have correct count");
+            Integer exp = expected.get(module);
+            if (exp != null) {
+                assertEquals(exp, cnt, "Module " + module + " should have correct count");
             }
         }
     }

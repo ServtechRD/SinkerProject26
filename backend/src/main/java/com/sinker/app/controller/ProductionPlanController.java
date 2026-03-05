@@ -1,9 +1,11 @@
 package com.sinker.app.controller;
 
-import com.sinker.app.dto.productionplan.ProductionPlanDTO;
+import com.sinker.app.dto.productionplan.ProductionFormRowDTO;
+import com.sinker.app.dto.productionplan.UpdateBufferRequest;
 import com.sinker.app.dto.productionplan.UpdateProductionPlanRequest;
 import com.sinker.app.exception.ResourceNotFoundException;
 import com.sinker.app.security.JwtUserPrincipal;
+import com.sinker.app.service.ProductionFormService;
 import com.sinker.app.service.ProductionPlanService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -27,14 +29,17 @@ public class ProductionPlanController {
     private static final Logger log = LoggerFactory.getLogger(ProductionPlanController.class);
 
     private final ProductionPlanService productionPlanService;
+    private final ProductionFormService productionFormService;
 
-    public ProductionPlanController(ProductionPlanService productionPlanService) {
+    public ProductionPlanController(ProductionPlanService productionPlanService,
+                                    ProductionFormService productionFormService) {
         this.productionPlanService = productionPlanService;
+        this.productionFormService = productionFormService;
     }
 
     @GetMapping
     @PreAuthorize("hasAuthority('production_plan.view')")
-    public ResponseEntity<List<ProductionPlanDTO>> getProductionPlans(
+    public ResponseEntity<List<ProductionFormRowDTO>> getProductionForm(
             @RequestParam Integer year,
             @AuthenticationPrincipal JwtUserPrincipal principal) {
 
@@ -44,22 +49,33 @@ public class ProductionPlanController {
             throw new IllegalArgumentException("year parameter is required");
         }
 
-        List<ProductionPlanDTO> plans = productionPlanService.queryProductionPlans(year);
+        List<ProductionFormRowDTO> rows = productionFormService.getProductionForm(year);
+        return ResponseEntity.ok(rows);
+    }
 
-        return ResponseEntity.ok(plans);
+    @PutMapping("/buffer")
+    @PreAuthorize("hasAuthority('production_plan.edit')")
+    public ResponseEntity<Void> updateBuffer(
+            @Valid @RequestBody UpdateBufferRequest request,
+            @AuthenticationPrincipal JwtUserPrincipal principal) {
+
+        log.info("PUT /api/production-plan/buffer - user={}, year={}, productCode={}",
+                principal.getUserId(), request.getYear(), request.getProductCode());
+
+        productionFormService.updateBuffer(request.getYear(), request.getProductCode(), request.getBufferQuantity());
+        return ResponseEntity.ok().build();
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('production_plan.edit')")
-    public ResponseEntity<ProductionPlanDTO> updateProductionPlan(
+    public ResponseEntity<com.sinker.app.dto.productionplan.ProductionPlanDTO> updateProductionPlan(
             @PathVariable Integer id,
             @Valid @RequestBody UpdateProductionPlanRequest request,
             @AuthenticationPrincipal JwtUserPrincipal principal) {
 
         log.info("PUT /api/production-plan/{} - user={}", id, principal.getUserId());
 
-        ProductionPlanDTO updatedPlan = productionPlanService.updateProductionPlan(id, request);
-
+        com.sinker.app.dto.productionplan.ProductionPlanDTO updatedPlan = productionPlanService.updateProductionPlan(id, request);
         return ResponseEntity.ok(updatedPlan);
     }
 

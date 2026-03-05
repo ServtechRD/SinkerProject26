@@ -1,7 +1,9 @@
 package com.sinker.app.controller;
 
 import com.sinker.app.dto.materialpurchase.MaterialPurchaseDTO;
+import com.sinker.app.dto.materialpurchase.MaterialPurchaseUpdateDTO;
 import com.sinker.app.exception.AlreadyTriggeredErpException;
+import com.sinker.app.exception.ExcelParseException;
 import com.sinker.app.exception.ResourceNotFoundException;
 import com.sinker.app.security.JwtUserPrincipal;
 import com.sinker.app.service.MaterialPurchaseService;
@@ -9,13 +11,18 @@ import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -54,6 +61,56 @@ public class MaterialPurchaseController {
         List<MaterialPurchaseDTO> purchases = materialPurchaseService.queryMaterialPurchase(weekStart, factory);
 
         return ResponseEntity.ok(purchases);
+    }
+
+    @PutMapping("/{id}")
+    @PreAuthorize("hasAuthority('material_purchase.edit')")
+    public ResponseEntity<MaterialPurchaseDTO> update(
+            @PathVariable Integer id,
+            @RequestBody MaterialPurchaseUpdateDTO dto) {
+        log.info("PUT /api/material-purchase/{}", id);
+        MaterialPurchaseDTO updated = materialPurchaseService.update(id, dto);
+        return ResponseEntity.ok(updated);
+    }
+
+    @PostMapping("/upload")
+    @PreAuthorize("hasAuthority('material_purchase.upload')")
+    public ResponseEntity<Map<String, Object>> upload(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("week_start") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart,
+            @RequestParam String factory) {
+        log.info("POST /api/material-purchase/upload - weekStart={}, factory={}", weekStart, factory);
+        int count = materialPurchaseService.upload(file, weekStart, factory);
+        return ResponseEntity.ok(Map.of("count", count, "message", "Upload successful"));
+    }
+
+    @GetMapping("/template/{factory}")
+    @PreAuthorize("hasAuthority('material_purchase.view')")
+    public ResponseEntity<byte[]> downloadTemplate(@PathVariable String factory) {
+        log.info("GET /api/material-purchase/template/{}", factory);
+        byte[] excelBytes = materialPurchaseService.generateTemplate(factory);
+        String filename = "material_purchase_template_" + factory + ".xlsx";
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType(
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+        headers.setContentDisposition(
+                ContentDisposition.attachment()
+                        .filename(filename, StandardCharsets.UTF_8)
+                        .build());
+        headers.setContentLength(excelBytes.length);
+        return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
+    }
+
+    @ExceptionHandler(ExcelParseException.class)
+    public ResponseEntity<Map<String, Object>> handleExcelParseException(
+            ExcelParseException ex, HttpServletRequest request) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of(
+                "timestamp", LocalDateTime.now().toString(),
+                "status", 400,
+                "error", "Validation failed",
+                "details", ex.getErrors(),
+                "path", request.getRequestURI()
+        ));
     }
 
     @PostMapping("/{id}/trigger-erp")

@@ -7,36 +7,48 @@ import { renderWithAuth } from '../../../test/helpers'
 
 vi.mock('../../../api/productionPlan', () => ({
   getProductionPlan: vi.fn(),
+  updateProductionPlanBuffer: vi.fn(),
   updateProductionPlanItem: vi.fn(),
 }))
 
 describe('ProductionPlanPage', () => {
+  const channelData = (ch, months, total) => ({ channel: ch, months: months || {}, total: total ?? 0 })
   const mockData = [
     {
-      id: 1,
-      productCode: 'PROD001',
-      productName: 'Product 1',
+      warehouse_location: 'WH1',
       category: 'A',
       spec: 'S1',
-      warehouseLocation: 'WH1',
-      channel: 'Direct',
-      monthlyAllocations: { '2': 100, '3': 150, '4': 200 },
-      buffer: 50,
-      forecast: 2300,
+      product_name: 'Product 1',
+      product_code: 'PROD001',
+      channel_data: [
+        channelData('PX/大全聯', { '2': 100, '3': 150 }, 250),
+        channelData('家樂福', {}, 0),
+      ],
+      aggregate_months: { '2': 80, '3': 120 },
+      buffer_quantity: 50,
+      aggregate_total: 250,
+      original_forecast: 250,
+      difference: 0,
       remarks: 'Test',
+      production_form_id: 1,
     },
     {
-      id: 2,
-      productCode: 'PROD002',
-      productName: 'Product 2',
+      warehouse_location: 'WH2',
       category: 'B',
       spec: 'S2',
-      warehouseLocation: 'WH2',
-      channel: 'Retail',
-      monthlyAllocations: { '2': 50, '3': 75 },
-      buffer: 25,
-      forecast: 1200,
+      product_name: 'Product 2',
+      product_code: 'PROD002',
+      channel_data: [
+        channelData('PX/大全聯', { '2': 50, '3': 75 }, 125),
+        channelData('家樂福', {}, 0),
+      ],
+      aggregate_months: { '2': 40, '3': 60 },
+      buffer_quantity: 25,
+      aggregate_total: 125,
+      original_forecast: 125,
+      difference: 0,
       remarks: '',
+      production_form_id: 2,
     },
   ]
 
@@ -68,12 +80,12 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    expect(screen.getByText(/生產計畫/)).toBeInTheDocument()
+    expect(screen.getByText(/生產表單/)).toBeInTheDocument()
    // expect(screen.getByLabelText('年度')).toBeInTheDocument()
    // expect(screen.getByRole('button', { name: '載入' })).toBeInTheDocument()
   })*/
 
-  it('loads data when Load button is clicked', async () => {
+  it('loads data when Query button is clicked', async () => {
     productionPlanApi.getProductionPlan.mockResolvedValue(mockData)
 
     const authValue = {
@@ -88,8 +100,8 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
       expect(productionPlanApi.getProductionPlan).toHaveBeenCalledWith(
@@ -120,15 +132,15 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
-      expect(screen.getByText('所選年度無生產計畫資料')).toBeInTheDocument()
+      expect(screen.getByText(/請選擇年份並按「查詢」取得生產表單資料/)).toBeInTheDocument()
     })
   })
 
-  it('displays grid with all columns', async () => {
+  it('displays grid with table headers', async () => {
     productionPlanApi.getProductionPlan.mockResolvedValue(mockData)
 
     const authValue = {
@@ -143,23 +155,20 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
-      expect(screen.getByText('產品代碼')).toBeInTheDocument()
-      expect(screen.getByText('產品名稱')).toBeInTheDocument()
-      expect(screen.getByText('類別')).toBeInTheDocument()
-      expect(screen.getByText('規格')).toBeInTheDocument()
-      expect(screen.getByText('倉儲位置')).toBeInTheDocument()
-      expect(screen.getByText('通路')).toBeInTheDocument()
-      expect(screen.getByText('Feb')).toBeInTheDocument()
-      expect(screen.getByText('Mar')).toBeInTheDocument()
-      expect(screen.getByText('Buffer')).toBeInTheDocument()
-      expect(screen.getByText('Total')).toBeInTheDocument()
-      expect(screen.getByText('Forecast')).toBeInTheDocument()
-      expect(screen.getByText('Diff')).toBeInTheDocument()
-      expect(screen.getByText('Remarks')).toBeInTheDocument()
+      expect(screen.getByText('庫位')).toBeInTheDocument()
+      expect(screen.getByText('中類名稱')).toBeInTheDocument()
+      expect(screen.getByText('貨品規格')).toBeInTheDocument()
+      expect(screen.getByText('品名')).toBeInTheDocument()
+      expect(screen.getByText('品號')).toBeInTheDocument()
+      expect(screen.getByText('原始預估')).toBeInTheDocument()
+      expect(screen.getByText('差異')).toBeInTheDocument()
+      expect(screen.getByText('備註')).toBeInTheDocument()
+      expect(screen.getByText('緩衝量')).toBeInTheDocument()
+      expect(screen.getByText('合計')).toBeInTheDocument()
     })
   })
 
@@ -178,8 +187,8 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
       // Total = 100 + 150 + 200 + 50 = 500
@@ -204,8 +213,8 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
       expect(screen.getByText('100.00')).toBeInTheDocument()
@@ -239,11 +248,11 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
-      expect(screen.getByText('所選年度無生產計畫資料')).toBeInTheDocument()
+      expect(screen.getByText(/請選擇年份並按「查詢」取得生產表單資料/)).toBeInTheDocument()
     })
   })
 
@@ -264,8 +273,8 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
       expect(screen.getByText('您沒有權限檢視此頁面')).toBeInTheDocument()
@@ -287,8 +296,8 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
       expect(screen.getByText('總計: 2 產品/通路組合')).toBeInTheDocument()
@@ -310,8 +319,8 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
       expect(screen.getByText('50.00')).toBeInTheDocument()
@@ -342,8 +351,8 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
       expect(screen.getByText('Test')).toBeInTheDocument()
@@ -374,8 +383,8 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
       expect(screen.getByText('100.00')).toBeInTheDocument()
@@ -406,8 +415,8 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
       expect(screen.getByText('100.00')).toBeInTheDocument()
@@ -445,8 +454,8 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
       expect(screen.getByText('100.00')).toBeInTheDocument()
@@ -490,8 +499,8 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
       expect(screen.getByText('100.00')).toBeInTheDocument()
@@ -535,8 +544,8 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
       expect(screen.getByText('100.00')).toBeInTheDocument()
@@ -576,8 +585,8 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
       expect(screen.getByText('100.00')).toBeInTheDocument()
@@ -617,8 +626,8 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
       expect(screen.getByText('100.00')).toBeInTheDocument()
@@ -658,8 +667,8 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
       expect(screen.getByText('100.00')).toBeInTheDocument()
@@ -699,8 +708,8 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
       expect(screen.getByText('100.00')).toBeInTheDocument()
@@ -728,8 +737,8 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
       expect(screen.getByText('Test')).toBeInTheDocument()
@@ -774,8 +783,8 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
       expect(screen.getByText('100.00')).toBeInTheDocument()
@@ -823,8 +832,8 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
       expect(screen.getByText('100.00')).toBeInTheDocument()
@@ -883,8 +892,8 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
       expect(screen.getByText('PROD001')).toBeInTheDocument()
@@ -949,8 +958,8 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
       expect(screen.getByText('100.00')).toBeInTheDocument()
@@ -1005,8 +1014,8 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
       expect(screen.getByText('PROD001')).toBeInTheDocument()
@@ -1044,7 +1053,7 @@ describe('ProductionPlanPage', () => {
 
   it('shows confirmation when loading with unsaved changes', async () => {
     productionPlanApi.getProductionPlan.mockResolvedValue([mockData[0]])
-    window.confirm = vi.fn(() => true)
+    productionPlanApi.updateProductionPlanBuffer.mockResolvedValue(undefined)
 
     const authValue = {
       user: {
@@ -1058,15 +1067,15 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
-      expect(screen.getByText('100.00')).toBeInTheDocument()
+      expect(screen.getByText('50')).toBeInTheDocument()
     })
 
-    // Edit a cell
-    const cell = screen.getByText('100.00')
+    // Edit buffer cell
+    const cell = screen.getByText('50')
     await userEvent.click(cell)
 
     await waitFor(() => {
@@ -1079,20 +1088,25 @@ describe('ProductionPlanPage', () => {
     await userEvent.type(input, '200{Enter}')
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /儲存/ })).toBeInTheDocument()
+      expect(productionPlanApi.updateProductionPlanBuffer).toHaveBeenCalledWith(
+        expect.any(Number),
+        'PROD001',
+        200
+      )
     })
 
-    // Click load again
-    await userEvent.click(loadButton)
+    // Click query again (new UI does not use confirm for query)
+    const queryBtn = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryBtn)
 
     await waitFor(() => {
-      expect(window.confirm).toHaveBeenCalledWith('您有未儲存的變更，確定要載入新資料嗎？')
+      expect(productionPlanApi.getProductionPlan).toHaveBeenCalled()
     })
   })
 
-  it('does not load when user cancels confirmation', async () => {
+  it('can edit buffer and save', async () => {
     productionPlanApi.getProductionPlan.mockResolvedValue([mockData[0]])
-    window.confirm = vi.fn(() => false)
+    productionPlanApi.updateProductionPlanBuffer.mockResolvedValue(undefined)
 
     const authValue = {
       user: {
@@ -1106,16 +1120,15 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     await waitFor(() => {
-      expect(screen.getByText('100.00')).toBeInTheDocument()
+      expect(screen.getByText('50')).toBeInTheDocument()
     })
 
-    // Edit a cell
-    const cell = screen.getByText('100.00')
-    await userEvent.click(cell)
+    const bufferCell = screen.getByText('50')
+    await userEvent.click(bufferCell)
 
     await waitFor(() => {
       const input = screen.getByRole('textbox')
@@ -1124,23 +1137,15 @@ describe('ProductionPlanPage', () => {
 
     const input = screen.getByRole('textbox')
     await userEvent.clear(input)
-    await userEvent.type(input, '200{Enter}')
+    await userEvent.type(input, '99{Enter}')
 
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /儲存/ })).toBeInTheDocument()
+      expect(productionPlanApi.updateProductionPlanBuffer).toHaveBeenCalledWith(
+        expect.any(Number),
+        'PROD001',
+        99
+      )
     })
-
-    const callCountBefore = productionPlanApi.getProductionPlan.mock.calls.length
-
-    // Click load again
-    await userEvent.click(loadButton)
-
-    await waitFor(() => {
-      expect(window.confirm).toHaveBeenCalled()
-    })
-
-    // Should not call API again
-    expect(productionPlanApi.getProductionPlan.mock.calls.length).toBe(callCountBefore)
   })
 
   it('shows loading state during data fetch', async () => {
@@ -1160,12 +1165,12 @@ describe('ProductionPlanPage', () => {
 
     renderWithAuth(<ProductionPlanPage />, { authValue })
 
-    const loadButton = screen.getByRole('button', { name: '載入' })
-    await userEvent.click(loadButton)
+    const queryButton = screen.getByRole('button', { name: '查詢' })
+    await userEvent.click(queryButton)
 
     // Should show loading state
     expect(screen.getByRole('status')).toHaveTextContent('載入中...')
-    expect(loadButton).toHaveTextContent('載入中...')
+    expect(screen.getByRole('button', { name: '查詢' })).toHaveTextContent('查詢中...')
 
     // Wait for loading to finish
     await waitFor(() => {

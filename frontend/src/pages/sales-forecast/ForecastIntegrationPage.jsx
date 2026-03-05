@@ -106,10 +106,13 @@ export default function ForecastIntegrationPage() {
       setLoadingVersions(true)
       try {
         const data = await getIntegrationVersions(month)
-        setVersions(data)
+        const versionStrings = (Array.isArray(data) ? data : []).map((item) =>
+          typeof item === 'string' ? item : item?.version
+        ).filter(Boolean)
+        setVersions(versionStrings)
 
-        if (data.length > 0) {
-          setSelectedVersion(data[0])
+        if (versionStrings.length > 0) {
+          setSelectedVersion(versionStrings[0])
         } else {
           setSelectedVersion('')
         }

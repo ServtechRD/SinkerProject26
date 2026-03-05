@@ -179,6 +179,72 @@
   font-size: 13px;
 }
 
+.btn--outline {
+  background: #fff;
+  color: #1976d2;
+  border: 1px solid #1976d2;
+}
+
+.material-purchase-block {
+  background: #fff;
+  padding: 1.25rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+}
+
+.material-purchase-block h2 {
+  font-size: 1.1rem;
+  margin-bottom: 0.75rem;
+  color: #333;
+}
+
+.material-purchase-upload-hint {
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.material-purchase-result-toolbar {
+  display: flex;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.material-purchase-edit-input {
+  width: 80px;
+  padding: 4px 8px;
+  border: 1px solid #1976d2;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  text-align: right;
+}
+
+.upload-area {
+  margin-bottom: 0.75rem;
+}
+
+.upload-actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.upload-spinner {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: material-purchase-spin 0.6s linear infinite;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+@keyframes material-purchase-spin {
+  to { transform: rotate(360deg); }
+}
+
 @media (max-width: 768px) {
   .material-purchase-filters {
     flex-direction: column;

@@ -22,7 +22,7 @@ test.describe('Navigation', () => {
 
     expect(page.url()).toContain('/users')
     await expect(layout.usersLink).toHaveClass(/sidebar-link--active/)
-    await expect(page.getByText('使用者管理')).toBeVisible()
+    await expect(page.getByRole('heading', { name: '使用者管理' })).toBeVisible()
   })
 
   test('sidebar navigation to Forecast Config', async ({ page }) => {

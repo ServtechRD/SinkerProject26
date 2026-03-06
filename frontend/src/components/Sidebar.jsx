@@ -4,11 +4,11 @@ import { APP_VERSION } from '../version'
 import './Sidebar.css'
 
 const navItems = [
-  { to: '/users', label: '使用者', permission: 'user.view' },
+  { to: '/users', label: '使用者管理', permission: 'user.view' },
   { to: '/roles', label: '角色管理', permission: 'role.view' },
   { to: '/sales-forecast/config', label: '銷售預估量-表單設定', permission: 'sales_forecast_config.view' },
   { to: '/sales-forecast/upload', label: '銷售預估量-共同編輯界面', permission: 'sales_forecast.upload' },
-  { to: '/sales-forecast', label: '銷售預估量表單', permission: 'sales_forecast.update_after_closed' },
+  { to: '/sales-forecast', label: '銷售預估量表單', permission: 'sales_forecast.update_after_closed', end: true },
   { to: '/inventory-integration', label: '庫存銷量預估量整合表單', permission: 'inventory.view' },
   { to: '/production-plan', label: '生產表單', permission: 'production_plan.view' },
   { to: '/weekly-schedule', label: '生產週排程表單-匯入', permission: 'weekly_schedule.view' },
@@ -38,7 +38,7 @@ export default function Sidebar() {
           <NavLink
             key={item.to}
             to={item.to}
-            end={false}
+            end={item.end ?? false}
             className={({ isActive }) =>
               `sidebar-link${isActive ? ' sidebar-link--active' : ''}`
             }

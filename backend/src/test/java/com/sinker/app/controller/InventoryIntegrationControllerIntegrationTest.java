@@ -58,7 +58,7 @@ class InventoryIntegrationControllerIntegrationTest {
 
         // Insert test forecast data with all 12 channels
         String version = "v20260101120000";
-        String[] channels = {"PX/大全聯", "家樂福", "愛買", "711", "全家", "OK/萊爾富",
+        String[] channels = {"PX + 大全聯", "家樂福", "愛買", "7-11", "全家", "Ok+萊爾富",
                 "好市多", "楓康", "美聯社", "康是美", "電商", "市面經銷"};
 
         for (String channel : channels) {
@@ -225,7 +225,7 @@ class InventoryIntegrationControllerIntegrationTest {
         jdbc.update("INSERT INTO sales_forecast (month, channel, category, spec, product_code, product_name, " +
                         "warehouse_location, quantity, version, is_modified, created_at, updated_at) " +
                         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, FALSE, NOW(), NOW())",
-                NORMALIZED_MONTH, "PX/大全聯", "Category C", "Spec C", "PROD003", "Product 3", "WH-C", 100.00, version);
+                NORMALIZED_MONTH, "PX + 大全聯", "Category C", "Spec C", "PROD003", "Product 3", "WH-C", 100.00, version);
 
         jdbc.update("INSERT INTO sales_forecast (month, channel, category, spec, product_code, product_name, " +
                         "warehouse_location, quantity, version, is_modified, created_at, updated_at) " +

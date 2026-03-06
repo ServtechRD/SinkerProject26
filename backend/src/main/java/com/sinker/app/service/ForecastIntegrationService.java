@@ -18,17 +18,19 @@ public class ForecastIntegrationService {
 
     private static final Logger log = LoggerFactory.getLogger(ForecastIntegrationService.class);
 
-    // Channel name mapping to DTO setter methods
+    // Channel name mapping to DTO setter methods (new names + legacy for backward compatibility)
     private static final Map<String, String> CHANNEL_MAPPING = Map.ofEntries(
+            Map.entry("PX + 大全聯", "qtyPx"),
             Map.entry("PX/大全聯", "qtyPx"),
             Map.entry("家樂福", "qtyCarrefour"),
             Map.entry("愛買", "qtyAimall"),
+            Map.entry("7-11", "qty711"),
             Map.entry("711", "qty711"),
-            Map.entry("7-11", "qty711"), // Alternative name
             Map.entry("全家", "qtyFamilymart"),
+            Map.entry("Ok+萊爾富", "qtyOk"),
             Map.entry("OK/萊爾富", "qtyOk"),
-            Map.entry("萊爾富", "qtyOk"), // Alternative name
-            Map.entry("OK超商", "qtyOk"), // Alternative name
+            Map.entry("萊爾富", "qtyOk"),
+            Map.entry("OK超商", "qtyOk"),
             Map.entry("好市多", "qtyCostco"),
             Map.entry("楓康", "qtyFkmart"),
             Map.entry("美聯社", "qtyWellsociety"),

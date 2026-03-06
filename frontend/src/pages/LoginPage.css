@@ -111,6 +111,31 @@
   cursor: not-allowed;
 }
 
+.login-remember {
+  margin-bottom: 16px;
+}
+
+.login-remember-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  color: #374151;
+  cursor: pointer;
+  user-select: none;
+}
+
+.login-remember-label input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #2563eb;
+  cursor: pointer;
+}
+
+.login-remember-label input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+}
+
 .login-submit {
   width: 100%;
   padding: 10px;

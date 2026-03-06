@@ -22,8 +22,8 @@ public class ProductionFormService {
 
     private static final Logger log = LoggerFactory.getLogger(ProductionFormService.class);
     private static final List<String> CHANNEL_ORDER = List.of(
-            "PX/大全聯", "家樂福", "7-11", "全家", "萊爾富", "OK超商",
-            "美廉社", "愛買", "大潤發", "好市多", "頂好", "楓康");
+            "PX + 大全聯", "家樂福", "愛買", "7-11", "全家", "Ok+萊爾富",
+            "好市多", "楓康", "美聯社", "康是美", "電商", "市面經銷");
     private static final List<String> MONTH_KEYS = List.of("2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12");
 
     private final SalesForecastRepository salesForecastRepository;

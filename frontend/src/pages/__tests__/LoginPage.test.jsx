@@ -9,9 +9,10 @@ describe('LoginPage', () => {
 
   beforeEach(() => {
     loginMock = vi.fn()
+    localStorage.removeItem('loginRememberUsername')
   })
 
-  it('renders login form with username, password, and submit button', () => {
+  it('renders login form with username, password, remember me, and submit button', () => {
     renderWithAuth(<LoginPage />, {
       initialEntries: ['/login'],
       authValue: { login: loginMock },
@@ -19,6 +20,7 @@ describe('LoginPage', () => {
 
     expect(screen.getByLabelText('帳號')).toBeInTheDocument()
     expect(screen.getByLabelText('密碼')).toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: '記住我的帳號' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '登入' })).toBeInTheDocument()
   })
 
@@ -117,6 +119,25 @@ describe('LoginPage', () => {
     expect(screen.getByRole('button', { name: '登入中...' })).toBeDisabled()
 
     resolveLogin({ token: 'tok', user: {} })
+  })
+
+  it('saves username to localStorage when remember me is checked and login succeeds', async () => {
+    loginMock.mockResolvedValue({ token: 'tok', user: { username: 'admin' } })
+    const user = userEvent.setup()
+    renderWithAuth(<LoginPage />, {
+      initialEntries: ['/login'],
+      authValue: { login: loginMock },
+    })
+
+    await user.type(screen.getByLabelText('帳號'), 'admin')
+    await user.type(screen.getByLabelText('密碼'), 'admin123')
+    await user.click(screen.getByRole('checkbox', { name: '記住我的帳號' }))
+    await user.click(screen.getByRole('button', { name: '登入' }))
+
+    await waitFor(() => {
+      expect(loginMock).toHaveBeenCalled()
+    })
+    expect(localStorage.getItem('loginRememberUsername')).toBe('admin')
   })
 
   it('displays network error message', async () => {

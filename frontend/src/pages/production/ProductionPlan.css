@@ -45,6 +45,34 @@
   color: #666;
 }
 
+.production-hint {
+  font-size: 0.875rem;
+  color: #666;
+  margin-left: 0.5rem;
+}
+
+.production-hint--error {
+  color: #c62828;
+}
+
+.production-form-block {
+  margin-top: 1.5rem;
+}
+
+.production-form-block h2 {
+  font-size: 1.25rem;
+  margin: 0 0 1rem;
+  color: #333;
+}
+
+.production-form-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
 .production-loading {
   text-align: center;
   padding: 3rem;
@@ -267,6 +295,71 @@
   font-size: 0.875rem;
   background-color: white;
   cursor: pointer;
+}
+
+/* 月份選擇器：外層包裝 + 可見日曆按鈕 */
+.month-input-wrap {
+  display: inline-flex;
+  align-items: stretch;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #fff;
+  overflow: hidden;
+}
+.month-input-wrap:focus-within {
+  border-color: #2196f3;
+  outline: 1px solid #2196f3;
+  outline-offset: -1px;
+}
+.production-controls .form-input-month {
+  display: inline-block;
+  min-width: 10rem;
+  padding: 0.5rem 0.5rem 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  border: none;
+  border-radius: 0;
+  background-color: transparent;
+  cursor: pointer;
+  color: #333;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+.production-controls .form-input-month::-webkit-calendar-picker-indicator {
+  display: none;
+}
+.production-controls .form-input-month:disabled {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+}
+.month-input-calendar-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  padding: 0;
+  border: none;
+  border-left: 1px solid #ccc;
+  background-color: #f5f5f5;
+  color: #555;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.month-input-calendar-btn:hover:not(:disabled) {
+  background-color: #e8e8e8;
+  color: #2196f3;
+}
+.month-input-calendar-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.month-input-wrap .form-input-month:disabled ~ .month-input-calendar-btn {
+  background-color: #eee;
+}
+
+.production-query-time {
+  font-size: 0.875rem;
+  color: #555;
+  margin: 0 0 0.75rem 0;
 }
 
 .form-select:disabled {

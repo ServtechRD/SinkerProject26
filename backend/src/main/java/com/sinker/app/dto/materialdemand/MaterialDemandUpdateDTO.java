@@ -4,31 +4,13 @@ import java.math.BigDecimal;
 
 public class MaterialDemandUpdateDTO {
 
-    private BigDecimal expectedDelivery;
-    private BigDecimal demandQuantity;
-    private BigDecimal estimatedInventory;
+    private BigDecimal purchaseQuantity;
 
-    public BigDecimal getExpectedDelivery() {
-        return expectedDelivery;
+    public BigDecimal getPurchaseQuantity() {
+        return purchaseQuantity;
     }
 
-    public void setExpectedDelivery(BigDecimal expectedDelivery) {
-        this.expectedDelivery = expectedDelivery;
-    }
-
-    public BigDecimal getDemandQuantity() {
-        return demandQuantity;
-    }
-
-    public void setDemandQuantity(BigDecimal demandQuantity) {
-        this.demandQuantity = demandQuantity;
-    }
-
-    public BigDecimal getEstimatedInventory() {
-        return estimatedInventory;
-    }
-
-    public void setEstimatedInventory(BigDecimal estimatedInventory) {
-        this.estimatedInventory = estimatedInventory;
+    public void setPurchaseQuantity(BigDecimal purchaseQuantity) {
+        this.purchaseQuantity = purchaseQuantity;
     }
 }

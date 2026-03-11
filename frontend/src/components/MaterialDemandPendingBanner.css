@@ -1,0 +1,29 @@
+.material-demand-pending-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  background: #fef3c7;
+  border-bottom: 1px solid #f59e0b;
+  font-size: 14px;
+}
+
+.material-demand-pending-banner__text {
+  font-weight: 600;
+  color: #92400e;
+}
+
+.material-demand-pending-banner__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.material-demand-pending-banner__link {
+  color: #b45309;
+  text-decoration: underline;
+}
+
+.material-demand-pending-banner__link:hover {
+  color: #92400e;
+}

@@ -20,10 +20,13 @@ public class MaterialDemandExcelParser {
     private static final int COL_UNIT = 2;             // 單位
     private static final int COL_LAST_PURCHASE = 3;   // 上次進貨日
     private static final int COL_DEMAND_DATE = 4;     // 需求日
-    private static final int COL_EXPECTED_DELIVERY = 5; // 預交量
-    private static final int COL_DEMAND_QUANTITY = 6;  // 需求量
-    private static final int COL_ESTIMATED_INVENTORY = 7; // 預計庫存量
-    private static final int MIN_COLUMNS = 8;
+    private static final int COL_CURRENT_STOCK = 5;   // 現有庫存
+    private static final int COL_EXPECTED_ARRIVAL = 6; // 預計進廠日
+    private static final int COL_EXPECTED_DELIVERY = 7; // 預交量
+    private static final int COL_DEMAND_QUANTITY = 8;  // 需求量
+    private static final int COL_ESTIMATED_INVENTORY = 9; // 預計庫存量
+    private static final int COL_PURCHASE_QUANTITY = 10;  // 採購量
+    private static final int MIN_COLUMNS = 11;
 
     public static class MaterialDemandRow {
         private final String materialCode;
@@ -31,21 +34,29 @@ public class MaterialDemandExcelParser {
         private final String unit;
         private final LocalDate lastPurchaseDate;
         private final LocalDate demandDate;
+        private final BigDecimal currentStock;
+        private final LocalDate expectedArrivalDate;
         private final BigDecimal expectedDelivery;
         private final BigDecimal demandQuantity;
         private final BigDecimal estimatedInventory;
+        private final BigDecimal purchaseQuantity;
 
         public MaterialDemandRow(String materialCode, String materialName, String unit,
                                  LocalDate lastPurchaseDate, LocalDate demandDate,
-                                 BigDecimal expectedDelivery, BigDecimal demandQuantity, BigDecimal estimatedInventory) {
+                                 BigDecimal currentStock, LocalDate expectedArrivalDate,
+                                 BigDecimal expectedDelivery, BigDecimal demandQuantity,
+                                 BigDecimal estimatedInventory, BigDecimal purchaseQuantity) {
             this.materialCode = materialCode;
             this.materialName = materialName;
             this.unit = unit;
             this.lastPurchaseDate = lastPurchaseDate;
             this.demandDate = demandDate;
+            this.currentStock = currentStock;
+            this.expectedArrivalDate = expectedArrivalDate;
             this.expectedDelivery = expectedDelivery;
             this.demandQuantity = demandQuantity;
             this.estimatedInventory = estimatedInventory;
+            this.purchaseQuantity = purchaseQuantity;
         }
 
         public String getMaterialCode() { return materialCode; }
@@ -53,9 +64,12 @@ public class MaterialDemandExcelParser {
         public String getUnit() { return unit; }
         public LocalDate getLastPurchaseDate() { return lastPurchaseDate; }
         public LocalDate getDemandDate() { return demandDate; }
+        public BigDecimal getCurrentStock() { return currentStock; }
+        public LocalDate getExpectedArrivalDate() { return expectedArrivalDate; }
         public BigDecimal getExpectedDelivery() { return expectedDelivery; }
         public BigDecimal getDemandQuantity() { return demandQuantity; }
         public BigDecimal getEstimatedInventory() { return estimatedInventory; }
+        public BigDecimal getPurchaseQuantity() { return purchaseQuantity; }
     }
 
     public List<MaterialDemandRow> parse(MultipartFile file) {
@@ -84,7 +98,7 @@ public class MaterialDemandExcelParser {
         }
         Row headerRow = sheet.getRow(0);
         if (headerRow == null || headerRow.getLastCellNum() < MIN_COLUMNS) {
-            throw new ExcelParseException("Excel must have 8 columns: 品號,品名,單位,上次進貨日,需求日,預交量,需求量,預計庫存量");
+            throw new ExcelParseException("Excel must have 11 columns: 品號,品名,單位,上次進貨日,需求日,現有庫存,預計進廠日,預交量,需求量,預計庫存量,採購量");
         }
         List<MaterialDemandRow> rows = new ArrayList<>();
         List<String> errors = new ArrayList<>();
@@ -125,16 +139,22 @@ public class MaterialDemandExcelParser {
         if (demandDate == null) {
             throw new ExcelParseException("Row " + rowNumber + ": 需求日 is required");
         }
+        BigDecimal currentStock = getDecimalCell(row, COL_CURRENT_STOCK, rowNumber, "現有庫存");
+        LocalDate expectedArrivalDate = getDateCell(row, COL_EXPECTED_ARRIVAL);
         BigDecimal expectedDelivery = getDecimalCell(row, COL_EXPECTED_DELIVERY, rowNumber, "預交量");
         BigDecimal demandQuantity = getDecimalCell(row, COL_DEMAND_QUANTITY, rowNumber, "需求量");
-        BigDecimal estimatedInventory = getDecimalCell(row, COL_ESTIMATED_INVENTORY, rowNumber, "預計庫存量");
+        BigDecimal purchaseQuantity = getDecimalCell(row, COL_PURCHASE_QUANTITY, rowNumber, "採購量");
+        if (currentStock == null) currentStock = BigDecimal.ZERO;
         if (expectedDelivery == null) expectedDelivery = BigDecimal.ZERO;
         if (demandQuantity == null) demandQuantity = BigDecimal.ZERO;
-        if (estimatedInventory == null) estimatedInventory = BigDecimal.ZERO;
+        // 預計庫存量 = 現有庫存 + 預交量 - 需求量
+        BigDecimal estimatedInventory = currentStock.add(expectedDelivery).subtract(demandQuantity);
+        if (purchaseQuantity == null) purchaseQuantity = BigDecimal.ZERO;
         return new MaterialDemandRow(
                 materialCode.trim(), materialName.trim(), unit.trim(),
                 lastPurchaseDate, demandDate,
-                expectedDelivery, demandQuantity, estimatedInventory
+                currentStock, expectedArrivalDate,
+                expectedDelivery, demandQuantity, estimatedInventory, purchaseQuantity
         );
     }
 

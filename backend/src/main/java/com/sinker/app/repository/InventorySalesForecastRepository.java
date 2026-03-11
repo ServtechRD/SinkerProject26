@@ -25,4 +25,9 @@ public interface InventorySalesForecastRepository extends JpaRepository<Inventor
 
     @Query("SELECT DISTINCT isf.version FROM InventorySalesForecast isf ORDER BY isf.version DESC")
     List<String> findDistinctVersionsOrderByVersionDesc();
+
+    @Query("SELECT DISTINCT isf.version FROM InventorySalesForecast isf WHERE isf.month >= :startMonth AND isf.month <= :endMonth ORDER BY isf.version DESC")
+    List<String> findDistinctVersionsByMonthBetween(
+            @Param("startMonth") String startMonth,
+            @Param("endMonth") String endMonth);
 }

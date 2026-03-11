@@ -17,6 +17,15 @@ public class Product {
     @Column(nullable = false, length = 500)
     private String name;
 
+    @Column(name = "category_name", length = 200)
+    private String categoryName;
+
+    @Column(length = 200)
+    private String spec;
+
+    @Column(name = "warehouse_location", length = 50)
+    private String warehouseLocation;
+
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
 
@@ -31,6 +40,15 @@ public class Product {
 
     public String getName() { return name; }
     public void setName(String name) { this.name = name; }
+
+    public String getCategoryName() { return categoryName; }
+    public void setCategoryName(String categoryName) { this.categoryName = categoryName; }
+
+    public String getSpec() { return spec; }
+    public void setSpec(String spec) { this.spec = spec; }
+
+    public String getWarehouseLocation() { return warehouseLocation; }
+    public void setWarehouseLocation(String warehouseLocation) { this.warehouseLocation = warehouseLocation; }
 
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }

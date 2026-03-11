@@ -1,5 +1,6 @@
 package com.sinker.app.controller;
 
+import com.sinker.app.dto.productionplan.ProductionFormRangeResponse;
 import com.sinker.app.dto.productionplan.ProductionFormRowDTO;
 import com.sinker.app.dto.productionplan.UpdateBufferRequest;
 import com.sinker.app.dto.productionplan.UpdateProductionPlanRequest;
@@ -39,18 +40,39 @@ public class ProductionPlanController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('production_plan.view')")
-    public ResponseEntity<List<ProductionFormRowDTO>> getProductionForm(
-            @RequestParam Integer year,
+    public ResponseEntity<?> getProductionForm(
+            @RequestParam(required = false) Integer year,
+            @RequestParam(required = false) String start_month,
+            @RequestParam(required = false) String end_month,
+            @RequestParam(required = false) String version,
             @AuthenticationPrincipal JwtUserPrincipal principal) {
 
-        log.info("GET /api/production-plan - user={}, year={}", principal.getUserId(), year);
-
-        if (year == null) {
-            throw new IllegalArgumentException("year parameter is required");
+        if (start_month != null && end_month != null) {
+            log.info("GET /api/production-plan - user={}, start_month={}, end_month={}, version={}",
+                    principal.getUserId(), start_month, end_month, version);
+            ProductionFormRangeResponse resp = productionFormService.getProductionFormByMonthRange(start_month, end_month, version);
+            return ResponseEntity.ok(resp);
         }
+        if (year != null) {
+            log.info("GET /api/production-plan - user={}, year={}", principal.getUserId(), year);
+            List<ProductionFormRowDTO> rows = productionFormService.getProductionForm(year);
+            return ResponseEntity.ok(rows);
+        }
+        throw new IllegalArgumentException("Either year or (start_month and end_month) is required");
+    }
 
-        List<ProductionFormRowDTO> rows = productionFormService.getProductionForm(year);
-        return ResponseEntity.ok(rows);
+    @GetMapping("/versions")
+    @PreAuthorize("hasAuthority('production_plan.view')")
+    public ResponseEntity<List<String>> listProductionPlanVersions(
+            @RequestParam String start_month,
+            @RequestParam String end_month,
+            @AuthenticationPrincipal JwtUserPrincipal principal) {
+
+        log.info("GET /api/production-plan/versions - user={}, start_month={}, end_month={}",
+                principal.getUserId(), start_month, end_month);
+
+        List<String> versions = productionFormService.listInventoryVersionsInRange(start_month, end_month);
+        return ResponseEntity.ok(versions);
     }
 
     @PutMapping("/buffer")

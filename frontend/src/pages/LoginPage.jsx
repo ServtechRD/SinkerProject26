@@ -1,16 +1,27 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { APP_VERSION } from '../version'
 import logoUrl from '../assets/logo.jpg'
 import './LoginPage.css'
 
+const REMEMBER_USERNAME_KEY = 'loginRememberUsername'
+
 export default function LoginPage() {
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [rememberMe, setRememberMe] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const saved = localStorage.getItem(REMEMBER_USERNAME_KEY)
+    if (saved) {
+      setUsername(saved)
+      setRememberMe(true)
+    }
+  }, [])
 
   const { login } = useAuth()
   const navigate = useNavigate()
@@ -30,6 +41,11 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await login(username.trim(), password)
+      if (rememberMe) {
+        localStorage.setItem(REMEMBER_USERNAME_KEY, username.trim())
+      } else {
+        localStorage.removeItem(REMEMBER_USERNAME_KEY)
+      }
       navigate(from, { replace: true })
     } catch (err) {
       const status = err.response?.status
@@ -101,6 +117,18 @@ export default function LoginPage() {
               )}
             </button>
           </div>
+        </div>
+        <div className="login-remember">
+          <label className="login-remember-label">
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              disabled={loading}
+              aria-label="記住我的帳號"
+            />
+            <span>記住我</span>
+          </label>
         </div>
         <button type="submit" className="login-submit" disabled={loading}>
           {loading ? '登入中...' : '登入'}

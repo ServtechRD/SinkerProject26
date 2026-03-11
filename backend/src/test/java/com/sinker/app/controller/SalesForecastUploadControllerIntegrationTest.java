@@ -248,8 +248,8 @@ class SalesForecastUploadControllerIntegrationTest {
 
     @Test
     void testUpload_DoesNotOwnChannel() throws Exception {
-        // Sales user does NOT own "PX/大全聯" (only owns "家樂福")
-        String targetChannel = "PX/大全聯";
+        // Sales user does NOT own "PX + 大全聯" (only owns "家樂福")
+        String targetChannel = "PX + 大全聯";
 
         MockMultipartFile file = createExcelFile(3);
         mockMvc.perform(multipart("/api/sales-forecast/upload")

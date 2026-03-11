@@ -292,12 +292,12 @@ export default function ForecastIntegrationPage() {
                       <th>貨品規格</th>
                       <th>品名</th>
                       <th>品號</th>
-                      <th className="align-right">PX/大全聯</th>
+                      <th className="align-right">PX + 大全聯</th>
                       <th className="align-right">家樂福</th>
                       <th className="align-right">愛買</th>
                       <th className="align-right">7-11</th>
                       <th className="align-right">全家</th>
-                      <th className="align-right">OK/萊爾富</th>
+                      <th className="align-right">Ok+萊爾富</th>
                       <th className="align-right">好市多</th>
                       <th className="align-right">楓康</th>
                       <th className="align-right">美聯社</th>

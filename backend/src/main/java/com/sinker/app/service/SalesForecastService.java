@@ -43,8 +43,8 @@ public class SalesForecastService {
             DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss");
 
     private static final List<String> FORM_SUMMARY_CHANNEL_ORDER = List.of(
-            "PX/大全聯", "家樂福", "7-11", "全家", "萊爾富", "OK超商",
-            "美廉社", "愛買", "大潤發", "好市多", "頂好", "楓康");
+            "PX + 大全聯", "家樂福", "愛買", "7-11", "全家", "Ok+萊爾富",
+            "好市多", "楓康", "美聯社", "康是美", "電商", "市面經銷");
 
     private final SalesForecastRepository forecastRepository;
     private final SalesForecastConfigRepository configRepository;

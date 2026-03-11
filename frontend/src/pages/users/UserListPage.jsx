@@ -27,6 +27,7 @@ export default function UserListPage() {
 
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  const [disableTarget, setDisableTarget] = useState(null)
 
   const debounceRef = useRef(null)
 
@@ -104,10 +105,19 @@ export default function UserListPage() {
       const updated = await toggleUserActive(user.id)
       setUsers((prev) => prev.map((u) => (u.id === user.id ? updated : u)))
       toast.success(`${user.username} 狀態已更新`)
+      setDisableTarget(null)
     } catch {
       toast.error('狀態切換失敗')
     } finally {
       setTogglingId(null)
+    }
+  }
+
+  function handleToggleClick(user) {
+    if (user.isActive) {
+      setDisableTarget(user)
+    } else {
+      handleToggle(user)
     }
   }
 
@@ -129,6 +139,23 @@ export default function UserListPage() {
   function sortIcon(col) {
     if (sortBy !== col) return ''
     return sortOrder === 'asc' ? ' ▲' : ' ▼'
+  }
+
+  function formatLastLoginAt(val) {
+    if (val == null || val === '') return '-'
+    try {
+      const d = new Date(val)
+      if (Number.isNaN(d.getTime())) return '-'
+      return d.toLocaleString('zh-TW', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    } catch {
+      return '-'
+    }
   }
 
   return (
@@ -184,6 +211,8 @@ export default function UserListPage() {
                     Email{sortIcon('email')}
                   </th>
                   <th>角色</th>
+                  <th>部門</th>
+                  <th>最後登入時間</th>
                   <th>狀態</th>
                   <th>操作</th>
                 </tr>
@@ -195,6 +224,8 @@ export default function UserListPage() {
                     <td>{u.fullName}</td>
                     <td>{u.email}</td>
                     <td>{u.role?.name}</td>
+                    <td>{u.department ?? '-'}</td>
+                    <td>{formatLastLoginAt(u.lastLoginAt)}</td>
                     <td>
                       <span className={`badge badge--${u.isActive ? 'active' : 'inactive'}`}>
                         {u.isActive ? '啟用' : '停用'}
@@ -209,7 +240,7 @@ export default function UserListPage() {
                       </button>
                       <button
                         className="btn btn--small btn--outline"
-                        onClick={() => handleToggle(u)}
+                        onClick={() => handleToggleClick(u)}
                         disabled={togglingId === u.id}
                       >
                         {togglingId === u.id ? '...' : u.isActive ? '停用' : '啟用'}
@@ -256,6 +287,17 @@ export default function UserListPage() {
         onConfirm={handleDeleteConfirm}
         onCancel={() => setDeleteTarget(null)}
         loading={deleting}
+      />
+
+      <ConfirmDialog
+        open={!!disableTarget}
+        title="確認停用"
+        message={disableTarget ? `確定要停用使用者「${disableTarget.username}」嗎？停用後該使用者將無法登入系統。` : ''}
+        onConfirm={() => disableTarget && handleToggle(disableTarget)}
+        onCancel={() => setDisableTarget(null)}
+        loading={togglingId === disableTarget?.id}
+        confirmText="停用"
+        confirmButtonClass="btn--outline"
       />
     </div>
   )

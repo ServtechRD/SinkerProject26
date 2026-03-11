@@ -5,8 +5,8 @@ import { useToast } from '../../components/Toast'
 import './UserPages.css'
 
 const CHANNELS = [
-  'PX/大全聯', '家樂福', '7-11', '全家', '萊爾富', 'OK超商',
-  '美廉社', '愛買', '大潤發', '好市多', '頂好', '楓康',
+  'PX + 大全聯', '家樂福', '愛買', '7-11', '全家', 'Ok+萊爾富',
+  '好市多', '楓康', '美聯社', '康是美', '電商', '市面經銷',
 ]
 
 export default function UserCreatePage() {
@@ -29,9 +29,18 @@ export default function UserCreatePage() {
   const selectedRole = roles.find((r) => String(r.id) === String(form.roleId))
   const isSales = selectedRole?.code === 'sales'
 
+  const USERNAME_REGEX = /^[a-zA-Z0-9_]*$/
+  const USERNAME_MIN = 3
+  const USERNAME_MAX = 50
+
   function handleChange(e) {
     const { name, value } = e.target
-    setForm((prev) => ({ ...prev, [name]: value }))
+    if (name === 'username') {
+      const filtered = value.replace(/[^a-zA-Z0-9_]/g, '')
+      setForm((prev) => ({ ...prev, [name]: filtered }))
+    } else {
+      setForm((prev) => ({ ...prev, [name]: value }))
+    }
     setErrors((prev) => ({ ...prev, [name]: '' }))
   }
 
@@ -47,12 +56,34 @@ export default function UserCreatePage() {
 
   function validate() {
     const errs = {}
-    if (!form.username.trim()) errs.username = '帳號為必填'
-    else if (form.username.trim().length > 50) errs.username = '帳號不得超過 50 字元'
+    const un = form.username.trim()
+    if (!un) {
+      errs.username = '帳號為必填'
+    } else if (!USERNAME_REGEX.test(un)) {
+      errs.username = '帳號僅能使用英文、數字與底線，不允許中文或特殊符號'
+    } else if (un.length < USERNAME_MIN || un.length > USERNAME_MAX) {
+      errs.username = `帳號長度為 ${USERNAME_MIN}-${USERNAME_MAX} 個字元`
+    }
     if (!form.email.trim()) errs.email = 'Email 為必填'
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = 'Email 格式無效'
-    if (!form.password) errs.password = '密碼為必填'
-    else if (form.password.length < 6) errs.password = '密碼至少 6 個字元'
+    if (!form.password) {
+      errs.password = '密碼為必填'
+    } else {
+      const pwd = form.password
+      if (pwd.length < 8) {
+        errs.password = '密碼至少 8 個字元'
+      } else {
+        const hasLetter = /[a-zA-Z]/.test(pwd)
+        const hasDigit = /\d/.test(pwd)
+        if (!hasLetter && !hasDigit) {
+          errs.password = '密碼須包含英文字母與數字'
+        } else if (!hasLetter) {
+          errs.password = '密碼須包含英文字母'
+        } else if (!hasDigit) {
+          errs.password = '密碼須包含數字'
+        }
+      }
+    }
     if (!form.fullName.trim()) errs.fullName = '姓名為必填'
     if (!form.roleId) errs.roleId = '角色為必填'
     if (isSales && form.channels.length === 0) errs.channels = '業務角色需選擇至少一個通路'
@@ -83,8 +114,22 @@ export default function UserCreatePage() {
       toast.success('使用者建立成功')
       navigate('/users')
     } catch (err) {
-      const msg = err.response?.data?.message || '建立失敗，請稍後再試'
-      setApiError(msg)
+      const msg = err.response?.data?.message || ''
+      const status = err.response?.status
+      if (status === 409) {
+        const lower = (msg || '').toLowerCase()
+        if (lower.includes('email')) {
+          setErrors((prev) => ({ ...prev, email: '此 Email 已被使用' }))
+          setApiError('此 Email 已被使用，請使用其他 Email。')
+        } else if (lower.includes('username')) {
+          setErrors((prev) => ({ ...prev, username: '此帳號已被使用' }))
+          setApiError(msg || '此帳號已被使用，請使用其他帳號。')
+        } else {
+          setApiError(msg || '資料重複，請檢查後再試。')
+        }
+      } else {
+        setApiError(msg || '建立失敗，請稍後再試')
+      }
     } finally {
       setSubmitting(false)
     }
@@ -100,7 +145,9 @@ export default function UserCreatePage() {
         <div className="form-group">
           <label htmlFor="username">帳號 <span className="required">*</span></label>
           <input id="username" name="username" className={`form-input${errors.username ? ' error' : ''}`}
-            value={form.username} onChange={handleChange} maxLength={50} disabled={submitting} />
+            value={form.username} onChange={handleChange} maxLength={USERNAME_MAX}
+            placeholder="僅限英文、數字、底線，3-50 字元"
+            disabled={submitting} />
           {errors.username && <div className="form-error">{errors.username}</div>}
         </div>
 
@@ -114,7 +161,8 @@ export default function UserCreatePage() {
         <div className="form-group">
           <label htmlFor="password">密碼 <span className="required">*</span></label>
           <input id="password" name="password" type="password" className={`form-input${errors.password ? ' error' : ''}`}
-            value={form.password} onChange={handleChange} disabled={submitting} />
+            value={form.password} onChange={handleChange} disabled={submitting}
+            placeholder="至少 8 字元，須包含英文與數字" />
           {errors.password && <div className="form-error">{errors.password}</div>}
         </div>
 

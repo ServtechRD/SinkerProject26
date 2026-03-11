@@ -104,7 +104,7 @@ describe('UserCreatePage', () => {
 
     await user.selectOptions(screen.getByLabelText(/角色/), '2')
 
-    expect(screen.getByText('PX/大全聯')).toBeInTheDocument()
+    expect(screen.getByText('PX + 大全聯')).toBeInTheDocument()
     expect(screen.getByText('家樂福')).toBeInTheDocument()
   })
 
@@ -114,10 +114,10 @@ describe('UserCreatePage', () => {
     await waitFor(() => expect(screen.getByLabelText(/角色/)).toBeInTheDocument())
 
     await user.selectOptions(screen.getByLabelText(/角色/), '2')
-    expect(screen.getByText('PX/大全聯')).toBeInTheDocument()
+    expect(screen.getByText('PX + 大全聯')).toBeInTheDocument()
 
     await user.selectOptions(screen.getByLabelText(/角色/), '1')
-    expect(screen.queryByText('PX/大全聯')).not.toBeInTheDocument()
+    expect(screen.queryByText('PX + 大全聯')).not.toBeInTheDocument()
   })
 
   it('validates channels required for sales role', async () => {
@@ -134,6 +134,36 @@ describe('UserCreatePage', () => {
     await user.click(screen.getByText('建立'))
 
     expect(screen.getByText('業務角色需選擇至少一個通路')).toBeInTheDocument()
+  })
+
+  it('validates username length 3-50 and alphanumeric+underscore only', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => expect(screen.getByLabelText(/帳號/)).toBeInTheDocument())
+
+    await user.type(screen.getByLabelText(/帳號/), 'ab')
+    await user.type(screen.getByLabelText(/Email/), 'a@t.com')
+    await user.type(screen.getByLabelText(/密碼/), 'password123')
+    await user.type(screen.getByLabelText(/姓名/), 'Test')
+    await user.selectOptions(screen.getByLabelText(/角色/), '1')
+    await user.click(screen.getByText('建立'))
+
+    expect(screen.getByText(/帳號長度為 3-50 個字元/)).toBeInTheDocument()
+  })
+
+  it('validates password at least 8 chars and must contain letter and digit', async () => {
+    const user = userEvent.setup()
+    renderPage()
+    await waitFor(() => expect(screen.getByLabelText(/帳號/)).toBeInTheDocument())
+
+    await user.type(screen.getByLabelText(/帳號/), 'newuser')
+    await user.type(screen.getByLabelText(/Email/), 'a@t.com')
+    await user.type(screen.getByLabelText(/密碼/), '12345678')
+    await user.type(screen.getByLabelText(/姓名/), 'Test')
+    await user.selectOptions(screen.getByLabelText(/角色/), '1')
+    await user.click(screen.getByText('建立'))
+
+    expect(screen.getByText('密碼須包含英文字母')).toBeInTheDocument()
   })
 
   it('shows API error on failure', async () => {

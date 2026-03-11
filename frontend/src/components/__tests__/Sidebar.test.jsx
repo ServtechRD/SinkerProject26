@@ -15,7 +15,7 @@ describe('Sidebar', () => {
     renderWithAuth(<Sidebar />, { authValue })
 
     expect(screen.getByText('儀表板')).toBeInTheDocument()
-    expect(screen.getByText('使用者')).toBeInTheDocument()
+    expect(screen.getByText('使用者管理')).toBeInTheDocument()
     expect(screen.getByText('預測設定')).toBeInTheDocument()
     expect(screen.getByText('預測上傳')).toBeInTheDocument()
   })
@@ -57,7 +57,7 @@ describe('Sidebar', () => {
       initialEntries: ['/users'],
     })
 
-    const usersLink = screen.getByText('使用者').closest('a')
+    const usersLink = screen.getByText('使用者管理').closest('a')
     expect(usersLink).toHaveClass('sidebar-link--active')
   })
 })

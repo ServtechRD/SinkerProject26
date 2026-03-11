@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -24,8 +25,14 @@ public class ProductController {
     }
 
     @GetMapping
-    public ResponseEntity<List<ProductDTO>> findAll() {
-        log.info("GET /api/products - list all product code and name");
+    public ResponseEntity<?> findProducts(@RequestParam(required = false) String code) {
+        if (code != null && !code.isBlank()) {
+            log.info("GET /api/products?code={} - lookup by 品號", code);
+            return productService.findByCode(code.trim())
+                    .map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.notFound().build());
+        }
+        log.info("GET /api/products - list all product code, name, spec, 庫位");
         List<ProductDTO> list = productService.findAll();
         return ResponseEntity.ok(list);
     }

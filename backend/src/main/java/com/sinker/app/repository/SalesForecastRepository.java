@@ -52,4 +52,16 @@ public interface SalesForecastRepository extends JpaRepository<SalesForecast, In
 
     @Query("SELECT DISTINCT sf.version FROM SalesForecast sf WHERE sf.month = :month ORDER BY sf.version DESC")
     List<String> findDistinctVersionsByMonth(@Param("month") String month);
+
+    @Query("SELECT sf FROM SalesForecast sf WHERE sf.month = :month AND sf.formVersionNo = :formVersionNo " +
+           "ORDER BY sf.channel ASC, sf.category ASC, sf.spec ASC, sf.productCode ASC")
+    List<SalesForecast> findByMonthAndFormVersionNoOrderByChannelCategorySpecProductCode(
+            @Param("month") String month, @Param("formVersionNo") Integer formVersionNo);
+
+    @Modifying
+    @Query("UPDATE SalesForecast sf SET sf.formVersionNo = :formVersionNo " +
+           "WHERE sf.month = :month AND sf.channel = :channel AND sf.version = :version")
+    void setFormVersionNoForMonthChannelVersion(
+            @Param("month") String month, @Param("channel") String channel,
+            @Param("version") String version, @Param("formVersionNo") Integer formVersionNo);
 }

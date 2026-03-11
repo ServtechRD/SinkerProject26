@@ -1,5 +1,6 @@
 .forecast-upload-page {
-  max-width: 1000px;
+  width: 100%;
+  max-width: none;
   padding: 24px;
 }
 
@@ -193,22 +194,24 @@
   }
 }
 
-/* 上傳結果：箱數小計修改完 -> 紅字顯示 */
-.forecast-upload-page .forecast-table .quantity-cell--modified,
-.forecast-upload-page .forecast-table .quantity-cell--modified .quantity-editable,
-.forecast-upload-page .forecast-table .quantity-cell--modified span {
+/* 上傳結果：箱數小計為 0 時紅字，其餘黑字 */
+.forecast-upload-page .forecast-table .quantity-cell--zero,
+.forecast-upload-page .forecast-table .quantity-cell--zero .quantity-editable,
+.forecast-upload-page .forecast-table .quantity-cell--zero .quantity-input,
+.forecast-upload-page .forecast-table .quantity-cell--zero span {
   color: #c62828 !important;
   font-weight: 600;
 }
 
-/* 上傳結果：新增項目 -> 所有欄位紅字顯示 */
+/* 上傳結果：新增項目整列紅字（重新查詢後 lastAddedIds 清空即恢復黑字） */
 .forecast-upload-page .forecast-table tbody tr.row-added td {
   color: #c62828 !important;
   font-weight: 500;
 }
 
 .forecast-upload-page .forecast-table tbody tr.row-added td .quantity-editable,
-.forecast-upload-page .forecast-table tbody tr.row-added td span {
+.forecast-upload-page .forecast-table tbody tr.row-added td span,
+.forecast-upload-page .forecast-table tbody tr.row-added td.quantity-cell--zero {
   color: #c62828 !important;
 }
 

@@ -1,6 +1,7 @@
 package com.sinker.app.dto.forecast;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.sinker.app.entity.GiftSalesForecast;
 import com.sinker.app.entity.SalesForecast;
 
 import java.math.BigDecimal;
@@ -29,6 +30,24 @@ public class ForecastResponse {
     private LocalDateTime updatedAt;
 
     public static ForecastResponse fromEntity(SalesForecast entity) {
+        ForecastResponse response = new ForecastResponse();
+        response.setId(entity.getId());
+        response.setMonth(entity.getMonth());
+        response.setChannel(entity.getChannel());
+        response.setCategory(entity.getCategory());
+        response.setSpec(entity.getSpec());
+        response.setProductCode(entity.getProductCode());
+        response.setProductName(entity.getProductName());
+        response.setWarehouseLocation(entity.getWarehouseLocation());
+        response.setQuantity(entity.getQuantity());
+        response.setVersion(entity.getVersion());
+        response.setIsModified(entity.getIsModified());
+        response.setCreatedAt(entity.getCreatedAt());
+        response.setUpdatedAt(entity.getUpdatedAt());
+        return response;
+    }
+
+    public static ForecastResponse fromEntity(GiftSalesForecast entity) {
         ForecastResponse response = new ForecastResponse();
         response.setId(entity.getId());
         response.setMonth(entity.getMonth());

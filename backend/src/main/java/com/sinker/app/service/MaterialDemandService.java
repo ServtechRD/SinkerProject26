@@ -8,6 +8,7 @@ import com.sinker.app.repository.MaterialDemandRepository;
 import com.sinker.app.util.MaterialDemandExcelParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -16,6 +17,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -25,11 +27,14 @@ public class MaterialDemandService {
 
     private final MaterialDemandRepository materialDemandRepository;
     private final MaterialDemandExcelParser excelParser;
+    private final JdbcTemplate jdbcTemplate;
 
     public MaterialDemandService(MaterialDemandRepository materialDemandRepository,
-                                 MaterialDemandExcelParser excelParser) {
+                                 MaterialDemandExcelParser excelParser,
+                                 JdbcTemplate jdbcTemplate) {
         this.materialDemandRepository = materialDemandRepository;
         this.excelParser = excelParser;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Transactional(readOnly = true)
@@ -48,26 +53,15 @@ public class MaterialDemandService {
     public MaterialDemandDTO update(Integer id, MaterialDemandUpdateDTO dto) {
         MaterialDemand entity = materialDemandRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Material demand not found with id: " + id));
-        if (dto.getExpectedDelivery() != null) {
-            if (dto.getExpectedDelivery().compareTo(BigDecimal.ZERO) < 0) {
-                throw new IllegalArgumentException("expectedDelivery must be >= 0");
+        if (dto.getPurchaseQuantity() != null) {
+            if (dto.getPurchaseQuantity().compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("purchaseQuantity must be >= 0");
             }
-            entity.setExpectedDelivery(dto.getExpectedDelivery());
-        }
-        if (dto.getDemandQuantity() != null) {
-            if (dto.getDemandQuantity().compareTo(BigDecimal.ZERO) < 0) {
-                throw new IllegalArgumentException("demandQuantity must be >= 0");
-            }
-            entity.setDemandQuantity(dto.getDemandQuantity());
-        }
-        if (dto.getEstimatedInventory() != null) {
-            if (dto.getEstimatedInventory().compareTo(BigDecimal.ZERO) < 0) {
-                throw new IllegalArgumentException("estimatedInventory must be >= 0");
-            }
-            entity.setEstimatedInventory(dto.getEstimatedInventory());
+            entity.setPurchaseQuantity(dto.getPurchaseQuantity());
         }
         entity.setUpdatedAt(LocalDateTime.now());
         MaterialDemand saved = materialDemandRepository.save(entity);
+        markPendingConfirm(saved.getWeekStart(), saved.getFactory());
         log.info("Updated material demand id={}", id);
         return MaterialDemandDTO.fromEntity(saved);
     }
@@ -90,9 +84,12 @@ public class MaterialDemandService {
             d.setUnit(row.getUnit());
             d.setLastPurchaseDate(row.getLastPurchaseDate());
             d.setDemandDate(row.getDemandDate());
+            d.setCurrentStock(row.getCurrentStock());
+            d.setExpectedArrivalDate(row.getExpectedArrivalDate());
             d.setExpectedDelivery(row.getExpectedDelivery());
             d.setDemandQuantity(row.getDemandQuantity());
             d.setEstimatedInventory(row.getEstimatedInventory());
+            d.setPurchaseQuantity(row.getPurchaseQuantity());
             d.setCreatedAt(now);
             d.setUpdatedAt(now);
             return d;
@@ -100,6 +97,25 @@ public class MaterialDemandService {
         materialDemandRepository.saveAll(entities);
         log.info("Saved {} material demand records", entities.size());
         return entities.size();
+    }
+
+    /** 編輯儲存後標記該週+廠區有待確認送出 ERP */
+    public void markPendingConfirm(LocalDate weekStart, String factory) {
+        jdbcTemplate.update(
+                "INSERT INTO material_demand_pending_confirm (week_start, factory) VALUES (?, ?) ON DUPLICATE KEY UPDATE updated_at = CURRENT_TIMESTAMP",
+                weekStart, factory);
+    }
+
+    /** 本週資料確認無誤送出至天心 ERP：清除待確認記錄（dummy API） */
+    @Transactional
+    public void confirmSendErp(LocalDate weekStart, String factory) {
+        jdbcTemplate.update("DELETE FROM material_demand_pending_confirm WHERE week_start = ? AND factory = ?", weekStart, factory);
+        log.info("Confirm send ERP: weekStart={}, factory={}", weekStart, factory);
+    }
+
+    /** 取得所有待確認送出 ERP 的 (week_start, factory) 清單，供採購主管提示用 */
+    public List<Map<String, Object>> getPendingConfirm() {
+        return jdbcTemplate.queryForList("SELECT week_start AS weekStart, factory FROM material_demand_pending_confirm ORDER BY updated_at DESC");
     }
 
     public byte[] generateTemplate(String factory) {

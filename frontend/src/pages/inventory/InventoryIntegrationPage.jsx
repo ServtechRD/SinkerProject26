@@ -47,6 +47,20 @@ function getLastDayOfMonth(monthStr) {
   return `${year}-${month}-${String(lastDay).padStart(2, '0')}`
 }
 
+/** 計算起始日～結束日涵蓋的月數（含頭尾），超過 4 個月回傳 false */
+function isDateRangeWithinFourMonths(startDateStr, endDateStr) {
+  if (!startDateStr || !endDateStr) return true
+  const start = new Date(startDateStr)
+  const end = new Date(endDateStr)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return true
+  if (end < start) return false
+  const monthsBetween =
+    (end.getFullYear() - start.getFullYear()) * 12 +
+    (end.getMonth() - start.getMonth()) +
+    1
+  return monthsBetween <= 4
+}
+
 export default function InventoryIntegrationPage() {
   const { user } = useAuth()
   const toast = useToast()
@@ -90,6 +104,12 @@ export default function InventoryIntegrationPage() {
     if (queryMode === QUERY_MODE_DATE && !month) {
       toast.error('請選擇月份')
       return
+    }
+    if (queryMode === QUERY_MODE_DATE && (startDate || endDate)) {
+      if (!isDateRangeWithinFourMonths(startDate, endDate)) {
+        toast.error('結存查詢起始日期與結存查詢結束日期最多只能查詢 4 個月')
+        return
+      }
     }
     if (queryMode === QUERY_MODE_VERSION && !selectedVersion) {
       toast.error('請選擇版本')

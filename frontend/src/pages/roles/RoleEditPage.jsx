@@ -14,7 +14,6 @@ const MODULE_LABELS = {
   weekly_schedule: '週排程',
   semi_product: '半成品設定',
   material_demand: '物料需求',
-  material_purchase: '物料採購',
 }
 
 export default function RoleEditPage() {

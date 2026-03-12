@@ -84,7 +84,8 @@ describe('forecast API', () => {
 
       await downloadTemplate('家樂福')
 
-      expect(api.get).toHaveBeenCalledWith('/api/sales-forecast/template/家樂福', {
+      expect(api.get).toHaveBeenCalledWith('/api/sales-forecast/template', {
+        params: { channel: '家樂福' },
         responseType: 'blob',
       })
       expect(createObjectURL).toHaveBeenCalledWith(expect.any(Blob))

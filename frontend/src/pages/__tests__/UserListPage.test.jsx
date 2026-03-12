@@ -168,6 +168,10 @@ describe('UserListPage', () => {
     const toggleBtn = within(adminRow).getByText('停用')
     await user.click(toggleBtn)
 
+    const dialog = screen.getByRole('alertdialog')
+    const confirmBtn = within(dialog).getByRole('button', { name: '停用' })
+    await user.click(confirmBtn)
+
     await waitFor(() => {
       expect(toggleUserActive).toHaveBeenCalledWith(1)
     })

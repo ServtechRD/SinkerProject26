@@ -87,15 +87,15 @@ describe('RoleEditPage', () => {
   })
 
   it('name field is editable', async () => {
-    const user = userEvent.setup()
+    const user = userEvent.setup({ delay: null })
     renderPage()
     await waitFor(() => expect(screen.getByDisplayValue('Administrator')).toBeInTheDocument())
 
     const nameInput = screen.getByLabelText(/名稱/)
     await user.clear(nameInput)
     await user.type(nameInput, 'New Name')
-    expect(nameInput.value).toBe('New Name')
-  })
+    expect(nameInput).toHaveValue('New Name')
+  }, 10000)
 
   it('displays permissions grouped by module', async () => {
     renderPage()

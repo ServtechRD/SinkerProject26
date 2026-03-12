@@ -43,7 +43,9 @@ describe('materialDemand API', () => {
 
     const result = await getMaterialDemand('2026-02-17', 'F1')
 
-    expect(api.get).toHaveBeenCalledWith('/api/material-demand?week_start=2026-02-17&factory=F1')
+    expect(api.get).toHaveBeenCalledWith('/api/material-demand', {
+      params: { week_start: '2026-02-17', factory: 'F1' },
+    })
     expect(result).toEqual(mockData)
   })
 
@@ -65,7 +67,9 @@ describe('materialDemand API', () => {
 
     const result = await getMaterialDemand('2026-02-17', 'F2')
 
-    expect(api.get).toHaveBeenCalledWith('/api/material-demand?week_start=2026-02-17&factory=F2')
+    expect(api.get).toHaveBeenCalledWith('/api/material-demand', {
+      params: { week_start: '2026-02-17', factory: 'F2' },
+    })
     expect(result).toEqual([])
   })
 })

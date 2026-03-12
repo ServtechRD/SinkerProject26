@@ -29,7 +29,9 @@ describe('materialPurchase API', () => {
 
       const result = await getMaterialPurchase('2026-02-17', 'F1')
 
-      expect(api.get).toHaveBeenCalledWith('/api/material-purchase?week_start=2026-02-17&factory=F1')
+      expect(api.get).toHaveBeenCalledWith('/api/material-purchase', {
+        params: { week_start: '2026-02-17', factory: 'F1' },
+      })
       expect(result).toEqual(mockData)
     })
 

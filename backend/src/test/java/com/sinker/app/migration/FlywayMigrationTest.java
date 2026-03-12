@@ -111,29 +111,29 @@ class FlywayMigrationTest {
     @Test
     void seedDataRoles() {
         Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM roles", Integer.class);
-        assertEquals(4, count, "Should have 4 seeded roles");
+        assertEquals(5, count, "Should have 5 seeded roles (V2 + V23 procurement_supervisor)");
 
         List<String> codes = jdbc.queryForList("SELECT code FROM roles ORDER BY id", String.class);
-        assertEquals(List.of("admin", "sales", "production_planner", "procurement"), codes);
+        assertEquals(List.of("admin", "sales", "production_planner", "procurement", "procurement_supervisor"), codes);
 
         Integer systemCount = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM roles WHERE is_system = TRUE AND is_active = TRUE", Integer.class);
-        assertEquals(4, systemCount, "All seeded roles should be system and active");
+        assertEquals(4, systemCount, "First 4 seeded roles should be system and active");
     }
 
     @Test
     void seedDataPermissions() {
         Integer total = jdbc.queryForObject("SELECT COUNT(*) FROM permissions", Integer.class);
-        assertTrue(total >= 34, "Should have at least 34 permissions (V2 seed + V14/V15/V16)");
+        assertTrue(total >= 35, "Should have at least 35 permissions (V2 seed + V14/V15/V16 + V23 confirm_data_send_erp)");
 
         // Verify module counts
         List<Map<String, Object>> moduleCounts = jdbc.queryForList(
                 "SELECT module, COUNT(*) as cnt FROM permissions GROUP BY module ORDER BY module");
 
-        // V2 seed + V14 (sales_forecast +1), V15 (material_demand +2), V16 (material_purchase +2)
+        // V2 seed + V14 (sales_forecast +1), V15 (material_demand +2), V16 (material_purchase +2), V23 (material_demand +1)
         Map<String, Integer> expected = Map.of(
                 "inventory", 2,
-                "material_demand", 3,
+                "material_demand", 4,
                 "material_purchase", 4,
                 "production_plan", 2,
                 "role", 4,
@@ -687,11 +687,12 @@ class FlywayMigrationTest {
         List<String> columns = jdbc.queryForList(
                 "SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'material_demand' ORDER BY ORDINAL_POSITION",
                 String.class);
-        assertEquals(13, columns.size(), "material_demand table should have 13 columns");
+        assertEquals(16, columns.size(), "material_demand table should have 16 columns (V10 + V23 current_stock, expected_arrival_date, purchase_quantity)");
         assertTrue(columns.containsAll(List.of(
                 "id", "week_start", "factory", "material_code", "material_name", "unit",
-                "last_purchase_date", "demand_date", "expected_delivery", "demand_quantity",
-                "estimated_inventory", "created_at", "updated_at")));
+                "last_purchase_date", "demand_date", "current_stock", "expected_arrival_date",
+                "expected_delivery", "demand_quantity", "estimated_inventory", "purchase_quantity",
+                "created_at", "updated_at")));
     }
 
     @Test

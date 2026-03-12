@@ -37,7 +37,9 @@ describe('productionPlan API', () => {
 
     const result = await getProductionPlan(2026)
 
-    expect(api.get).toHaveBeenCalledWith('/api/production-plan?year=2026')
+    expect(api.get).toHaveBeenCalledWith('/api/production-plan', {
+      params: { year: 2026 },
+    })
     expect(result).toEqual(mockData)
   })
 

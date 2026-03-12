@@ -87,7 +87,7 @@ describe('CreateMonthsDialog', () => {
     await user.click(screen.getByRole('button', { name: '建立' }))
 
     await waitFor(() => {
-      expect(createMonths).toHaveBeenCalledWith('202601', '202603')
+      expect(createMonths).toHaveBeenCalledWith('202601', '202603', 10)
     })
     await waitFor(() => {
       expect(props.onSuccess).toHaveBeenCalled()

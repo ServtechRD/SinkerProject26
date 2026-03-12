@@ -1,13 +1,13 @@
 import api from './axios'
 
-export function uploadForecast(file, month, channel) {
+export function uploadGiftForecast(file, month, channel) {
   const formData = new FormData()
   formData.append('file', file)
   formData.append('month', month)
   formData.append('channel', channel)
 
   return api
-    .post('/api/sales-forecast/upload', formData, {
+    .post('/api/gift-sales-forecast/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
@@ -15,9 +15,9 @@ export function uploadForecast(file, month, channel) {
     .then((r) => r.data)
 }
 
-export function downloadTemplate(channel) {
+export function downloadGiftTemplate(channel) {
   return api
-    .get('/api/sales-forecast/template', {
+    .get('/api/gift-sales-forecast/template', {
       params: { channel },
       responseType: 'blob',
     })
@@ -41,7 +41,7 @@ export function downloadTemplate(channel) {
       const url = window.URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `sales_forecast_template_${safeName}.xlsx`
+      link.download = `gift_sales_forecast_template_${safeName}.xlsx`
       document.body.appendChild(link)
       link.click()
       document.body.removeChild(link)
@@ -49,78 +49,62 @@ export function downloadTemplate(channel) {
     })
 }
 
-export function getForecastVersions(month, channel) {
+export function getGiftForecastVersions(month, channel) {
   return api
-    .get('/api/sales-forecast/versions', {
+    .get('/api/gift-sales-forecast/versions', {
       params: { month, channel },
     })
     .then((r) => r.data)
 }
 
-export function getForecastList(month, channel, version) {
+export function getGiftForecastList(month, channel, version) {
   return api
-    .get('/api/sales-forecast', {
+    .get('/api/gift-sales-forecast', {
       params: { month, channel, version: version || undefined },
     })
     .then((r) => r.data)
 }
 
-export function copyVersion(month, channel) {
+export function copyGiftVersion(month, channel) {
   return api
-    .post('/api/sales-forecast/copy-version', null, {
+    .post('/api/gift-sales-forecast/copy-version', null, {
       params: { month, channel },
     })
     .then((r) => r.data)
 }
 
-export function saveVersionReason(month, channel, version, changeReason) {
+export function saveGiftVersionReason(month, channel, version, changeReason) {
   return api
-    .put('/api/sales-forecast/versions/reason', { changeReason }, {
+    .put('/api/gift-sales-forecast/versions/reason', { changeReason }, {
       params: { month, channel, version },
     })
     .then(() => {})
 }
 
-export function deleteVersion(month, channel, version) {
+export function deleteGiftVersion(month, channel, version) {
   return api
-    .delete('/api/sales-forecast/versions', {
+    .delete('/api/gift-sales-forecast/versions', {
       params: { month, channel, version },
     })
     .then(() => {})
 }
 
-export function getVersionDiff(month, channel, version) {
+export function getGiftVersionDiff(month, channel, version) {
   return api
-    .get('/api/sales-forecast/versions/diff', {
+    .get('/api/gift-sales-forecast/versions/diff', {
       params: { month, channel, version },
     })
     .then((r) => r.data)
 }
 
-export function getFormSummary(month, versionNo = null) {
-  const params = { month }
-  if (versionNo != null) params.version_no = versionNo
-  return api.get('/api/sales-forecast/form-summary', { params }).then((r) => r.data)
+export function createGiftForecastItem(data) {
+  return api.post('/api/gift-sales-forecast', data).then((r) => r.data)
 }
 
-export function getFormVersions(month) {
-  return api.get('/api/sales-forecast/form-versions', { params: { month } }).then((r) => r.data)
+export function updateGiftForecastItem(id, data) {
+  return api.put(`/api/gift-sales-forecast/${id}`, data).then((r) => r.data)
 }
 
-export function saveFormSummaryVersion(month, payload) {
-  return api
-    .post('/api/sales-forecast/form-summary/save-version', payload, { params: { month } })
-    .then((r) => r.data)
-}
-
-export function createForecastItem(data) {
-  return api.post('/api/sales-forecast', data).then((r) => r.data)
-}
-
-export function updateForecastItem(id, data) {
-  return api.put(`/api/sales-forecast/${id}`, data).then((r) => r.data)
-}
-
-export function deleteForecastItem(id) {
-  return api.delete(`/api/sales-forecast/${id}`).then((r) => r.data)
+export function deleteGiftForecastItem(id) {
+  return api.delete(`/api/gift-sales-forecast/${id}`).then((r) => r.data)
 }

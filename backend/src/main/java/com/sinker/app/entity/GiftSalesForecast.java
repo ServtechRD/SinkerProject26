@@ -5,8 +5,8 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "sales_forecast")
-public class SalesForecast {
+@Table(name = "gift_sales_forecast")
+public class GiftSalesForecast {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -38,9 +38,6 @@ public class SalesForecast {
 
     @Column(nullable = false, length = 100)
     private String version;
-
-    @Column(name = "form_version_no")
-    private Integer formVersionNo;
 
     @Column(name = "is_modified", nullable = false)
     private Boolean isModified = false;
@@ -80,9 +77,6 @@ public class SalesForecast {
 
     public String getVersion() { return version; }
     public void setVersion(String version) { this.version = version; }
-
-    public Integer getFormVersionNo() { return formVersionNo; }
-    public void setFormVersionNo(Integer formVersionNo) { this.formVersionNo = formVersionNo; }
 
     public Boolean getIsModified() { return isModified; }
     public void setIsModified(Boolean isModified) { this.isModified = isModified; }

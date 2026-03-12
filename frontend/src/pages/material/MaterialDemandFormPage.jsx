@@ -1,4 +1,5 @@
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../components/Toast'
 import { getWeeklyScheduleFactories } from '../../api/weeklySchedule'
@@ -7,6 +8,7 @@ import {
   updateMaterialDemand,
   uploadMaterialDemand,
   downloadMaterialDemandTemplate,
+  confirmSendErp,
 } from '../../api/materialDemand'
 import FileDropzone from '../../components/forecast/FileDropzone'
 import './MaterialDemand.css'
@@ -41,9 +43,24 @@ function formatNum(v) {
   return n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
 }
 
+/** 預計庫存量 = 現有庫存 + 預交量 - 需求量（後端已計算，此處僅供顯示一致） */
+function computedEstimatedInventory(row) {
+  const cur = Number(row.currentStock)
+  const del = Number(row.expectedDelivery)
+  const dem = Number(row.demandQuantity)
+  if (Number.isNaN(cur) && Number.isNaN(del) && Number.isNaN(dem)) return row.estimatedInventory
+  const c = Number.isNaN(cur) ? 0 : cur
+  const d = Number.isNaN(del) ? 0 : del
+  const q = Number.isNaN(dem) ? 0 : dem
+  return c + d - q
+}
+
 export default function MaterialDemandFormPage() {
   const { user } = useAuth()
   const toast = useToast()
+  const [searchParams] = useSearchParams()
+  const paramWeek = searchParams.get('week_start')
+  const paramFactory = searchParams.get('factory')
 
   const weekOptions = useMemo(() => getWeekOptions(), [])
   const defaultWeek = weekOptions[0]?.value ?? ''
@@ -61,13 +78,15 @@ export default function MaterialDemandFormPage() {
   const [uploading, setUploading] = useState(false)
   const [downloadingTemplate, setDownloadingTemplate] = useState(false)
 
-  const [editingId, setEditingId] = useState(null)
-  const [editValues, setEditValues] = useState({ expectedDelivery: '', demandQuantity: '', estimatedInventory: '' })
+  const [editMode, setEditMode] = useState(false)
+  const [purchaseQuantityById, setPurchaseQuantityById] = useState({})
   const [saving, setSaving] = useState(false)
+  const [confirmingErp, setConfirmingErp] = useState(false)
 
   const canView = hasPermission(user, 'material_demand.view')
   const canUpload = hasPermission(user, 'material_demand.upload')
   const canEdit = hasPermission(user, 'material_demand.edit')
+  const canConfirmSendErp = hasPermission(user, 'confirm_data_send_erp')
 
   useEffect(() => {
     let cancelled = false
@@ -92,13 +111,33 @@ export default function MaterialDemandFormPage() {
     if (defaultWeek && !weekStart) setWeekStart(defaultWeek)
   }, [defaultWeek, weekStart])
 
-  const runQuery = useCallback(async () => {
-    if (!weekStart || !factory) {
-      toast.error('請選擇生產週與廠區')
-      return
-    }
+  const hasAutoRun = useRef(false)
+  useEffect(() => {
+    if (!paramWeek || !paramFactory || factories.length === 0 || hasAutoRun.current) return
+    if (!factories.includes(paramFactory)) return
+    hasAutoRun.current = true
+    setWeekStart(paramWeek)
+    setFactory(paramFactory)
+    setQueryClicked(true)
+    setLoading(true)
+    getMaterialDemand(paramWeek, paramFactory)
+      .then((result) => {
+        setData(Array.isArray(result) ? result : [])
+        if (!result?.length) toast.info('查無資料')
+      })
+      .catch(() => {
+        setData([])
+        toast.error('查詢失敗')
+      })
+      .finally(() => setLoading(false))
+  }, [paramWeek, paramFactory, factories, toast])
+
+  const runQueryRef = useCallback(async () => {
+    if (!weekStart || !factory) return
     setLoading(true)
     setQueryClicked(true)
+    setEditMode(false)
+    setPurchaseQuantityById({})
     try {
       const result = await getMaterialDemand(weekStart, factory)
       setData(Array.isArray(result) ? result : [])
@@ -111,6 +150,14 @@ export default function MaterialDemandFormPage() {
       setLoading(false)
     }
   }, [weekStart, factory, toast])
+
+  const runQuery = useCallback(async () => {
+    if (!weekStart || !factory) {
+      toast.error('請選擇生產週與廠區')
+      return
+    }
+    await runQueryRef()
+  }, [weekStart, factory, toast, runQueryRef])
 
   const handleFileChange = (file) => {
     setFileError('')
@@ -168,23 +215,23 @@ export default function MaterialDemandFormPage() {
     }
   }
 
-  const handleEditStart = (row) => {
-    if (!canEdit) return
-    setEditingId(row.id)
-    setEditValues({
-      expectedDelivery: String(row.expectedDelivery ?? ''),
-      demandQuantity: String(row.demandQuantity ?? ''),
-      estimatedInventory: String(row.estimatedInventory ?? ''),
+  const handleEditStart = () => {
+    if (!canEdit || !data.length) return
+    const initial = {}
+    data.forEach((row) => {
+      initial[row.id] = row.purchaseQuantity != null ? String(row.purchaseQuantity) : ''
     })
+    setPurchaseQuantityById(initial)
+    setEditMode(true)
   }
 
   const handleEditCancel = () => {
-    setEditingId(null)
-    setEditValues({ expectedDelivery: '', demandQuantity: '', estimatedInventory: '' })
+    setEditMode(false)
+    setPurchaseQuantityById({})
   }
 
-  const setEdit = (field, value) => {
-    setEditValues((prev) => ({ ...prev, [field]: value }))
+  const setPurchaseQuantity = (id, value) => {
+    setPurchaseQuantityById((prev) => ({ ...prev, [id]: value }))
   }
 
   const parseDecimal = (v) => {
@@ -193,48 +240,48 @@ export default function MaterialDemandFormPage() {
     return Number.isNaN(n) ? null : n
   }
 
-  const handleEditSave = async (rowId) => {
-    const expectedDelivery = parseDecimal(editValues.expectedDelivery)
-    const demandQuantity = parseDecimal(editValues.demandQuantity)
-    const estimatedInventory = parseDecimal(editValues.estimatedInventory)
-    if (expectedDelivery != null && expectedDelivery < 0) {
-      toast.error('預交量不可為負')
-      return
-    }
-    if (demandQuantity != null && demandQuantity < 0) {
-      toast.error('需求量不可為負')
-      return
-    }
-    if (estimatedInventory != null && estimatedInventory < 0) {
-      toast.error('預計庫存量不可為負')
-      return
+  const handleEditSave = async () => {
+    const toUpdate = []
+    for (const row of data) {
+      const edited = purchaseQuantityById[row.id]
+      if (edited === undefined) continue
+      const parsed = parseDecimal(edited)
+      const current = row.purchaseQuantity != null ? Number(row.purchaseQuantity) : null
+      if (parsed !== null && parsed < 0) {
+        toast.error('採購量不可為負')
+        return
+      }
+      const same = parsed === null && (current === null || current === 0)
+      const sameNum = parsed !== null && current !== null && Math.abs(parsed - current) < 1e-9
+      if (!same && !sameNum) toUpdate.push({ row, parsed })
     }
     setSaving(true)
     try {
-      const payload = {}
-      if (expectedDelivery !== null) payload.expectedDelivery = expectedDelivery
-      if (demandQuantity !== null) payload.demandQuantity = demandQuantity
-      if (estimatedInventory !== null) payload.estimatedInventory = estimatedInventory
-      await updateMaterialDemand(rowId, payload)
-      setData((prev) =>
-        prev.map((r) =>
-          r.id === rowId
-            ? {
-                ...r,
-                expectedDelivery: payload.expectedDelivery ?? r.expectedDelivery,
-                demandQuantity: payload.demandQuantity ?? r.demandQuantity,
-                estimatedInventory: payload.estimatedInventory ?? r.estimatedInventory,
-              }
-            : r
-        )
-      )
-      toast.success('儲存成功')
-      setEditingId(null)
-      setEditValues({ expectedDelivery: '', demandQuantity: '', estimatedInventory: '' })
+      for (const { row, parsed } of toUpdate) {
+        await updateMaterialDemand(row.id, { purchaseQuantity: parsed })
+      }
+      if (toUpdate.length > 0) toast.success('儲存成功')
+      setEditMode(false)
+      setPurchaseQuantityById({})
+      await runQuery()
     } catch (err) {
       toast.error(err.response?.data?.message || '儲存失敗')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleConfirmSendErp = async () => {
+    if (!weekStart || !factory) return
+    setConfirmingErp(true)
+    try {
+      await confirmSendErp(weekStart, factory)
+      toast.success('已送ERP')
+      await runQuery()
+    } catch (err) {
+      toast.error(err.response?.data?.message || '送出失敗')
+    } finally {
+      setConfirmingErp(false)
     }
   }
 
@@ -244,16 +291,31 @@ export default function MaterialDemandFormPage() {
       return
     }
     const BOM = '\uFEFF'
-    const headers = ['品號', '品名', '單位', '上次進貨日', '需求日', '預交量', '需求量', '預計庫存量']
+    const headers = [
+      '品號',
+      '品名',
+      '單位',
+      '上次進貨日',
+      '需求日',
+      '現有庫存',
+      '預計進廠日',
+      '預交量',
+      '需求量',
+      '預計庫存量',
+      '採購量',
+    ]
     const rows = data.map((r) => [
       r.materialCode ?? '',
       r.materialName ?? '',
       r.unit ?? '',
       r.lastPurchaseDate ?? '',
       r.demandDate ?? '',
+      r.currentStock ?? '',
+      r.expectedArrivalDate ?? '',
       r.expectedDelivery ?? '',
       r.demandQuantity ?? '',
-      r.estimatedInventory ?? '',
+      computedEstimatedInventory(r) ?? '',
+      r.purchaseQuantity ?? '',
     ])
     const csv = BOM + [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
@@ -375,7 +437,52 @@ export default function MaterialDemandFormPage() {
         <section className="material-demand-block material-demand-block--result">
           <h2>上傳結果</h2>
           <div className="material-demand-result-toolbar">
-            <button type="button" className="btn btn--outline" onClick={handleExportCsv} disabled={!data.length}>
+            {canEdit && !editMode && (
+              <button
+                type="button"
+                className="btn btn--outline"
+                onClick={handleEditStart}
+                disabled={!data.length || loading}
+              >
+                編輯
+              </button>
+            )}
+            {canEdit && editMode && (
+              <>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={handleEditSave}
+                  disabled={saving}
+                >
+                  {saving ? '儲存中...' : '儲存'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--outline"
+                  onClick={handleEditCancel}
+                  disabled={saving}
+                >
+                  取消
+                </button>
+              </>
+            )}
+            {canConfirmSendErp && !editMode && data.length > 0 && (
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={handleConfirmSendErp}
+                disabled={confirmingErp}
+              >
+                {confirmingErp ? '送出中...' : '本週資料確認無誤送出至天心ERP'}
+              </button>
+            )}
+            <button
+              type="button"
+              className="btn btn--outline"
+              onClick={handleExportCsv}
+              disabled={!data.length}
+            >
               Excel 匯出 (CSV)
             </button>
           </div>
@@ -393,10 +500,12 @@ export default function MaterialDemandFormPage() {
                     <th>單位</th>
                     <th>上次進貨日</th>
                     <th>需求日</th>
+                    <th className="numeric-col">現有庫存</th>
+                    <th>預計進廠日</th>
                     <th className="numeric-col">預交量</th>
                     <th className="numeric-col">需求量</th>
                     <th className="numeric-col">預計庫存量</th>
-                    {canEdit && <th>操作</th>}
+                    <th className="numeric-col">採購量</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -407,70 +516,23 @@ export default function MaterialDemandFormPage() {
                       <td>{row.unit ?? '-'}</td>
                       <td>{row.lastPurchaseDate ?? '-'}</td>
                       <td>{row.demandDate ?? '-'}</td>
+                      <td className="numeric-col">{formatNum(row.currentStock)}</td>
+                      <td>{row.expectedArrivalDate ?? '-'}</td>
+                      <td className="numeric-col">{formatNum(row.expectedDelivery)}</td>
+                      <td className="numeric-col">{formatNum(row.demandQuantity)}</td>
+                      <td className="numeric-col">{formatNum(computedEstimatedInventory(row))}</td>
                       <td className="numeric-col">
-                        {editingId === row.id ? (
+                        {editMode ? (
                           <input
                             type="text"
                             className="material-demand-edit-input"
-                            value={editValues.expectedDelivery}
-                            onChange={(e) => setEdit('expectedDelivery', e.target.value)}
+                            value={purchaseQuantityById[row.id] ?? ''}
+                            onChange={(e) => setPurchaseQuantity(row.id, e.target.value)}
                           />
                         ) : (
-                          formatNum(row.expectedDelivery)
+                          formatNum(row.purchaseQuantity)
                         )}
                       </td>
-                      <td className="numeric-col">
-                        {editingId === row.id ? (
-                          <input
-                            type="text"
-                            className="material-demand-edit-input"
-                            value={editValues.demandQuantity}
-                            onChange={(e) => setEdit('demandQuantity', e.target.value)}
-                          />
-                        ) : (
-                          formatNum(row.demandQuantity)
-                        )}
-                      </td>
-                      <td className="numeric-col">
-                        {editingId === row.id ? (
-                          <input
-                            type="text"
-                            className="material-demand-edit-input"
-                            value={editValues.estimatedInventory}
-                            onChange={(e) => setEdit('estimatedInventory', e.target.value)}
-                          />
-                        ) : (
-                          formatNum(row.estimatedInventory)
-                        )}
-                      </td>
-                      {canEdit && (
-                        <td>
-                          {editingId === row.id ? (
-                            <>
-                              <button
-                                type="button"
-                                className="btn btn--primary btn-sm"
-                                onClick={() => handleEditSave(row.id)}
-                                disabled={saving}
-                              >
-                                儲存
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn--outline btn-sm"
-                                onClick={handleEditCancel}
-                                disabled={saving}
-                              >
-                                取消
-                              </button>
-                            </>
-                          ) : (
-                            <button type="button" className="btn btn--outline btn-sm" onClick={() => handleEditStart(row)}>
-                              編輯
-                            </button>
-                          )}
-                        </td>
-                      )}
                     </tr>
                   ))}
                 </tbody>

@@ -34,6 +34,12 @@ public class MaterialDemand {
     @Column(name = "demand_date", nullable = false)
     private LocalDate demandDate;
 
+    @Column(name = "current_stock", precision = 10, scale = 2)
+    private BigDecimal currentStock;
+
+    @Column(name = "expected_arrival_date")
+    private LocalDate expectedArrivalDate;
+
     @Column(name = "expected_delivery", nullable = false, precision = 10, scale = 2)
     private BigDecimal expectedDelivery;
 
@@ -42,6 +48,9 @@ public class MaterialDemand {
 
     @Column(name = "estimated_inventory", nullable = false, precision = 10, scale = 2)
     private BigDecimal estimatedInventory;
+
+    @Column(name = "purchase_quantity", precision = 10, scale = 2)
+    private BigDecimal purchaseQuantity;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -113,6 +122,22 @@ public class MaterialDemand {
         this.demandDate = demandDate;
     }
 
+    public BigDecimal getCurrentStock() {
+        return currentStock;
+    }
+
+    public void setCurrentStock(BigDecimal currentStock) {
+        this.currentStock = currentStock;
+    }
+
+    public LocalDate getExpectedArrivalDate() {
+        return expectedArrivalDate;
+    }
+
+    public void setExpectedArrivalDate(LocalDate expectedArrivalDate) {
+        this.expectedArrivalDate = expectedArrivalDate;
+    }
+
     public BigDecimal getExpectedDelivery() {
         return expectedDelivery;
     }
@@ -135,6 +160,14 @@ public class MaterialDemand {
 
     public void setEstimatedInventory(BigDecimal estimatedInventory) {
         this.estimatedInventory = estimatedInventory;
+    }
+
+    public BigDecimal getPurchaseQuantity() {
+        return purchaseQuantity;
+    }
+
+    public void setPurchaseQuantity(BigDecimal purchaseQuantity) {
+        this.purchaseQuantity = purchaseQuantity;
     }
 
     public LocalDateTime getCreatedAt() {

@@ -10,6 +10,18 @@ export function updateMaterialDemand(id, data) {
   return api.put(`/api/material-demand/${id}`, data).then((r) => r.data)
 }
 
+export function confirmSendErp(weekStart, factory) {
+  return api
+    .post('/api/material-demand/confirm-send-erp', null, {
+      params: { week_start: weekStart, factory },
+    })
+    .then((r) => r.data)
+}
+
+export function getMaterialDemandPendingConfirm() {
+  return api.get('/api/material-demand/pending-confirm').then((r) => r.data)
+}
+
 export function uploadMaterialDemand(file, weekStart, factory) {
   const formData = new FormData()
   formData.append('file', file)

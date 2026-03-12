@@ -9,7 +9,7 @@ import java.io.IOException;
 public class MaterialDemandTemplateService {
 
     private static final String[] HEADERS = {
-            "品號", "品名", "單位", "上次進貨日", "需求日", "預交量", "需求量", "預計庫存量"
+            "品號", "品名", "單位", "上次進貨日", "需求日", "現有庫存", "預計進廠日", "預交量", "需求量", "預計庫存量", "採購量"
     };
 
     public static byte[] generateTemplate() {

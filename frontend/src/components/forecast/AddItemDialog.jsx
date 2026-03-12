@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { createForecastItem } from '../../api/forecast'
-import { getCategories, getProducts } from '../../api/reference'
+import { getProducts } from '../../api/reference'
 import './AddItemDialog.css'
 
 const MIN_PRODUCT_CHARS = 3
 
-export default function AddItemDialog({ open, month, channel, onClose, onSuccess }) {
+export default function AddItemDialog({ open, month, channel, onClose, onSuccess, createItemApi }) {
   const [formData, setFormData] = useState({
     category: '',
     spec: '',
@@ -16,20 +16,13 @@ export default function AddItemDialog({ open, month, channel, onClose, onSuccess
   })
   const [errors, setErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
-  const [categories, setCategories] = useState([])
   const [products, setProducts] = useState([])
-  const [categoryOpen, setCategoryOpen] = useState(false)
-  const [categoryFilter, setCategoryFilter] = useState('')
   const [productOpen, setProductOpen] = useState(false)
   const [productFilter, setProductFilter] = useState('')
-  const categoryRef = useRef(null)
   const productRef = useRef(null)
 
   useEffect(() => {
     if (!open) return
-    getCategories()
-      .then((data) => setCategories(Array.isArray(data) ? data : []))
-      .catch(() => setCategories([]))
     getProducts()
       .then((data) => setProducts(Array.isArray(data) ? data : []))
       .catch(() => setProducts([]))
@@ -46,16 +39,10 @@ export default function AddItemDialog({ open, month, channel, onClose, onSuccess
         quantity: 0,
       })
       setErrors({})
-      setCategoryFilter('')
       setProductFilter('')
-      setCategoryOpen(false)
       setProductOpen(false)
     }
   }, [open])
-
-  const filteredCategories = categoryFilter.trim()
-    ? categories.filter((c) => (c.name || '').toLowerCase().includes(categoryFilter.trim().toLowerCase()))
-    : categories
 
   const productFilterTrim = productFilter.trim()
   const filteredProducts =
@@ -69,7 +56,6 @@ export default function AddItemDialog({ open, month, channel, onClose, onSuccess
 
   useEffect(() => {
     function handleClickOutside(e) {
-      if (categoryRef.current && !categoryRef.current.contains(e.target)) setCategoryOpen(false)
       if (productRef.current && !productRef.current.contains(e.target)) closeProductDropdown()
     }
     if (open) {
@@ -109,7 +95,8 @@ export default function AddItemDialog({ open, month, channel, onClose, onSuccess
         warehouseLocation: formData.warehouseLocation || null,
         quantity: Number(formData.quantity),
       }
-      const created = await createForecastItem(payload)
+      const createItem = createItemApi || createForecastItem
+      const created = await createItem(payload)
       onSuccess(created)
     } catch (err) {
       setErrors({ general: err.response?.data?.error || '新增失敗，請重試' })
@@ -123,15 +110,12 @@ export default function AddItemDialog({ open, month, channel, onClose, onSuccess
     if (errors[field]) setErrors((prev) => ({ ...prev, [field]: undefined }))
   }
 
-  const selectCategory = (name) => {
-    handleChange('category', name)
-    setCategoryFilter('')
-    setCategoryOpen(false)
-  }
-
   const selectProduct = (p) => {
     handleChange('productCode', p.code)
-    handleChange('productName', p.name)
+    handleChange('category', p.categoryName || '')
+    handleChange('spec', p.spec || '')
+    handleChange('productName', p.name || '')
+    handleChange('warehouseLocation', p.warehouseLocation || '')
     setProductFilter(p.code)
     setProductOpen(false)
   }
@@ -144,7 +128,10 @@ export default function AddItemDialog({ open, month, channel, onClose, onSuccess
       return {
         ...prev,
         productCode: productFilterTrim,
+        category: exact?.categoryName ?? prev.category,
+        spec: exact?.spec ?? prev.spec,
         productName: exact ? exact.name : prev.productName,
+        warehouseLocation: exact?.warehouseLocation ?? prev.warehouseLocation,
       }
     })
   }
@@ -171,53 +158,6 @@ export default function AddItemDialog({ open, month, channel, onClose, onSuccess
             </div>
           )}
 
-          <div className="form-field" ref={categoryRef}>
-            <label htmlFor="category">中類名稱</label>
-            <input
-              type="text"
-              id="category"
-              className="form-input"
-              value={categoryOpen ? categoryFilter : formData.category}
-              onChange={(e) => {
-                setCategoryFilter(e.target.value)
-                setCategoryOpen(true)
-              }}
-              onFocus={() => setCategoryOpen(true)}
-              disabled={submitting}
-              placeholder="輸入以篩選..."
-              autoComplete="off"
-            />
-            {categoryOpen && (
-              <ul className="add-item-dropdown">
-                {filteredCategories.length === 0 ? (
-                  <li className="add-item-dropdown-empty">無符合項目</li>
-                ) : (
-                  filteredCategories.slice(0, 100).map((c) => (
-                    <li
-                      key={c.id}
-                      className="add-item-dropdown-item"
-                      onClick={() => selectCategory(c.name)}
-                    >
-                      {c.name}
-                    </li>
-                  ))
-                )}
-              </ul>
-            )}
-          </div>
-
-          <div className="form-field">
-            <label htmlFor="spec">貨品規格</label>
-            <input
-              type="text"
-              id="spec"
-              className="form-input"
-              value={formData.spec}
-              onChange={(e) => handleChange('spec', e.target.value)}
-              disabled={submitting}
-            />
-          </div>
-
           <div className="form-field" ref={productRef}>
             <label htmlFor="productCode">
               品號 <span className="required">*</span>
@@ -230,7 +170,10 @@ export default function AddItemDialog({ open, month, channel, onClose, onSuccess
               onChange={(e) => {
                 setProductFilter(e.target.value)
                 setProductOpen(true)
-                if (!productOpen) handleChange('productName', '')
+                handleChange('category', '')
+                handleChange('spec', '')
+                handleChange('productName', '')
+                handleChange('warehouseLocation', '')
               }}
               onFocus={() => {
                 setProductOpen(true)
@@ -266,6 +209,36 @@ export default function AddItemDialog({ open, month, channel, onClose, onSuccess
           </div>
 
           <div className="form-field">
+            <label htmlFor="category">中類名稱</label>
+            <input
+              type="text"
+              id="category"
+              className="form-input form-input--readonly"
+              value={formData.category}
+              readOnly
+              tabIndex={-1}
+              onFocus={(e) => e.target.blur()}
+              disabled={submitting}
+              placeholder="依品號選擇後自動帶出"
+            />
+          </div>
+
+          <div className="form-field">
+            <label htmlFor="spec">貨品規格</label>
+            <input
+              type="text"
+              id="spec"
+              className="form-input form-input--readonly"
+              value={formData.spec}
+              readOnly
+              tabIndex={-1}
+              onFocus={(e) => e.target.blur()}
+              disabled={submitting}
+              placeholder="依品號選擇後自動帶出"
+            />
+          </div>
+
+          <div className="form-field">
             <label htmlFor="productName">
               品名 <span className="required">*</span>
             </label>
@@ -275,6 +248,8 @@ export default function AddItemDialog({ open, month, channel, onClose, onSuccess
               className={`form-input form-input--readonly ${errors.productName ? 'form-input--error' : ''}`}
               value={formData.productName}
               readOnly
+              tabIndex={-1}
+              onFocus={(e) => e.target.blur()}
               disabled={submitting}
               placeholder="依品號選擇後自動帶出"
             />
@@ -290,10 +265,13 @@ export default function AddItemDialog({ open, month, channel, onClose, onSuccess
             <input
               type="text"
               id="warehouseLocation"
-              className="form-input"
+              className="form-input form-input--readonly"
               value={formData.warehouseLocation}
-              onChange={(e) => handleChange('warehouseLocation', e.target.value)}
+              readOnly
+              tabIndex={-1}
+              onFocus={(e) => e.target.blur()}
               disabled={submitting}
+              placeholder="依品號選擇後自動帶出"
             />
           </div>
 

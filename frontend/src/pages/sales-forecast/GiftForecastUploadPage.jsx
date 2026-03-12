@@ -1,17 +1,17 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { listConfigs } from '../../api/forecastConfig'
 import {
-  uploadForecast,
-  downloadTemplate,
-  getForecastVersions,
-  getForecastList,
-  updateForecastItem,
-  createForecastItem,
-  copyVersion,
-  saveVersionReason,
-  deleteVersion,
-  getVersionDiff,
-} from '../../api/forecast'
+  uploadGiftForecast,
+  downloadGiftTemplate,
+  getGiftForecastVersions,
+  getGiftForecastList,
+  updateGiftForecastItem,
+  createGiftForecastItem,
+  copyGiftVersion,
+  saveGiftVersionReason,
+  deleteGiftVersion,
+  getGiftVersionDiff,
+} from '../../api/giftForecast'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../components/Toast'
 import FileDropzone from '../../components/forecast/FileDropzone'
@@ -101,7 +101,7 @@ function downloadForecastCsv(data, filename) {
   URL.revokeObjectURL(url)
 }
 
-export default function ForecastUploadPage() {
+export default function GiftForecastUploadPage() {
   const { user } = useAuth()
   const toast = useToast()
 
@@ -208,7 +208,7 @@ export default function ForecastUploadPage() {
     setSelectedVersion('')
     setForecastData([])
     try {
-      const data = await getForecastVersions(selectedMonth, selectedChannel)
+      const data = await getGiftForecastVersions(selectedMonth, selectedChannel)
       const versionStrings = (Array.isArray(data) ? data : [])
         .map((item) => (typeof item === 'string' ? item : item?.version))
         .filter(Boolean)
@@ -217,7 +217,7 @@ export default function ForecastUploadPage() {
       setSelectedVersion(versionToUse)
       setLoadingData(true)
       try {
-        const list = await getForecastList(selectedMonth, selectedChannel, versionToUse || undefined)
+        const list = await getGiftForecastList(selectedMonth, selectedChannel, versionToUse || undefined)
         setForecastData(Array.isArray(list) ? list : [])
       } catch (e) {
         toast.error('無法載入上傳結果')
@@ -238,7 +238,7 @@ export default function ForecastUploadPage() {
     if (!selectedMonth || !selectedChannel || !selectedVersion) return
     setLoadingData(true)
     try {
-      const list = await getForecastList(selectedMonth, selectedChannel, selectedVersion)
+      const list = await getGiftForecastList(selectedMonth, selectedChannel, selectedVersion)
       setForecastData(Array.isArray(list) ? list : [])
     } catch (err) {
       toast.error('無法載入上傳結果')
@@ -277,7 +277,7 @@ export default function ForecastUploadPage() {
     if (!selectedChannel) return
     setDownloadingTemplate(true)
     try {
-      await downloadTemplate(selectedChannel)
+      await downloadGiftTemplate(selectedChannel)
       toast.success('範本下載成功')
     } catch (err) {
       let msg = err?.message || '下載範本失敗'
@@ -299,7 +299,7 @@ export default function ForecastUploadPage() {
     if (!selectedMonth || !selectedChannel || !selectedFile) return
     setUploading(true)
     try {
-      const response = await uploadForecast(selectedFile, selectedMonth, selectedChannel)
+      const response = await uploadGiftForecast(selectedFile, selectedMonth, selectedChannel)
       toast.success(`成功上傳 ${response.rows_processed} 筆資料`)
       setSelectedFile(null)
       setFileError('')
@@ -337,7 +337,7 @@ export default function ForecastUploadPage() {
     }
     setSavingEdit(true)
     try {
-      await updateForecastItem(id, { quantity: numValue })
+      await updateGiftForecastItem(id, { quantity: numValue })
       toast.success('已儲存')
       await fetchResultList()
       cancelEditing()
@@ -365,7 +365,7 @@ export default function ForecastUploadPage() {
   }
 
   const handleExportExcel = () => {
-    const name = `sales_forecast_${selectedMonth}_${(selectedChannel || '').replace(/\//g, '_')}.csv`
+    const name = `gift_sales_forecast_${selectedMonth}_${(selectedChannel || '').replace(/\//g, '_')}.csv`
     downloadForecastCsv(forecastData, name)
     toast.success('已匯出 CSV')
   }
@@ -373,14 +373,14 @@ export default function ForecastUploadPage() {
   const handleStartEditVersion = async () => {
     if (!selectedMonth || !selectedChannel) return
     try {
-      const res = await copyVersion(selectedMonth, selectedChannel)
+      const res = await copyGiftVersion(selectedMonth, selectedChannel)
       setNewVersionVersion(res.version)
       setEditingNewVersion(true)
       setSelectedVersion(res.version)
       setVersions((prev) => [res.version, ...prev])
       setLoadingData(true)
       try {
-        const list = await getForecastList(selectedMonth, selectedChannel, res.version)
+        const list = await getGiftForecastList(selectedMonth, selectedChannel, res.version)
         setForecastData(Array.isArray(list) ? list : [])
       } catch (e) {
         toast.error('無法載入新版本資料')
@@ -407,7 +407,7 @@ export default function ForecastUploadPage() {
     if (!selectedMonth || !selectedChannel || !newVersionVersion) return
     setSavingVersionReason(true)
     try {
-      await saveVersionReason(selectedMonth, selectedChannel, newVersionVersion, reason)
+      await saveGiftVersionReason(selectedMonth, selectedChannel, newVersionVersion, reason)
       toast.success('已儲存版本與修改原因')
       setShowReasonDialog(false)
       setReasonInput('')
@@ -424,7 +424,7 @@ export default function ForecastUploadPage() {
   const handleCancelEditVersion = async () => {
     if (!selectedMonth || !selectedChannel || !newVersionVersion) return
     try {
-      await deleteVersion(selectedMonth, selectedChannel, newVersionVersion)
+      await deleteGiftVersion(selectedMonth, selectedChannel, newVersionVersion)
       toast.success('已取消，新版本資料已刪除')
       setEditingNewVersion(false)
       setNewVersionVersion('')
@@ -440,7 +440,7 @@ export default function ForecastUploadPage() {
     setLoadingDiff(true)
     setDiffData([])
     try {
-      const list = await getVersionDiff(selectedMonth, selectedChannel, selectedVersion)
+      const list = await getGiftVersionDiff(selectedMonth, selectedChannel, selectedVersion)
       setDiffData(Array.isArray(list) ? list : [])
     } catch (err) {
       toast.error('無法載入差異')
@@ -453,7 +453,7 @@ export default function ForecastUploadPage() {
   if (accessDenied || (!loading && !canUpload && !canUpdateAfterClosed)) {
     return (
       <div className="forecast-upload-page">
-        <h1>銷售預估量上傳-共同編輯界面</h1>
+        <h1>禮品銷售預估量表單</h1>
         <div className="forecast-access-denied" role="alert">
           您沒有權限檢視此頁面
         </div>
@@ -463,7 +463,7 @@ export default function ForecastUploadPage() {
 
   return (
     <div className="forecast-upload-page">
-      <h1>銷售預估量上傳-共同編輯界面</h1>
+      <h1>禮品銷售預估量表單</h1>
 
       {loading ? (
         <div className="forecast-loading" role="status">載入中...</div>
@@ -526,9 +526,9 @@ export default function ForecastUploadPage() {
             </div>
           </section>
 
-          {/* Block 2: 銷售預估表單上傳 */}
+          {/* Block 2: 禮品銷售預估量表單上傳 */}
           <section className="upload-block upload-block--upload">
-            <h2 className="upload-block-title">銷售預估表單上傳</h2>
+            <h2 className="upload-block-title">禮品銷售預估量表單上傳</h2>
             <div className="upload-block-current">
               目前選擇的月份：{selectedMonth ? formatMonth(selectedMonth) : '—'}　通路：{selectedChannel || '—'}
             </div>
@@ -781,6 +781,7 @@ export default function ForecastUploadPage() {
             channel={selectedChannel}
             onClose={() => setShowAddDialog(false)}
             onSuccess={handleAddSuccess}
+            createItemApi={createGiftForecastItem}
           />
 
           {showReasonDialog && (

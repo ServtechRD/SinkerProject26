@@ -71,6 +71,23 @@ public class MaterialDemandController {
         return ResponseEntity.ok(updated);
     }
 
+    @PostMapping("/confirm-send-erp")
+    @PreAuthorize("hasAuthority('confirm_data_send_erp')")
+    public ResponseEntity<Map<String, Object>> confirmSendErp(
+            @RequestParam("week_start") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart,
+            @RequestParam String factory) {
+        log.info("POST /api/material-demand/confirm-send-erp - weekStart={}, factory={}", weekStart, factory);
+        materialDemandService.confirmSendErp(weekStart, factory);
+        return ResponseEntity.ok(Map.of("message", "Confirm send ERP successful"));
+    }
+
+    @GetMapping("/pending-confirm")
+    @PreAuthorize("hasAuthority('confirm_data_send_erp')")
+    public ResponseEntity<List<Map<String, Object>>> getPendingConfirm() {
+        log.info("GET /api/material-demand/pending-confirm");
+        return ResponseEntity.ok(materialDemandService.getPendingConfirm());
+    }
+
     @PostMapping("/upload")
     @PreAuthorize("hasAuthority('material_demand.upload')")
     public ResponseEntity<Map<String, Object>> upload(

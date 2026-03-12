@@ -16,9 +16,12 @@ public class MaterialDemandDTO {
     private String unit;
     private LocalDate lastPurchaseDate;
     private LocalDate demandDate;
+    private BigDecimal currentStock;
+    private LocalDate expectedArrivalDate;
     private BigDecimal expectedDelivery;
     private BigDecimal demandQuantity;
     private BigDecimal estimatedInventory;
+    private BigDecimal purchaseQuantity;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 
@@ -34,9 +37,20 @@ public class MaterialDemandDTO {
         dto.setUnit(entity.getUnit());
         dto.setLastPurchaseDate(entity.getLastPurchaseDate());
         dto.setDemandDate(entity.getDemandDate());
+        dto.setCurrentStock(entity.getCurrentStock());
+        dto.setExpectedArrivalDate(entity.getExpectedArrivalDate());
         dto.setExpectedDelivery(entity.getExpectedDelivery());
         dto.setDemandQuantity(entity.getDemandQuantity());
-        dto.setEstimatedInventory(entity.getEstimatedInventory());
+        // 預計庫存量 = 現有庫存 + 預交量 - 需求量
+        if (entity.getCurrentStock() != null) {
+            BigDecimal computed = entity.getCurrentStock()
+                    .add(entity.getExpectedDelivery() != null ? entity.getExpectedDelivery() : BigDecimal.ZERO)
+                    .subtract(entity.getDemandQuantity() != null ? entity.getDemandQuantity() : BigDecimal.ZERO);
+            dto.setEstimatedInventory(computed);
+        } else {
+            dto.setEstimatedInventory(entity.getEstimatedInventory());
+        }
+        dto.setPurchaseQuantity(entity.getPurchaseQuantity());
         dto.setCreatedAt(entity.getCreatedAt());
         dto.setUpdatedAt(entity.getUpdatedAt());
         return dto;
@@ -106,6 +120,22 @@ public class MaterialDemandDTO {
         this.demandDate = demandDate;
     }
 
+    public BigDecimal getCurrentStock() {
+        return currentStock;
+    }
+
+    public void setCurrentStock(BigDecimal currentStock) {
+        this.currentStock = currentStock;
+    }
+
+    public LocalDate getExpectedArrivalDate() {
+        return expectedArrivalDate;
+    }
+
+    public void setExpectedArrivalDate(LocalDate expectedArrivalDate) {
+        this.expectedArrivalDate = expectedArrivalDate;
+    }
+
     public BigDecimal getExpectedDelivery() {
         return expectedDelivery;
     }
@@ -128,6 +158,14 @@ public class MaterialDemandDTO {
 
     public void setEstimatedInventory(BigDecimal estimatedInventory) {
         this.estimatedInventory = estimatedInventory;
+    }
+
+    public BigDecimal getPurchaseQuantity() {
+        return purchaseQuantity;
+    }
+
+    public void setPurchaseQuantity(BigDecimal purchaseQuantity) {
+        this.purchaseQuantity = purchaseQuantity;
     }
 
     public LocalDateTime getCreatedAt() {

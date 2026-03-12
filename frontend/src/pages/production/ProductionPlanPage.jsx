@@ -1,16 +1,13 @@
-import { useState, useCallback, useRef, Fragment } from 'react'
+import React, { useState } from 'react'
 import {
-  getProductionPlan,
-  updateProductionPlanBuffer,
+  getProductionPlanVersions,
+  getProductionPlanByRange,
 } from '../../api/productionPlan'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../components/Toast'
 import './ProductionPlan.css'
 
-const MONTH_KEYS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12']
-const MONTH_LABELS = Object.fromEntries(
-  MONTH_KEYS.map((k) => [k, `${parseInt(k, 10)}月`])
-)
+const MAX_MONTH_RANGE = 4
 
 function hasPermission(user, perm) {
   return Boolean(
@@ -26,169 +23,145 @@ function num(v) {
   return Number.isFinite(n) ? n : 0
 }
 
+/** 內部/API 使用 YYYYMM，input type="month" 使用 YYYY-MM */
+function toMonthInputValue(ym) {
+  if (!ym || ym.length !== 6) return ''
+  return `${ym.slice(0, 4)}-${ym.slice(4, 6)}`
+}
+function fromMonthInputValue(v) {
+  if (!v) return ''
+  return v.replace(/-/g, '')
+}
+
+function getDefaultMonth() {
+  const now = new Date()
+  return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}`
+}
+
+function monthRangeCount(start, end) {
+  if (!start || !end || start > end) return 0
+  const [sy, sm] = [parseInt(start.slice(0, 4), 10), parseInt(start.slice(4, 6), 10)]
+  const [ey, em] = [parseInt(end.slice(0, 4), 10), parseInt(end.slice(4, 6), 10)]
+  return (ey - sy) * 12 + (em - sm) + 1
+}
+
 export default function ProductionPlanPage() {
   const { user } = useAuth()
   const toast = useToast()
+  const defaultMonth = getDefaultMonth()
 
-  const [year, setYear] = useState(new Date().getFullYear())
+  const [startMonth, setStartMonth] = useState(defaultMonth)
+  const [endMonth, setEndMonth] = useState(defaultMonth)
+  const [versions, setVersions] = useState([])
+  const [selectedVersion, setSelectedVersion] = useState('')
+  const [monthKeys, setMonthKeys] = useState([])
+  const [channelOrder, setChannelOrder] = useState([])
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
   const [accessDenied, setAccessDenied] = useState(false)
-  const [saving, setSaving] = useState(false)
-
-  const [editingRowId, setEditingRowId] = useState(null)
-  const [editingValue, setEditingValue] = useState('')
-  const editInputRef = useRef(null)
+  const [queryClicked, setQueryClicked] = useState(false)
+  const [queryTime, setQueryTime] = useState(null)
 
   const canView = hasPermission(user, 'production_plan.view')
-  const canEdit = hasPermission(user, 'production_plan.edit')
-
-  const fetchData = useCallback(async () => {
-    if (!year) return
-    setLoading(true)
-    setAccessDenied(false)
-    try {
-      const result = await getProductionPlan(year)
-      setData(Array.isArray(result) ? result : [])
-    } catch (err) {
-      if (err.response?.status === 403) {
-        setAccessDenied(true)
-      } else {
-        toast.error('無法載入生產表單資料')
-      }
-      setData([])
-    } finally {
-      setLoading(false)
-    }
-  }, [year, toast])
 
   const handleQuery = () => {
-    fetchData()
-  }
-
-  const getRowId = (row) => {
-    return row.production_form_id ?? row.product_code ?? `${row.warehouse_location}-${row.product_code}`
-  }
-
-  const startEditBuffer = (row) => {
-    if (!canEdit) return
-    const id = getRowId(row)
-    const buf = row.buffer_quantity ?? row.bufferQuantity ?? 0
-    setEditingRowId(id)
-    setEditingValue(String(num(buf)))
-    setTimeout(() => editInputRef.current?.focus(), 0)
-  }
-
-  const cancelEdit = () => {
-    setEditingRowId(null)
-    setEditingValue('')
-  }
-
-  const saveBuffer = async (row) => {
-    const productCode = row.product_code ?? row.productCode
-    const newVal = editingValue === '' ? 0 : parseFloat(editingValue)
-    if (Number.isNaN(newVal) || newVal < 0) {
-      toast.error('請輸入有效的緩衝量（≥0）')
+    const count = monthRangeCount(startMonth, endMonth)
+    if (!startMonth || !endMonth) {
+      toast.error('請選擇查詢起始月份與查詢結束月份')
       return
     }
-    setSaving(true)
-    try {
-      await updateProductionPlanBuffer(year, productCode, newVal)
-      setData((prev) =>
-        prev.map((r) =>
-          (r.product_code ?? r.productCode) === productCode
-            ? {
-                ...r,
-                buffer_quantity: newVal,
-                bufferQuantity: newVal,
-                aggregate_total:
-                  num(r.aggregate_total ?? r.aggregateTotal) -
-                  num(r.buffer_quantity ?? r.bufferQuantity) +
-                  newVal,
-                aggregateTotal:
-                  num(r.aggregate_total ?? r.aggregateTotal) -
-                  num(r.buffer_quantity ?? r.bufferQuantity) +
-                  newVal,
-                difference:
-                  num(r.original_forecast ?? r.originalForecast) -
-                  (num(r.aggregate_total ?? r.aggregateTotal) -
-                    num(r.buffer_quantity ?? r.bufferQuantity) +
-                    newVal),
-              }
-            : r
-        )
-      )
-      toast.success('已儲存緩衝量')
-      cancelEdit()
-    } catch (err) {
-      toast.error(err.response?.data?.message || '儲存失敗')
-    } finally {
-      setSaving(false)
+    if (count > MAX_MONTH_RANGE) {
+      toast.error('查詢區間最多 4 個月')
+      return
+    }
+    setQueryClicked(true)
+    setQueryTime(new Date())
+    setLoading(true)
+    getProductionPlanVersions(startMonth, endMonth)
+      .then((list) => {
+        const verList = Array.isArray(list) ? list : []
+        setVersions(verList)
+        const first = verList.length > 0 ? verList[0] : ''
+        setSelectedVersion(first)
+        if (first) {
+          return getProductionPlanByRange(startMonth, endMonth, first)
+        }
+        return { month_keys: [], rows: [] }
+      })
+      .then((result) => {
+        if (result) {
+          setMonthKeys(result.month_keys ?? result.monthKeys ?? [])
+          setChannelOrder(Array.isArray(result.channel_order) ? result.channel_order : (result.rows?.[0]?.channel_data ?? []).map((c) => c.channel))
+          setData(Array.isArray(result.rows) ? result.rows : [])
+        }
+      })
+      .catch((err) => {
+        if (err.response?.status === 403) setAccessDenied(true)
+        else toast.error(err.response?.data?.message || '無法載入')
+        setData([])
+        setVersions([])
+      })
+      .finally(() => setLoading(false))
+  }
+
+  const onVersionChange = (version) => {
+    setSelectedVersion(version)
+    if (startMonth && endMonth && version) {
+      setLoading(true)
+      getProductionPlanByRange(startMonth, endMonth, version)
+        .then((result) => {
+          setMonthKeys(result.month_keys ?? result.monthKeys ?? [])
+          setChannelOrder(Array.isArray(result.channel_order) ? result.channel_order : (result.rows?.[0]?.channel_data ?? []).map((c) => c.channel))
+          setData(Array.isArray(result.rows) ? result.rows : [])
+        })
+        .catch(() => setData([]))
+        .finally(() => setLoading(false))
     }
   }
 
-  const handleEditKeyDown = (e, row) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      saveBuffer(row)
-    } else if (e.key === 'Escape') {
-      cancelEdit()
-    }
-  }
+  const channels = channelOrder.length > 0 ? channelOrder : (data[0]?.channel_data ?? []).map((c) => c.channel ?? c)
 
   const exportExcel = () => {
     if (data.length === 0) {
       toast.error('尚無資料可匯出')
       return
     }
-    const channelOrder =
-      data[0]?.channel_data?.map((c) => c.channel) ?? []
     const headers = [
       '庫位',
       '中類名稱',
       '貨品規格',
       '品名',
       '品號',
-      ...channelOrder.flatMap((ch) => [
-        ...MONTH_KEYS.map((k) => `${ch}-${MONTH_LABELS[k]}`),
-        `${ch}-Total`,
-      ]),
-      ...MONTH_KEYS.map((k) => `合計-${MONTH_LABELS[k]}`),
-      '緩衝量',
-      '合計-Total',
+      ...channels.flatMap((ch) => [...monthKeys.map((m) => `${ch} ${m.slice(0, 4)}/${m.slice(4, 6)}`), `${ch} Total`]),
+      ...monthKeys.map((m) => `合計 ${m.slice(0, 4)}/${m.slice(4, 6)}`),
+      '合計 Total',
       '原始預估',
       '差異',
       '備註',
     ]
     const rows = data.map((row) => {
-      const cd = row.channel_data ?? []
-      const channelCells = channelOrder.map((ch) => {
-        const c = cd.find((x) => x.channel === ch) ?? {}
-        const months = c.months ?? {}
-        const total = num(c.total)
-        return [
-          ...MONTH_KEYS.map((k) => num(months[k])),
-          total,
-        ]
-      }).flat()
+      const chData = row.channel_data ?? row.channelData ?? []
+      const channelCells = channels.map((_, i) => {
+        const cd = chData[i]
+        const months = cd?.months ?? cd ?? {}
+        const monthVals = monthKeys.map((k) => num(months[k]))
+        const total = num(cd?.total)
+        return [...monthVals, total]
+      })
       const agg = row.aggregate_months ?? row.aggregateMonths ?? {}
-      const aggMonths = MONTH_KEYS.map((k) => num(agg[k]))
-      const buf = num(row.buffer_quantity ?? row.bufferQuantity)
+      const aggMonthVals = monthKeys.map((k) => num(agg[k]))
       const aggTotal = num(row.aggregate_total ?? row.aggregateTotal)
-      const orig = num(row.original_forecast ?? row.originalForecast)
-      const diff = num(row.difference)
       return [
         row.warehouse_location ?? row.warehouseLocation ?? '',
         row.category ?? '',
         row.spec ?? '',
         row.product_name ?? row.productName ?? '',
         row.product_code ?? row.productCode ?? '',
-        ...channelCells,
-        ...aggMonths,
-        buf,
+        ...channelCells.flat(),
+        ...aggMonthVals,
         aggTotal,
-        orig,
-        diff,
+        num(row.original_forecast ?? row.originalForecast),
+        num(row.difference),
         row.remarks ?? '',
       ]
     })
@@ -203,7 +176,7 @@ export default function ProductionPlanPage() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `生產表單_${year}.csv`
+    a.download = `生產表單_${startMonth}_${endMonth}.csv`
     a.click()
     URL.revokeObjectURL(url)
     toast.success('已匯出 CSV')
@@ -220,42 +193,72 @@ export default function ProductionPlanPage() {
     )
   }
 
-  const yearOptions = []
-  for (let y = 2020; y <= 2030; y++) yearOptions.push(y)
-
-  const channelOrder = data[0]?.channel_data?.map((c) => c.channel) ?? []
-
   return (
     <div className="production-plan-page">
       <div className="production-page-header">
         <h1>生產表單</h1>
-        {data.length > 0 && canView && (
-          <button
-            type="button"
-            className="btn btn--outline"
-            onClick={exportExcel}
-          >
-            Excel 匯出
-          </button>
-        )}
       </div>
 
       <div className="production-controls">
         <div className="control-group">
-          <label htmlFor="year-select">年份</label>
-          <select
-            id="year-select"
-            className="form-select"
-            value={year}
-            onChange={(e) => setYear(Number(e.target.value))}
-            disabled={loading}
-          >
-            {yearOptions.map((y) => (
-              <option key={y} value={y}>
-                {y}
-              </option>
-            ))}
-          </select>
+          <label htmlFor="start-month">查詢起始月份</label>
+          <span className="month-input-wrap">
+            <input
+              id="start-month"
+              type="month"
+              className="form-input-month"
+              value={toMonthInputValue(startMonth)}
+              onChange={(e) => {
+                setStartMonth(fromMonthInputValue(e.target.value))
+                setQueryClicked(false)
+              }}
+              disabled={loading}
+            />
+            <button
+              type="button"
+              className="month-input-calendar-btn"
+              onClick={() => document.getElementById('start-month')?.showPicker?.()}
+              disabled={loading}
+              aria-label="選擇月份"
+              title="選擇月份"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+            </button>
+          </span>
+          <label htmlFor="end-month">查詢結束月份</label>
+          <span className="month-input-wrap">
+            <input
+              id="end-month"
+              type="month"
+              className="form-input-month"
+              value={toMonthInputValue(endMonth)}
+              onChange={(e) => {
+                setEndMonth(fromMonthInputValue(e.target.value))
+                setQueryClicked(false)
+              }}
+              disabled={loading}
+            />
+            <button
+              type="button"
+              className="month-input-calendar-btn"
+              onClick={() => document.getElementById('end-month')?.showPicker?.()}
+              disabled={loading}
+              aria-label="選擇月份"
+              title="選擇月份"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                <line x1="16" y1="2" x2="16" y2="6" />
+                <line x1="8" y1="2" x2="8" y2="6" />
+                <line x1="3" y1="10" x2="21" y2="10" />
+              </svg>
+            </button>
+          </span>
           <button
             type="button"
             className="btn btn--primary"
@@ -265,150 +268,139 @@ export default function ProductionPlanPage() {
             {loading ? '查詢中...' : '查詢'}
           </button>
         </div>
-        {data.length > 0 && (
-          <div className="production-info">共 {data.length} 筆</div>
+        {monthRangeCount(startMonth, endMonth) > MAX_MONTH_RANGE && (
+          <span className="production-hint production-hint--error">查詢區間最多 4 個月</span>
         )}
       </div>
 
-      {loading ? (
-        <div className="production-loading" role="status">
-          載入中...
-        </div>
-      ) : data.length === 0 ? (
-        <div className="production-empty">
-          請選擇年份並按「查詢」取得生產表單資料
-        </div>
-      ) : (
-        <div className="production-grid-wrap">
-          <table className="production-grid production-form-table">
-            <thead>
-              <tr>
-                <th className="frozen-col frozen-col-1">庫位</th>
-                <th className="frozen-col frozen-col-2">中類名稱</th>
-                <th className="frozen-col frozen-col-3">貨品規格</th>
-                <th>品名</th>
-                <th>品號</th>
-                {channelOrder.map((ch) => (
-                  <th key={ch} colSpan={MONTH_KEYS.length + 1} className="channel-group">
-                    {ch}
-                  </th>
-                ))}
-                <th colSpan={MONTH_KEYS.length + 2} className="aggregate-group">
-                  合計
-                </th>
-                <th className="numeric-col">原始預估</th>
-                <th className="numeric-col">差異</th>
-                <th>備註</th>
-              </tr>
-              <tr>
-                <th className="frozen-col frozen-col-1" />
-                <th className="frozen-col frozen-col-2" />
-                <th className="frozen-col frozen-col-3" />
-                <th />
-                <th />
-                {channelOrder.map((ch) => (
-                  <Fragment key={ch}>
-                    {MONTH_KEYS.map((k) => (
-                      <th key={`${ch}-${k}`} className="month-col">
-                        {MONTH_LABELS[k]}
+      {queryClicked && (
+        <section className="production-form-block">
+          <h2>生產表單</h2>
+          {queryTime != null && (
+            <p className="production-query-time">
+              查詢時間：{`${queryTime.getFullYear()}-${String(queryTime.getMonth() + 1).padStart(2, '0')}-${String(queryTime.getDate()).padStart(2, '0')} ${String(queryTime.getHours()).padStart(2, '0')}:${String(queryTime.getMinutes()).padStart(2, '0')}:${String(queryTime.getSeconds()).padStart(2, '0')}`}
+            </p>
+          )}
+          {data.length > 0 && (
+            <div className="production-form-toolbar">
+              <div className="control-group">
+                <label htmlFor="version-select">版本</label>
+                <select
+                  id="version-select"
+                  className="form-select"
+                  value={selectedVersion}
+                  onChange={(e) => onVersionChange(e.target.value)}
+                  disabled={loading}
+                >
+                  {(versions || []).map((v) => (
+                    <option key={v} value={v}>{v}</option>
+                  ))}
+                </select>
+              </div>
+              <button type="button" className="btn btn--outline" onClick={exportExcel}>
+                Excel 匯出
+              </button>
+            </div>
+          )}
+          {loading && !data.length ? (
+            <div className="production-loading" role="status">載入中...</div>
+          ) : data.length === 0 ? (
+            <div className="production-empty">
+              該區間尚無生產表單資料，或請先選擇版本
+            </div>
+          ) : (
+            <div className="production-grid-wrap">
+              <table className="production-grid production-form-table">
+                <thead>
+                  <tr>
+                    <th className="frozen-col frozen-col-1">庫位</th>
+                    <th className="frozen-col frozen-col-2">中類名稱</th>
+                    <th className="frozen-col frozen-col-3">貨品規格</th>
+                    <th>品名</th>
+                    <th>品號</th>
+                    {(channels.length ? channels : (data[0]?.channel_data ?? []).map((c) => c.channel)).map((chName) => (
+                      <th key={chName} colSpan={monthKeys.length + 1} className="channel-group numeric-col">
+                        {chName}
+                      </th>
+                    ))}
+                    <th colSpan={monthKeys.length + 1} className="aggregate-group numeric-col">合計</th>
+                    <th className="numeric-col">原始預估</th>
+                    <th className="numeric-col">差異</th>
+                    <th>備註</th>
+                  </tr>
+                  <tr>
+                    <th className="frozen-col frozen-col-1" />
+                    <th className="frozen-col frozen-col-2" />
+                    <th className="frozen-col frozen-col-3" />
+                    <th />
+                    <th />
+                    {(channels.length ? channels : (data[0]?.channel_data ?? []).map((c) => c.channel)).map((chName) => (
+                      <React.Fragment key={chName}>
+                        {monthKeys.map((m) => (
+                          <th key={m} className="month-col numeric-col">
+                            {m.slice(0, 4)}/{m.slice(4, 6)}
+                          </th>
+                        ))}
+                        <th className="numeric-col">Total</th>
+                      </React.Fragment>
+                    ))}
+                    {monthKeys.map((m) => (
+                      <th key={`agg-${m}`} className="month-col numeric-col">
+                        {m.slice(0, 4)}/{m.slice(4, 6)}
                       </th>
                     ))}
                     <th className="numeric-col">Total</th>
-                  </Fragment>
-                ))}
-                {MONTH_KEYS.map((k) => (
-                  <th key={`agg-${k}`} className="month-col">
-                    {MONTH_LABELS[k]}
-                  </th>
-                ))}
-                <th className="numeric-col">緩衝量{canEdit && <span className="edit-hint">(可點擊編輯)</span>}</th>
-                <th className="numeric-col">Total</th>
-                <th className="numeric-col" />
-                <th className="numeric-col" />
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((row, idx) => {
-                const rowId = getRowId(row)
-                const isEditing = editingRowId === rowId
-                const cd = row.channel_data ?? []
-                const agg = row.aggregate_months ?? row.aggregateMonths ?? {}
-                const buf = row.buffer_quantity ?? row.bufferQuantity
-                const aggTotal = row.aggregate_total ?? row.aggregateTotal
-                const orig = row.original_forecast ?? row.originalForecast
-                const diff = num(row.difference)
-
-                return (
-                  <tr key={rowId}>
-                    <td className="frozen-col frozen-col-1">
-                      {row.warehouse_location ?? row.warehouseLocation ?? '-'}
-                    </td>
-                    <td className="frozen-col frozen-col-2">
-                      {row.category ?? '-'}
-                    </td>
-                    <td className="frozen-col frozen-col-3">{row.spec ?? '-'}</td>
-                    <td>{row.product_name ?? row.productName ?? '-'}</td>
-                    <td>{row.product_code ?? row.productCode ?? '-'}</td>
-                    {channelOrder.map((ch) => {
-                      const c = cd.find((x) => x.channel === ch) ?? {}
-                      const months = c.months ?? {}
-                      return (
-                        <Fragment key={ch}>
-                          {MONTH_KEYS.map((k) => (
-                            <td key={`${ch}-${k}`} className="numeric-col">
-                              {num(months[k])}
-                            </td>
-                          ))}
-                          <td className="numeric-col">{num(c.total)}</td>
-                        </Fragment>
-                      )
-                    })}
-                    {MONTH_KEYS.map((k) => (
-                      <td key={`agg-${k}`} className="numeric-col">
-                        {num(agg[k])}
-                      </td>
-                    ))}
-                    <td className="numeric-col editable-cell">
-                      {isEditing ? (
-                        <input
-                          ref={editInputRef}
-                          type="text"
-                          className="cell-input"
-                          value={editingValue}
-                          onChange={(e) => setEditingValue(e.target.value)}
-                          onBlur={() => saveBuffer(row)}
-                          onKeyDown={(e) => handleEditKeyDown(e, row)}
-                        />
-                      ) : (
-                        <span
-                          className={canEdit ? 'editable' : ''}
-                          onClick={() => startEditBuffer(row)}
-                          role={canEdit ? 'button' : undefined}
-                          tabIndex={canEdit ? 0 : undefined}
-                          title={canEdit ? '點擊編輯緩衝量' : undefined}
-                        >
-                          {num(buf)}
-                        </span>
-                      )}
-                    </td>
-                    <td className="numeric-col">{num(aggTotal)}</td>
-                    <td className="numeric-col">{num(orig)}</td>
-                    <td
-                      className={`numeric-col ${
-                        diff > 0 ? 'diff-positive' : diff < 0 ? 'diff-negative' : ''
-                      }`}
-                    >
-                      {diff > 0 ? '+' : ''}
-                      {diff}
-                    </td>
-                    <td className="remarks-cell">{row.remarks ?? '-'}</td>
+                    <th className="numeric-col">原始預估</th>
+                    <th className="numeric-col">差異</th>
+                    <th>備註</th>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody>
+                  {data.map((row, idx) => {
+                    const chData = row.channel_data ?? row.channelData ?? []
+                    const agg = row.aggregate_months ?? row.aggregateMonths ?? {}
+                    const aggTotal = num(row.aggregate_total ?? row.aggregateTotal)
+                    const orig = num(row.original_forecast ?? row.originalForecast)
+                    const diff = num(row.difference)
+                    return (
+                      <tr key={row.product_code ?? row.productCode ?? idx}>
+                        <td className="frozen-col frozen-col-1">{row.warehouse_location ?? row.warehouseLocation ?? '-'}</td>
+                        <td className="frozen-col frozen-col-2">{row.category ?? '-'}</td>
+                        <td className="frozen-col frozen-col-3">{row.spec ?? '-'}</td>
+                        <td>{row.product_name ?? row.productName ?? '-'}</td>
+                        <td>{row.product_code ?? row.productCode ?? '-'}</td>
+                        {chData.map((cd, i) => {
+                          const months = cd.months ?? {}
+                          return (
+                            <React.Fragment key={i}>
+                              {monthKeys.map((m) => (
+                                <td key={m} className="numeric-col">{num(months[m])}</td>
+                              ))}
+                              <td className="numeric-col">{num(cd.total)}</td>
+                            </React.Fragment>
+                          )
+                        })}
+                        {monthKeys.map((m) => (
+                          <td key={m} className="numeric-col">{num(agg[m])}</td>
+                        ))}
+                        <td className="numeric-col">{aggTotal}</td>
+                        <td className="numeric-col">{orig}</td>
+                        <td className={`numeric-col ${diff > 0 ? 'diff-positive' : diff < 0 ? 'diff-negative' : ''}`}>
+                          {diff > 0 ? '+' : ''}{diff}
+                        </td>
+                        <td className="remarks-cell">{row.remarks ?? '-'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+      )}
+
+      {!queryClicked && (
+        <p className="production-hint">請選擇查詢起始月份、查詢結束月份（最多 4 個月）後按「查詢」。</p>
       )}
     </div>
   )

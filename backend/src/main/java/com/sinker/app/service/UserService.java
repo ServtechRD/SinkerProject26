@@ -13,6 +13,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -29,20 +30,23 @@ public class UserService {
     private static final String SALES_ROLE_CODE = "sales";
 
     private static final Set<String> ALLOWED_CHANNELS = Set.of(
-            "PX/大全聯", "家樂福", "7-11", "全家", "萊爾富", "OK超商",
-            "美廉社", "愛買", "大潤發", "好市多", "頂好", "楓康"
+            "PX + 大全聯", "家樂福", "愛買", "7-11", "全家", "Ok+萊爾富",
+            "好市多", "楓康", "美聯社", "康是美", "電商", "市面經銷"
     );
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final JdbcTemplate jdbcTemplate;
 
     public UserService(UserRepository userRepository,
                        RoleRepository roleRepository,
-                       PasswordEncoder passwordEncoder) {
+                       PasswordEncoder passwordEncoder,
+                       JdbcTemplate jdbcTemplate) {
         this.userRepository = userRepository;
         this.roleRepository = roleRepository;
         this.passwordEncoder = passwordEncoder;
+        this.jdbcTemplate = jdbcTemplate;
     }
 
     @Transactional(readOnly = true)
@@ -68,7 +72,12 @@ public class UserService {
     public UserDTO getUserById(Long id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
-        return UserDTO.fromEntity(user);
+        UserDTO dto = UserDTO.fromEntity(user);
+        List<String> channels = jdbcTemplate.query(
+                "SELECT channel FROM sales_channels_users WHERE user_id = ? ORDER BY channel",
+                (rs, rowNum) -> rs.getString("channel"), id);
+        dto.setChannels(channels);
+        return dto;
     }
 
     @Transactional
@@ -102,10 +111,11 @@ public class UserService {
         user.setCreatedAt(LocalDateTime.now());
         user.setUpdatedAt(LocalDateTime.now());
 
-        // TODO: persist channels to sales_channels_users table when T007 is complete
-
         User saved = userRepository.save(user);
-        return UserDTO.fromEntity(saved);
+        if (SALES_ROLE_CODE.equals(role.getCode()) && request.getChannels() != null && !request.getChannels().isEmpty()) {
+            persistChannels(saved.getId(), request.getChannels());
+        }
+        return toDtoWithChannels(saved);
     }
 
     @Transactional
@@ -154,11 +164,17 @@ public class UserService {
             user.setPhone(request.getPhone());
         }
 
-        // TODO: persist channels to sales_channels_users table when T007 is complete
-
         user.setUpdatedAt(LocalDateTime.now());
         User saved = userRepository.save(user);
-        return UserDTO.fromEntity(saved);
+
+        // Sync sales_channels_users: persist when sales with channels, clear when not sales
+        if (SALES_ROLE_CODE.equals(saved.getRole().getCode()) && request.getChannels() != null && !request.getChannels().isEmpty()) {
+            persistChannels(saved.getId(), request.getChannels());
+        } else if (!SALES_ROLE_CODE.equals(saved.getRole().getCode())) {
+            jdbcTemplate.update("DELETE FROM sales_channels_users WHERE user_id = ?", saved.getId());
+        }
+
+        return toDtoWithChannels(saved);
     }
 
     @Transactional
@@ -177,6 +193,24 @@ public class UserService {
         user.setUpdatedAt(LocalDateTime.now());
         User saved = userRepository.save(user);
         return UserDTO.fromEntity(saved);
+    }
+
+    private void persistChannels(Long userId, List<String> channels) {
+        jdbcTemplate.update("DELETE FROM sales_channels_users WHERE user_id = ?", userId);
+        for (String ch : channels) {
+            if (ALLOWED_CHANNELS.contains(ch)) {
+                jdbcTemplate.update("INSERT INTO sales_channels_users (user_id, channel) VALUES (?, ?)", userId, ch);
+            }
+        }
+    }
+
+    private UserDTO toDtoWithChannels(User user) {
+        UserDTO dto = UserDTO.fromEntity(user);
+        List<String> channels = jdbcTemplate.query(
+                "SELECT channel FROM sales_channels_users WHERE user_id = ? ORDER BY channel",
+                (rs, rowNum) -> rs.getString("channel"), user.getId());
+        dto.setChannels(channels);
+        return dto;
     }
 
     private void validateSalesChannels(String roleCode, List<String> channels) {

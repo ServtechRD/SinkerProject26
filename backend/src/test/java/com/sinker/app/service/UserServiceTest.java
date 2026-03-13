@@ -28,6 +28,7 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -51,8 +52,8 @@ class UserServiceTest {
         userService = new UserService(userRepository, roleRepository, passwordEncoder, jdbcTemplate);
         when(jdbcTemplate.query(anyString(), any(org.springframework.jdbc.core.RowMapper.class), anyLong()))
                 .thenReturn(List.of());
-        lenient().when(jdbcTemplate.update(anyString(), any())).thenReturn(1);
-        lenient().when(jdbcTemplate.update(anyString(), any(), any())).thenReturn(1);
+        lenient().when(jdbcTemplate.update(anyString(), anyLong())).thenReturn(1);
+        lenient().when(jdbcTemplate.update(anyString(), anyLong(), anyString())).thenReturn(1);
     }
 
     private Role createTestRole(Long id, String code, String name) {

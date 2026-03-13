@@ -17,6 +17,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -26,6 +27,7 @@ import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -37,13 +39,20 @@ class UserServiceTest {
     @Mock
     private RoleRepository roleRepository;
 
+    @Mock
+    private JdbcTemplate jdbcTemplate;
+
     private PasswordEncoder passwordEncoder;
     private UserService userService;
 
     @BeforeEach
     void setUp() {
         passwordEncoder = new BCryptPasswordEncoder(10);
-        userService = new UserService(userRepository, roleRepository, passwordEncoder);
+        userService = new UserService(userRepository, roleRepository, passwordEncoder, jdbcTemplate);
+        when(jdbcTemplate.query(anyString(), any(org.springframework.jdbc.core.RowMapper.class), anyLong()))
+                .thenReturn(List.of());
+        lenient().when(jdbcTemplate.update(anyString(), any())).thenReturn(1);
+        lenient().when(jdbcTemplate.update(anyString(), any(), any())).thenReturn(1);
     }
 
     private Role createTestRole(Long id, String code, String name) {
@@ -191,7 +200,7 @@ class UserServiceTest {
         request.setEmail("sales@sinker.local");
         request.setPassword("password123");
         request.setRoleId(2L);
-        request.setChannels(List.of("PX/大全聯", "家樂福"));
+        request.setChannels(List.of("PX + 大全聯", "家樂福"));
 
         UserDTO result = userService.createUser(request, 1L);
         assertEquals(11L, result.getId());

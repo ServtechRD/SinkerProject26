@@ -76,7 +76,7 @@ describe('ForecastConfigPage', () => {
     expect(screen.getByText('202512')).toBeInTheDocument()
     expect(screen.getByText('10')).toBeInTheDocument()
     expect(screen.getByText('15')).toBeInTheDocument()
-    expect(screen.getByText('開放')).toBeInTheDocument()
+    expect(screen.getByText('開放中')).toBeInTheDocument()
     expect(screen.getByText('已結束新增設定')).toBeInTheDocument()
   })
 
@@ -85,9 +85,9 @@ describe('ForecastConfigPage', () => {
     renderPage({ permissions: ['sales_forecast_config.view'] })
 
     await waitFor(() => {
-      expect(screen.getByText('開放')).toBeInTheDocument()
+      expect(screen.getByText('開放中')).toBeInTheDocument()
     })
-    const badge = screen.getByText('開放')
+    const badge = screen.getByText('開放中')
     expect(badge.className).toContain('badge--open')
   })
 

@@ -3,6 +3,7 @@ package com.sinker.app.dto.user;
 import com.sinker.app.entity.User;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 public class UserDTO {
 
@@ -18,6 +19,7 @@ public class UserDTO {
     private LocalDateTime lastLoginAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private List<String> channels;
 
     public UserDTO() {}
 
@@ -73,4 +75,7 @@ public class UserDTO {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public List<String> getChannels() { return channels; }
+    public void setChannels(List<String> channels) { this.channels = channels; }
 }

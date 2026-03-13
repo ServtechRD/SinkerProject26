@@ -7,7 +7,7 @@ describe('FileDropzone', () => {
   it('renders dropzone when no file selected', () => {
     render(<FileDropzone file={null} onFileChange={vi.fn()} />)
 
-    expect(screen.getByText(/拖放 Excel 檔案到此處/)).toBeInTheDocument()
+    expect(screen.getByText(/拖放檔案到此處/)).toBeInTheDocument()
     expect(screen.getByText(/僅支援 .xlsx 檔案/)).toBeInTheDocument()
   })
 

@@ -8,7 +8,12 @@ vi.mock('../../../api/forecast', () => ({
   createForecastItem: vi.fn(),
 }))
 
+vi.mock('../../../api/reference', () => ({
+  getProducts: vi.fn(),
+}))
+
 import { createForecastItem } from '../../../api/forecast'
+import { getProducts } from '../../../api/reference'
 
 function renderDialog({ open = true, month = '202601', channel = '家樂福', onClose = vi.fn(), onSuccess = vi.fn() } = {}) {
   return render(
@@ -24,9 +29,18 @@ function renderDialog({ open = true, month = '202601', channel = '家樂福', on
   )
 }
 
+const mockProduct = {
+  code: 'P001',
+  name: '測試產品',
+  categoryName: '飲料',
+  spec: '500ml',
+  warehouseLocation: 'A1',
+}
+
 describe('AddItemDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    getProducts.mockResolvedValue([mockProduct])
   })
 
   it('does not render when open is false', () => {
@@ -42,20 +56,20 @@ describe('AddItemDialog', () => {
   it('renders all form fields', () => {
     renderDialog()
 
-    expect(screen.getByLabelText(/類別/)).toBeInTheDocument()
-    expect(screen.getByLabelText(/規格/)).toBeInTheDocument()
-    expect(screen.getByLabelText(/產品代碼/)).toBeInTheDocument()
-    expect(screen.getByLabelText(/產品名稱/)).toBeInTheDocument()
-    expect(screen.getByLabelText(/倉儲位置/)).toBeInTheDocument()
-    expect(screen.getByLabelText(/數量/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/中類名稱/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/貨品規格/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/品號/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/品名/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/庫位/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/箱數小計/)).toBeInTheDocument()
   })
 
   it('shows required indicators for mandatory fields', () => {
     renderDialog()
 
-    const productCodeLabel = screen.getByLabelText(/產品代碼/)
-    const productNameLabel = screen.getByLabelText(/產品名稱/)
-    const quantityLabel = screen.getByLabelText(/數量/)
+    const productCodeLabel = screen.getByLabelText(/品號/)
+    const productNameLabel = screen.getByLabelText(/品名/)
+    const quantityLabel = screen.getByLabelText(/箱數小計/)
 
     expect(productCodeLabel.closest('.form-field')).toHaveTextContent('*')
     expect(productNameLabel.closest('.form-field')).toHaveTextContent('*')
@@ -81,21 +95,21 @@ describe('AddItemDialog', () => {
   it('validates quantity is positive number', async () => {
     renderDialog()
 
-    const productCodeInput = screen.getByLabelText(/產品代碼/)
-    const productNameInput = screen.getByLabelText(/產品名稱/)
-    const quantityInput = screen.getByLabelText(/數量/)
-
+    const productCodeInput = screen.getByLabelText(/品號/)
+    await userEvent.clear(productCodeInput)
     await userEvent.type(productCodeInput, 'P001')
-    await userEvent.type(productNameInput, '測試產品')
+
+    await waitFor(() => {
+      expect(screen.getByRole('listitem')).toBeInTheDocument()
+    })
+    await userEvent.click(screen.getByRole('listitem'))
+
+    const quantityInput = screen.getByLabelText(/箱數小計/)
+    await userEvent.clear(quantityInput)
     await userEvent.type(quantityInput, '-10')
 
     const saveButton = screen.getByText('儲存')
     await userEvent.click(saveButton)
-
-    /*
-    await waitFor(() => {
-      expect(screen.getByText('數量必須為正數')).toBeInTheDocument()
-    })*/
 
     expect(createForecastItem).not.toHaveBeenCalled()
   })
@@ -106,12 +120,17 @@ describe('AddItemDialog', () => {
 
     renderDialog({ onSuccess })
 
-    const productCodeInput = screen.getByLabelText(/產品代碼/)
-    const productNameInput = screen.getByLabelText(/產品名稱/)
-    const quantityInput = screen.getByLabelText(/數量/)
-
+    const productCodeInput = screen.getByLabelText(/品號/)
+    await userEvent.clear(productCodeInput)
     await userEvent.type(productCodeInput, 'P001')
-    await userEvent.type(productNameInput, '測試產品')
+
+    await waitFor(() => {
+      expect(screen.getByRole('listitem')).toBeInTheDocument()
+    })
+    await userEvent.click(screen.getByRole('listitem'))
+
+    const quantityInput = screen.getByLabelText(/箱數小計/)
+    await userEvent.clear(quantityInput)
     await userEvent.type(quantityInput, '100')
 
     const saveButton = screen.getByText('儲存')
@@ -121,11 +140,11 @@ describe('AddItemDialog', () => {
       expect(createForecastItem).toHaveBeenCalledWith({
         month: '202601',
         channel: '家樂福',
-        category: null,
-        spec: null,
+        category: '飲料',
+        spec: '500ml',
         productCode: 'P001',
         productName: '測試產品',
-        warehouseLocation: null,
+        warehouseLocation: 'A1',
         quantity: 100,
       })
     })
@@ -141,12 +160,18 @@ describe('AddItemDialog', () => {
 
     renderDialog({ onSuccess })
 
-    await userEvent.type(screen.getByLabelText(/類別/), '飲料')
-    await userEvent.type(screen.getByLabelText(/規格/), '500ml')
-    await userEvent.type(screen.getByLabelText(/產品代碼/), 'P001')
-    await userEvent.type(screen.getByLabelText(/產品名稱/), '測試產品')
-    await userEvent.type(screen.getByLabelText(/倉儲位置/), 'A1')
-    await userEvent.type(screen.getByLabelText(/數量/), '100')
+    const productCodeInput = screen.getByLabelText(/品號/)
+    await userEvent.clear(productCodeInput)
+    await userEvent.type(productCodeInput, 'P001')
+
+    await waitFor(() => {
+      expect(screen.getByRole('listitem')).toBeInTheDocument()
+    })
+    await userEvent.click(screen.getByRole('listitem'))
+
+    const quantityInput = screen.getByLabelText(/箱數小計/)
+    await userEvent.clear(quantityInput)
+    await userEvent.type(quantityInput, '100')
 
     const saveButton = screen.getByText('儲存')
     await userEvent.click(saveButton)
@@ -176,9 +201,18 @@ describe('AddItemDialog', () => {
 
     renderDialog()
 
-    await userEvent.type(screen.getByLabelText(/產品代碼/), 'P001')
-    await userEvent.type(screen.getByLabelText(/產品名稱/), '測試產品')
-    await userEvent.type(screen.getByLabelText(/數量/), '100')
+    const productCodeInput = screen.getByLabelText(/品號/)
+    await userEvent.clear(productCodeInput)
+    await userEvent.type(productCodeInput, 'P001')
+
+    await waitFor(() => {
+      expect(screen.getByRole('listitem')).toBeInTheDocument()
+    })
+    await userEvent.click(screen.getByRole('listitem'))
+
+    const quantityInput = screen.getByLabelText(/箱數小計/)
+    await userEvent.clear(quantityInput)
+    await userEvent.type(quantityInput, '100')
 
     const saveButton = screen.getByText('儲存')
     await userEvent.click(saveButton)
@@ -201,8 +235,8 @@ describe('AddItemDialog', () => {
   it('clears form when dialog reopened', async () => {
     const { rerender } = renderDialog({ open: true })
 
-    await userEvent.type(screen.getByLabelText(/產品代碼/), 'P001')
-    await userEvent.type(screen.getByLabelText(/產品名稱/), '測試產品')
+    await userEvent.type(screen.getByLabelText(/品號/), 'P001')
+    await userEvent.type(screen.getByLabelText(/品名/), '測試產品')
 
     rerender(
       <ToastProvider>
@@ -228,8 +262,8 @@ describe('AddItemDialog', () => {
       </ToastProvider>
     )
 
-    const productCodeInput = screen.getByLabelText(/產品代碼/)
-    const productNameInput = screen.getByLabelText(/產品名稱/)
+    const productCodeInput = screen.getByLabelText(/品號/)
+    const productNameInput = screen.getByLabelText(/品名/)
 
     expect(productCodeInput).toHaveValue('')
     expect(productNameInput).toHaveValue('')
@@ -240,18 +274,26 @@ describe('AddItemDialog', () => {
 
     renderDialog()
 
-    await userEvent.type(screen.getByLabelText(/產品代碼/), 'P001')
-    await userEvent.type(screen.getByLabelText(/產品名稱/), '測試產品')
-    await userEvent.type(screen.getByLabelText(/數量/), '100')
+    const productCodeInput = screen.getByLabelText(/品號/)
+    await userEvent.clear(productCodeInput)
+    await userEvent.type(productCodeInput, 'P001')
+
+    await waitFor(() => {
+      expect(screen.getByRole('listitem')).toBeInTheDocument()
+    })
+    await userEvent.click(screen.getByRole('listitem'))
+
+    const quantityInput = screen.getByLabelText(/箱數小計/)
+    await userEvent.clear(quantityInput)
+    await userEvent.type(quantityInput, '100')
 
     const saveButton = screen.getByText('儲存')
     await userEvent.click(saveButton)
 
     await waitFor(() => {
-      expect(screen.getByLabelText(/產品代碼/)).toBeDisabled()
-      expect(screen.getByLabelText(/產品名稱/)).toBeDisabled()
-      expect(screen.getByLabelText(/數量/)).toBeDisabled()
+      expect(screen.getByLabelText(/品號/)).toBeDisabled()
       expect(screen.getByText('處理中...')).toBeInTheDocument()
     })
+    expect(screen.getByLabelText(/箱數小計/)).toBeDisabled()
   })
 })

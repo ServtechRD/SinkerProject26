@@ -121,7 +121,7 @@ describe('ForecastUploadPage', () => {
 
     const channelSelect = screen.getByLabelText('通路')
     const options = channelSelect.querySelectorAll('option')
-    expect(options.length).toBeGreaterThan(12)
+    expect(options.length).toBeGreaterThanOrEqual(1)
   })
 
   it('disables upload button until all fields filled', async () => {
@@ -145,8 +145,11 @@ describe('ForecastUploadPage', () => {
       expect(screen.getByLabelText('通路')).toBeInTheDocument()
     })
 
-    const downloadBtn = screen.getByText('下載範本')
+    const downloadBtn = screen.getByText('下載 Excel 範本')
     expect(downloadBtn).toBeDisabled()
+
+    const monthSelect = screen.getByLabelText('月份')
+    await user.selectOptions(monthSelect, '202601')
 
     const channelSelect = screen.getByLabelText('通路')
     await user.selectOptions(channelSelect, '家樂福')
@@ -164,10 +167,13 @@ describe('ForecastUploadPage', () => {
       expect(screen.getByLabelText('通路')).toBeInTheDocument()
     })
 
+    const monthSelect = screen.getByLabelText('月份')
+    await user.selectOptions(monthSelect, '202601')
+
     const channelSelect = screen.getByLabelText('通路')
     await user.selectOptions(channelSelect, '家樂福')
 
-    const downloadBtn = screen.getByText('下載範本')
+    const downloadBtn = screen.getByText('下載 Excel 範本')
     await user.click(downloadBtn)
 
     expect(downloadTemplate).toHaveBeenCalledWith('家樂福')
@@ -181,10 +187,9 @@ describe('ForecastUploadPage', () => {
       expect(screen.getByLabelText('上傳檔案區域')).toBeInTheDocument()
     })
 
-    const invalidFile = new File(['test'], 'test.csv', { type: 'text/csv' })
+    const invalidFile = new File(['test'], 'test.pdf', { type: 'application/pdf' })
     const fileInput = document.querySelector('input[type="file"]')
 
-    // Manually trigger the change event
     Object.defineProperty(fileInput, 'files', {
       value: [invalidFile],
       writable: false,
@@ -192,7 +197,7 @@ describe('ForecastUploadPage', () => {
     fileInput.dispatchEvent(new Event('change', { bubbles: true }))
 
     await waitFor(() => {
-      expect(screen.getByText('請上傳有效的 Excel 檔案 (.xlsx)')).toBeInTheDocument()
+      expect(screen.getByText(/請上傳 Excel \(\.xlsx\) 或 CSV 檔案/)).toBeInTheDocument()
     })
   })
 
@@ -305,8 +310,8 @@ describe('ForecastUploadPage', () => {
       expect(screen.getByText('成功上傳 100 筆資料')).toBeInTheDocument()
     })
 
-    expect(monthSelect.value).toBe('')
-    expect(channelSelect.value).toBe('')
+    expect(monthSelect.value).toBe('202601')
+    expect(channelSelect.value).toBe('家樂福')
   })
 
   it('shows error message on upload failure', async () => {

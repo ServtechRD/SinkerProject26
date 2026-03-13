@@ -7,17 +7,27 @@ import { renderWithAuth } from '../../test/helpers'
 describe('Sidebar', () => {
   const authValue = {
     isAuthenticated: true,
-    user: { username: 'admin', fullName: 'System Administrator' },
+    user: {
+      username: 'admin',
+      fullName: 'System Administrator',
+      permissions: [
+        'user.view',
+        'role.view',
+        'sales_forecast_config.view',
+        'sales_forecast.upload',
+        'sales_forecast.update_after_closed',
+      ],
+    },
     logout: vi.fn(),
   }
 
   it('renders all navigation links', () => {
     renderWithAuth(<Sidebar />, { authValue })
 
-    expect(screen.getByText('儀表板')).toBeInTheDocument()
     expect(screen.getByText('使用者管理')).toBeInTheDocument()
-    expect(screen.getByText('預測設定')).toBeInTheDocument()
-    expect(screen.getByText('預測上傳')).toBeInTheDocument()
+    expect(screen.getByText('銷售預估量-表單設定')).toBeInTheDocument()
+    expect(screen.getByText('銷售預估量上傳-共同編輯界面')).toBeInTheDocument()
+    expect(screen.getByText('銷售預估量表單')).toBeInTheDocument()
   })
 
   it('renders logout button', () => {
@@ -41,16 +51,6 @@ describe('Sidebar', () => {
     expect(logoutMock).toHaveBeenCalledOnce()
   })
 
-  it('highlights active link for dashboard', () => {
-    renderWithAuth(<Sidebar />, {
-      authValue,
-      initialEntries: ['/'],
-    })
-
-    const dashboardLink = screen.getByText('儀表板').closest('a')
-    expect(dashboardLink).toHaveClass('sidebar-link--active')
-  })
-
   it('highlights active link for users page', () => {
     renderWithAuth(<Sidebar />, {
       authValue,
@@ -59,5 +59,15 @@ describe('Sidebar', () => {
 
     const usersLink = screen.getByText('使用者管理').closest('a')
     expect(usersLink).toHaveClass('sidebar-link--active')
+  })
+
+  it('highlights active link for sales forecast page', () => {
+    renderWithAuth(<Sidebar />, {
+      authValue,
+      initialEntries: ['/sales-forecast'],
+    })
+
+    const link = screen.getByText('銷售預估量表單').closest('a')
+    expect(link).toHaveClass('sidebar-link--active')
   })
 })

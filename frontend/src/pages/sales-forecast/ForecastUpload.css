@@ -126,6 +126,19 @@
   margin-bottom: 16px;
 }
 
+/* 表頭左上方：新增項目靠左、匯出靠右 */
+.forecast-table-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.forecast-table-toolbar-right {
+  margin-left: auto;
+}
+
 .filter-field--inline {
   display: flex;
   align-items: center;
@@ -153,13 +166,22 @@
 
 .forecast-pagination {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
   margin-top: 16px;
   padding-top: 12px;
   border-top: 1px solid #e2e8f0;
+}
+
+.forecast-pagination .filter-field--inline {
+  flex-shrink: 0;
+}
+
+.forecast-pagination .filter-field--inline .form-select,
+.forecast-pagination .filter-field--inline .form-select--sm {
+  width: auto;
+  min-width: 72px;
 }
 
 .forecast-pagination-info {
@@ -238,6 +260,15 @@
   }
 
   .upload-result-actions {
+    margin-left: 0;
+  }
+
+  .forecast-table-toolbar {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .forecast-table-toolbar-right {
     margin-left: 0;
   }
 }

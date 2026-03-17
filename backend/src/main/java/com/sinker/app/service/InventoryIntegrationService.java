@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -295,10 +296,10 @@ public class InventoryIntegrationService {
     }
 
     /**
-     * Generate version string, same format as sales forecast: yyyy-MM-dd HH:mm:ss
+     * Generate version string in local time (Asia/Taipei): yyyy-MM-dd HH:mm:ss
      */
     private String generateVersion() {
-        return LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
+        return LocalDateTime.now(ZoneId.of("Asia/Taipei")).format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
     }
 
     /**

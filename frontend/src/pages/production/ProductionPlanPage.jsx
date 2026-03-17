@@ -313,27 +313,22 @@ export default function ProductionPlanPage() {
               <table className="production-grid production-form-table">
                 <thead>
                   <tr>
-                    <th className="frozen-col frozen-col-1">庫位</th>
-                    <th className="frozen-col frozen-col-2">中類名稱</th>
-                    <th className="frozen-col frozen-col-3">貨品規格</th>
-                    <th>品名</th>
-                    <th>品號</th>
+                    <th rowSpan={2} className="frozen-col frozen-col-1 production-form-th-span">庫位</th>
+                    <th rowSpan={2} className="frozen-col frozen-col-2 production-form-th-span">中類名稱</th>
+                    <th rowSpan={2} className="frozen-col frozen-col-3 production-form-th-span">貨品規格</th>
+                    <th rowSpan={2} className="production-form-th-span">品名</th>
+                    <th rowSpan={2} className="production-form-th-span">品號</th>
                     {(channels.length ? channels : (data[0]?.channel_data ?? []).map((c) => c.channel)).map((chName) => (
                       <th key={chName} colSpan={monthKeys.length + 1} className="channel-group numeric-col">
                         {chName}
                       </th>
                     ))}
                     <th colSpan={monthKeys.length + 1} className="aggregate-group numeric-col">合計</th>
-                    <th className="numeric-col">原始預估</th>
-                    <th className="numeric-col">差異</th>
-                    <th>備註</th>
+                    <th rowSpan={2} className="numeric-col production-form-th-span">原始預估</th>
+                    <th rowSpan={2} className="numeric-col production-form-th-span">差異</th>
+                    <th rowSpan={2} className="production-form-th-span">備註</th>
                   </tr>
                   <tr>
-                    <th className="frozen-col frozen-col-1" />
-                    <th className="frozen-col frozen-col-2" />
-                    <th className="frozen-col frozen-col-3" />
-                    <th />
-                    <th />
                     {(channels.length ? channels : (data[0]?.channel_data ?? []).map((c) => c.channel)).map((chName) => (
                       <React.Fragment key={chName}>
                         {monthKeys.map((m) => (
@@ -350,9 +345,6 @@ export default function ProductionPlanPage() {
                       </th>
                     ))}
                     <th className="numeric-col">Total</th>
-                    <th className="numeric-col">原始預估</th>
-                    <th className="numeric-col">差異</th>
-                    <th>備註</th>
                   </tr>
                 </thead>
                 <tbody>

@@ -39,6 +39,9 @@ public class SaveFormSummaryVersionRequest {
         private String productName;
         @JsonProperty("product_code")
         private String productCode;
+        /** 該列備註（與修改原因獨立） */
+        @JsonProperty("remark")
+        private String remark;
         @JsonProperty("channel_quantities")
         private List<java.math.BigDecimal> channelQuantities;
 
@@ -52,6 +55,8 @@ public class SaveFormSummaryVersionRequest {
         public void setProductName(String productName) { this.productName = productName; }
         public String getProductCode() { return productCode; }
         public void setProductCode(String productCode) { this.productCode = productCode; }
+        public String getRemark() { return remark; }
+        public void setRemark(String remark) { this.remark = remark; }
         public List<java.math.BigDecimal> getChannelQuantities() { return channelQuantities; }
         public void setChannelQuantities(List<java.math.BigDecimal> channelQuantities) { this.channelQuantities = channelQuantities; }
     }

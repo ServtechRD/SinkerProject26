@@ -82,8 +82,9 @@ describe('InventoryIntegrationPage', () => {
 
     expect(screen.getByText('庫存銷量預估量整合表單')).toBeInTheDocument()
     expect(screen.getByLabelText('查詢月份')).toBeInTheDocument()
-    expect(screen.getByLabelText('結存查詢起始日期')).toBeInTheDocument()
-    expect(screen.getByLabelText('結存查詢結束日期')).toBeInTheDocument()
+    expect(screen.getByLabelText('結存查詢起訖日期')).toBeInTheDocument()
+    expect(screen.getByLabelText('結存查詢起始日')).toBeInTheDocument()
+    expect(screen.getByLabelText('結存查詢結束日')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '查詢' })).toBeInTheDocument()
   })
 
@@ -183,7 +184,8 @@ describe('InventoryIntegrationPage', () => {
     expect(dataRow).toBeDefined()
   })
 
-  it('should not allow editing without inventory.edit permission', () => {
+  it('should not allow editing without inventory.edit permission', async () => {
+    const user = userEvent.setup()
     const viewOnlyUser = {
       ...mockUser,
       permissions: ['inventory.view']
@@ -192,8 +194,14 @@ describe('InventoryIntegrationPage', () => {
     inventoryApi.getInventoryIntegration.mockResolvedValue(mockData)
     renderWithContext(viewOnlyUser)
 
-    // Save and Cancel buttons should not be present
-    expect(screen.queryByRole('button', { name: '儲存' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '查詢' }))
+    await waitFor(() => {
+      expect(screen.getByText('320.00')).toBeInTheDocument()
+    })
+
+    // 版本編輯, 儲存版本, 取消 should not be present for view-only user
+    expect(screen.queryByRole('button', { name: '版本編輯' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '儲存版本' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '取消' })).not.toBeInTheDocument()
   })
 
@@ -375,7 +383,7 @@ describe('InventoryIntegrationPage', () => {
     })
   })
 
-  it('should allow editing modified subtotal cell', async () => {
+  it('should allow editing modified subtotal in version edit mode', async () => {
     const user = userEvent.setup()
     inventoryApi.getInventoryIntegration.mockResolvedValue(mockData)
 
@@ -388,22 +396,20 @@ describe('InventoryIntegrationPage', () => {
       expect(screen.getByText('320.00')).toBeInTheDocument()
     })
 
-    // Click on the editable cell
-    const row = screen.getByText('320.00').closest('tr')
-    const editBtn = within(row).getByRole('button', { name: '編輯' })
-    await user.click(editBtn)
+    await user.click(screen.getByRole('button', { name: '版本編輯' }))
 
     await waitFor(() => {
-      const input = screen.getByRole('textbox')
-      expect(input).toBeInTheDocument()
-      expect(input).toHaveValue('320')
+      const inputs = screen.getAllByRole('textbox')
+      expect(inputs.length).toBeGreaterThanOrEqual(1)
+      expect(inputs[0]).toHaveValue('320')
     })
   })
 
-  it('should save edit on Enter key', async () => {
+  it('should save modified subtotals and create version on 儲存版本', async () => {
     const user = userEvent.setup()
     inventoryApi.getInventoryIntegration.mockResolvedValue(mockData)
     inventoryApi.updateModifiedSubtotal.mockResolvedValue({})
+    inventoryApi.copyInventoryVersion.mockResolvedValue({ version: 'v20260116120000' })
 
     renderWithContext()
 
@@ -414,29 +420,28 @@ describe('InventoryIntegrationPage', () => {
       expect(screen.getByText('320.00')).toBeInTheDocument()
     })
 
-    const row = screen.getByText('320.00').closest('tr')
-    const editBtn = within(row).getByRole('button', { name: '編輯' })
-    await user.click(editBtn)
+    await user.click(screen.getByRole('button', { name: '版本編輯' }))
 
     await waitFor(() => {
-      const input = screen.getByRole('textbox')
-      expect(input).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: '儲存版本' })).toBeInTheDocument()
     })
 
-    const input = screen.getByRole('textbox')
-    await user.tripleClick(input)
-    await user.keyboard('350{Enter}')
+    const inputs = screen.getAllByRole('textbox')
+    await user.tripleClick(inputs[0])
+    await user.keyboard('350')
 
-    await waitFor(() => {
-      expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
-    })
+    await user.click(screen.getByRole('button', { name: '儲存版本' }))
+
     await waitFor(() => {
       expect(inventoryApi.updateModifiedSubtotal).toHaveBeenCalledWith(1, 350)
     })
-    expect(screen.getByText('已儲存')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(inventoryApi.copyInventoryVersion).toHaveBeenCalledWith('v20260115120000')
+    })
+    expect(screen.getByText(/已建立新版次/)).toBeInTheDocument()
   })
 
-  it('should cancel edit on Escape key', async () => {
+  it('should cancel version edit mode on 取消', async () => {
     const user = userEvent.setup()
     inventoryApi.getInventoryIntegration.mockResolvedValue(mockData)
 
@@ -449,27 +454,23 @@ describe('InventoryIntegrationPage', () => {
       expect(screen.getByText('320.00')).toBeInTheDocument()
     })
 
-    const row = screen.getByText('320.00').closest('tr')
-    const editBtn = within(row).getByRole('button', { name: '編輯' })
-    await user.click(editBtn)
+    await user.click(screen.getByRole('button', { name: '版本編輯' }))
 
     await waitFor(() => {
-      const input = screen.getByRole('textbox')
-      expect(input).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: '取消' })).toBeInTheDocument()
     })
 
-    const input = screen.getByRole('textbox')
-    await user.type(input, '{Escape}')
+    await user.click(screen.getByRole('button', { name: '取消' }))
 
     await waitFor(() => {
-      expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: '儲存版本' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: '取消' })).not.toBeInTheDocument()
     })
-
-    // Save buttons should not appear
-    expect(screen.queryByRole('button', { name: '儲存' })).not.toBeInTheDocument()
+    expect(inventoryApi.updateModifiedSubtotal).not.toHaveBeenCalled()
+    expect(inventoryApi.copyInventoryVersion).not.toHaveBeenCalled()
   })
 
-  it('should show validation error for invalid format', async () => {
+  it('should show validation error for invalid format on 儲存版本', async () => {
     const user = userEvent.setup()
     inventoryApi.getInventoryIntegration.mockResolvedValue(mockData)
 
@@ -482,25 +483,22 @@ describe('InventoryIntegrationPage', () => {
       expect(screen.getByText('320.00')).toBeInTheDocument()
     })
 
-    const row = screen.getByText('320.00').closest('tr')
-    const editBtn = within(row).getByRole('button', { name: '編輯' })
-    await user.click(editBtn)
+    await user.click(screen.getByRole('button', { name: '版本編輯' }))
 
-    await waitFor(() => {
-      const input = screen.getByRole('textbox')
-      expect(input).toBeInTheDocument()
-    })
+    const inputs = screen.getAllByRole('textbox')
+    await user.clear(inputs[0])
+    await user.type(inputs[0], '123.456')
 
-    const input = screen.getByRole('textbox')
-    await user.clear(input)
-    await user.type(input, '123.456')
+    await user.click(screen.getByRole('button', { name: '儲存版本' }))
 
     await waitFor(() => {
       expect(screen.getByText(/格式錯誤/)).toBeInTheDocument()
     })
+    expect(inventoryApi.updateModifiedSubtotal).not.toHaveBeenCalled()
+    expect(inventoryApi.copyInventoryVersion).not.toHaveBeenCalled()
   })
 
-  it('should show validation error for invalid number', async () => {
+  it('should show validation error for invalid number on 儲存版本', async () => {
     const user = userEvent.setup()
     inventoryApi.getInventoryIntegration.mockResolvedValue(mockData)
 
@@ -513,22 +511,19 @@ describe('InventoryIntegrationPage', () => {
       expect(screen.getByText('320.00')).toBeInTheDocument()
     })
 
-    const row = screen.getByText('320.00').closest('tr')
-    const editBtn = within(row).getByRole('button', { name: '編輯' })
-    await user.click(editBtn)
+    await user.click(screen.getByRole('button', { name: '版本編輯' }))
 
-    await waitFor(() => {
-      const input = screen.getByRole('textbox')
-      expect(input).toBeInTheDocument()
-    })
+    const inputs = screen.getAllByRole('textbox')
+    await user.clear(inputs[0])
+    await user.type(inputs[0], 'abc')
 
-    const input = screen.getByRole('textbox')
-    await user.clear(input)
-    await user.type(input, 'abc')
+    await user.click(screen.getByRole('button', { name: '儲存版本' }))
 
     await waitFor(() => {
       expect(screen.getByText(/格式錯誤/)).toBeInTheDocument()
     })
+    expect(inventoryApi.updateModifiedSubtotal).not.toHaveBeenCalled()
+    expect(inventoryApi.copyInventoryVersion).not.toHaveBeenCalled()
   })
 
   it('should not save when validation fails', async () => {
@@ -544,29 +539,25 @@ describe('InventoryIntegrationPage', () => {
       expect(screen.getByText('320.00')).toBeInTheDocument()
     })
 
-    const row = screen.getByText('320.00').closest('tr')
-    const editBtn = within(row).getByRole('button', { name: '編輯' })
-    await user.click(editBtn)
+    await user.click(screen.getByRole('button', { name: '版本編輯' }))
+    const inputs = screen.getAllByRole('textbox')
+    await user.clear(inputs[0])
+    await user.type(inputs[0], 'invalid')
+
+    await user.click(screen.getByRole('button', { name: '儲存版本' }))
 
     await waitFor(() => {
-      const input = screen.getByRole('textbox')
-      expect(input).toBeInTheDocument()
-    })
-
-    const input = screen.getByRole('textbox')
-    await user.clear(input)
-    await user.type(input, 'invalid{Enter}')
-
-    await waitFor(() => {
-      expect(screen.getByRole('textbox')).toBeInTheDocument()
+      expect(screen.getByText(/請輸入有效數字/)).toBeInTheDocument()
     })
     expect(inventoryApi.updateModifiedSubtotal).not.toHaveBeenCalled()
+    expect(inventoryApi.copyInventoryVersion).not.toHaveBeenCalled()
   })
 
-  it('should save all changes successfully', async () => {
+  it('should save all changes and call copyVersion on 儲存版本', async () => {
     const user = userEvent.setup()
     inventoryApi.getInventoryIntegration.mockResolvedValue(mockData)
     inventoryApi.updateModifiedSubtotal.mockResolvedValue({})
+    inventoryApi.copyInventoryVersion.mockResolvedValue({ version: 'v20260116120000' })
 
     renderWithContext()
 
@@ -577,29 +568,26 @@ describe('InventoryIntegrationPage', () => {
       expect(screen.getByText('320.00')).toBeInTheDocument()
     })
 
-    const row = screen.getByText('320.00').closest('tr')
-    const editBtn = within(row).getByRole('button', { name: '編輯' })
-    await user.click(editBtn)
+    await user.click(screen.getByRole('button', { name: '版本編輯' }))
+    const inputs = screen.getAllByRole('textbox')
+    await user.tripleClick(inputs[0])
+    await user.keyboard('350')
 
-    await waitFor(() => {
-      const input = screen.getByRole('textbox')
-      expect(input).toBeInTheDocument()
-    })
-
-    const input = screen.getByRole('textbox')
-    await user.tripleClick(input)
-    await user.keyboard('350{Enter}')
+    await user.click(screen.getByRole('button', { name: '儲存版本' }))
 
     await waitFor(() => {
       expect(inventoryApi.updateModifiedSubtotal).toHaveBeenCalledWith(1, 350)
     })
+    await waitFor(() => {
+      expect(inventoryApi.copyInventoryVersion).toHaveBeenCalled()
+    })
   })
 
-  it('should handle 403 error when saving', async () => {
+  it('should handle 403 error when 儲存版本', async () => {
     const user = userEvent.setup()
     inventoryApi.getInventoryIntegration.mockResolvedValue(mockData)
     inventoryApi.updateModifiedSubtotal.mockRejectedValue({
-      response: { status: 403 }
+      response: { status: 403, data: { message: '權限不足' } }
     })
 
     renderWithContext()
@@ -611,32 +599,22 @@ describe('InventoryIntegrationPage', () => {
       expect(screen.getByText('320.00')).toBeInTheDocument()
     })
 
-    const row = screen.getByText('320.00').closest('tr')
-    const editBtn = within(row).getByRole('button', { name: '編輯' })
-    await user.click(editBtn)
+    await user.click(screen.getByRole('button', { name: '版本編輯' }))
+    const inputs = screen.getAllByRole('textbox')
+    await user.tripleClick(inputs[0])
+    await user.keyboard('350')
 
-    await waitFor(() => {
-      const input = screen.getByRole('textbox')
-      expect(input).toBeInTheDocument()
-    })
-
-    const input = screen.getByRole('textbox')
-    await user.tripleClick(input)
-    await user.keyboard('350{Enter}')
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: '儲存' })).toBeInTheDocument()
-    })
-
-    const saveButton = screen.getByRole('button', { name: '儲存' })
-    await user.click(saveButton)
+    await user.click(screen.getByRole('button', { name: '儲存版本' }))
 
     await waitFor(() => {
       expect(inventoryApi.updateModifiedSubtotal).toHaveBeenCalled()
     })
+    await waitFor(() => {
+      expect(screen.getByText(/儲存版本失敗|權限不足/)).toBeInTheDocument()
+    })
   })
 
-  it('should cancel all changes', async () => {
+  it('should cancel version edit and discard changes', async () => {
     const user = userEvent.setup()
     inventoryApi.getInventoryIntegration.mockResolvedValue(mockData)
 
@@ -649,35 +627,24 @@ describe('InventoryIntegrationPage', () => {
       expect(screen.getByText('320.00')).toBeInTheDocument()
     })
 
-    const row = screen.getByText('320.00').closest('tr')
-    const editBtn = within(row).getByRole('button', { name: '編輯' })
-    await user.click(editBtn)
+    await user.click(screen.getByRole('button', { name: '版本編輯' }))
+    const inputs = screen.getAllByRole('textbox')
+    await user.tripleClick(inputs[0])
+    await user.keyboard('350')
+
+    await user.click(screen.getByRole('button', { name: '取消' }))
 
     await waitFor(() => {
-      const input = screen.getByRole('textbox')
-      expect(input).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: '儲存版本' })).not.toBeInTheDocument()
     })
-
-    const input = screen.getByRole('textbox')
-    await user.tripleClick(input)
-    await user.keyboard('350{Enter}')
-
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: '取消' })).toBeInTheDocument()
-    })
-
-    const cancelButton = screen.getByRole('button', { name: '取消' })
-    await user.click(cancelButton)
-
-    await waitFor(() => {
-      expect(screen.queryByRole('button', { name: '儲存' })).not.toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: '取消' })).not.toBeInTheDocument()
-    })
+    expect(inventoryApi.updateModifiedSubtotal).not.toHaveBeenCalled()
+    expect(inventoryApi.copyInventoryVersion).not.toHaveBeenCalled()
   })
 
-  it('should show error when saving with no changes', async () => {
+  it('should create version without subtotal changes when 儲存版本 with no edits', async () => {
     const user = userEvent.setup()
     inventoryApi.getInventoryIntegration.mockResolvedValue(mockData)
+    inventoryApi.copyInventoryVersion.mockResolvedValue({ version: 'v20260116120000' })
 
     renderWithContext()
 
@@ -688,9 +655,13 @@ describe('InventoryIntegrationPage', () => {
       expect(screen.getByText('320.00')).toBeInTheDocument()
     })
 
-    // Try to save without making any changes
-    // Since there are no changes, save button should not be visible
-    expect(screen.queryByRole('button', { name: '儲存' })).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '版本編輯' }))
+    await user.click(screen.getByRole('button', { name: '儲存版本' }))
+
+    await waitFor(() => {
+      expect(inventoryApi.copyInventoryVersion).toHaveBeenCalledWith('v20260115120000')
+    })
+    expect(inventoryApi.updateModifiedSubtotal).not.toHaveBeenCalled()
   })
 
   it('should toggle sort direction on repeated clicks', async () => {
@@ -727,8 +698,8 @@ describe('InventoryIntegrationPage', () => {
     await user.clear(monthInput)
     await user.type(monthInput, '2026-02')
 
-    const startDateInput = screen.getByLabelText('結存查詢起始日期')
-    const endDateInput = screen.getByLabelText('結存查詢結束日期')
+    const startDateInput = screen.getByLabelText('結存查詢起始日')
+    const endDateInput = screen.getByLabelText('結存查詢結束日')
 
     await waitFor(() => {
       expect(startDateInput).toHaveValue('2026-02-01')
@@ -824,7 +795,7 @@ describe('InventoryIntegrationPage', () => {
     expect(within(firstDataRow).queryByText('-')).not.toBeInTheDocument()
   })
 
-  it('should handle beforeunload event with unsaved changes', async () => {
+  it('should show 儲存版本 in version edit mode', async () => {
     const user = userEvent.setup()
     inventoryApi.getInventoryIntegration.mockResolvedValue(mockData)
 
@@ -837,27 +808,18 @@ describe('InventoryIntegrationPage', () => {
       expect(screen.getByText('320.00')).toBeInTheDocument()
     })
 
-    // Enter edit mode via 編輯 button (clicking cell does not open inline edit)
-    const row = screen.getByText('320.00').closest('tr')
-    const editBtn = within(row).getByRole('button', { name: '編輯' })
-    await user.click(editBtn)
+    await user.click(screen.getByRole('button', { name: '版本編輯' }))
 
     await waitFor(() => {
-      const input = screen.getByRole('textbox')
-      expect(input).toBeInTheDocument()
+      const inputs = screen.getAllByRole('textbox')
+      expect(inputs.length).toBeGreaterThanOrEqual(1)
     })
 
-    const input = screen.getByRole('textbox')
-    await user.clear(input)
-    await user.type(input, '350')
+    const inputs = screen.getAllByRole('textbox')
+    await user.clear(inputs[0])
+    await user.type(inputs[0], '350')
 
-    // Simulate beforeunload while in edit mode with unsaved change
-    const event = new Event('beforeunload')
-    const preventDefaultSpy = vi.spyOn(event, 'preventDefault')
-    window.dispatchEvent(event)
-
-    // App may or may not call preventDefault; just verify we reached edit state
-    expect(screen.getByRole('button', { name: '儲存' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '儲存版本' })).toBeInTheDocument()
   })
 
   it('should not trigger beforeunload without changes', async () => {
@@ -883,9 +845,11 @@ describe('InventoryIntegrationPage', () => {
     expect(preventDefaultSpy).not.toHaveBeenCalled()
   })
 
-  it('should accept empty value for modified subtotal', async () => {
+  it('should accept empty value for modified subtotal and save as null', async () => {
     const user = userEvent.setup()
     inventoryApi.getInventoryIntegration.mockResolvedValue(mockData)
+    inventoryApi.updateModifiedSubtotal.mockResolvedValue({ modified_subtotal: null })
+    inventoryApi.copyInventoryVersion.mockResolvedValue({ version: 'v20260116120000' })
 
     renderWithContext()
 
@@ -896,29 +860,26 @@ describe('InventoryIntegrationPage', () => {
       expect(screen.getByText('320.00')).toBeInTheDocument()
     })
 
-    const row = screen.getByText('320.00').closest('tr')
-    const editBtn = within(row).getByRole('button', { name: '編輯' })
-    await user.click(editBtn)
+    await user.click(screen.getByRole('button', { name: '版本編輯' }))
+    const inputs = screen.getAllByRole('textbox')
+    await user.tripleClick(inputs[0])
+    await user.keyboard('{Backspace}')
+
+    await user.click(screen.getByRole('button', { name: '儲存版本' }))
 
     await waitFor(() => {
-      const input = screen.getByRole('textbox')
-      expect(input).toBeInTheDocument()
+      expect(inventoryApi.updateModifiedSubtotal).toHaveBeenCalledWith(1, null)
     })
-
-    const input = screen.getByRole('textbox')
-    await user.tripleClick(input)
-    await user.keyboard('{Backspace}{Enter}')
-
-    // Empty value may cause save to fail and stay in edit mode
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '儲存' })).toBeInTheDocument()
+      expect(inventoryApi.copyInventoryVersion).toHaveBeenCalled()
     })
-    expect(screen.getByText('儲存失敗')).toBeInTheDocument()
   })
 
   it('should accept negative values for modified subtotal', async () => {
     const user = userEvent.setup()
     inventoryApi.getInventoryIntegration.mockResolvedValue(mockData)
+    inventoryApi.updateModifiedSubtotal.mockResolvedValue({})
+    inventoryApi.copyInventoryVersion.mockResolvedValue({ version: 'v20260116120000' })
 
     renderWithContext()
 
@@ -929,24 +890,19 @@ describe('InventoryIntegrationPage', () => {
       expect(screen.getByText('320.00')).toBeInTheDocument()
     })
 
-    const row = screen.getByText('320.00').closest('tr')
-    const editBtn = within(row).getByRole('button', { name: '編輯' })
-    await user.click(editBtn)
+    await user.click(screen.getByRole('button', { name: '版本編輯' }))
+    const inputs = screen.getAllByRole('textbox')
+    await user.tripleClick(inputs[0])
+    await user.keyboard('-50.25')
+
+    await user.click(screen.getByRole('button', { name: '儲存版本' }))
 
     await waitFor(() => {
-      const input = screen.getByRole('textbox')
-      expect(input).toBeInTheDocument()
+      expect(inventoryApi.updateModifiedSubtotal).toHaveBeenCalledWith(1, -50.25)
     })
-
-    const input = screen.getByRole('textbox')
-    await user.tripleClick(input)
-    await user.keyboard('-50.25{Enter}')
-
-    // Negative value may cause save to fail; assert 儲存 button or 儲存失敗 toast
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: '儲存' })).toBeInTheDocument()
+      expect(inventoryApi.copyInventoryVersion).toHaveBeenCalled()
     })
-    expect(screen.getByText('儲存失敗')).toBeInTheDocument()
   })
 
   it('should show current version and product count after query', async () => {
@@ -964,7 +920,7 @@ describe('InventoryIntegrationPage', () => {
     })
   })
 
-  it('should not show version info when data has no version', async () => {
+  it('should show version block with 目前版本 - when data has no version', async () => {
     const user = userEvent.setup()
     const dataWithoutVersion = mockData.map(d => ({ ...d, version: null }))
     inventoryApi.getInventoryIntegration.mockResolvedValue(dataWithoutVersion)
@@ -978,8 +934,10 @@ describe('InventoryIntegrationPage', () => {
       expect(screen.getByText('P001')).toBeInTheDocument()
     })
 
-    // Version info should not be displayed
-    expect(screen.queryByText(/目前版本:/)).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText(/目前版本:/)).toBeInTheDocument()
+      expect(screen.getByText(/筆數: 2/)).toBeInTheDocument()
+    })
   })
 
   it('should handle admin user with roleCode', () => {

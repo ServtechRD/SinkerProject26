@@ -31,6 +31,9 @@ function formatMonth(monthStr) {
 }
 
 function formatVersionOption(v) {
+  // 優先使用後端回傳的台灣時間顯示字串 (created_at_display)
+  const display = v.created_at_display ?? v.createdAtDisplay
+  if (display) return display
   const at = v.created_at ?? v.createdAt
   if (at) {
     try {
@@ -91,6 +94,7 @@ export default function ForecastListPage() {
 
   const [editMode, setEditMode] = useState(false)
   const [editChannelValues, setEditChannelValues] = useState({})
+  const [editRowRemarks, setEditRowRemarks] = useState({})
   const [saving, setSaving] = useState(false)
   const [reasonModal, setReasonModal] = useState(null)
   const [remarkModal, setRemarkModal] = useState(null)
@@ -204,12 +208,18 @@ export default function ForecastListPage() {
       next[rowIdx] = cells.map((c) => String(c.current_qty ?? c.currentQty ?? ''))
     })
     setEditChannelValues(next)
+    const remarks = {}
+    rows.forEach((row, rowIdx) => {
+      remarks[rowIdx] = row.remark ?? ''
+    })
+    setEditRowRemarks(remarks)
     setEditMode(true)
   }
 
   const handleEditCancel = () => {
     setEditMode(false)
     setEditChannelValues({})
+    setEditRowRemarks({})
   }
 
   const setEditCell = (rowIdx, chIdx, value) => {
@@ -231,23 +241,25 @@ export default function ForecastListPage() {
   }
 
   const handleReasonSubmit = async (changeReason) => {
-    setReasonModal(null)
     if (!changeReason || !changeReason.trim()) {
       toast.error('請輸入修改原因')
       return
     }
+    setReasonModal(null)
     setSaving(true)
     try {
       const channelOrderList = channelOrder.length ? channelOrder : (rows[0]?.channel_cells ?? rows[0]?.channelCells ?? []).map((_, i) => `通路${i + 1}`)
-      const payloadRows = sortedRows.map((row, rowIdx) => {
+      const payloadRows = sortedRows.map((row) => {
+        const rowIdxInRows = rows.indexOf(row)
         const cells = row.channel_cells ?? row.channelCells ?? []
-        const quantities = editMode ? (editChannelValues[rowIdx] ?? cells.map((c) => c.current_qty ?? c.currentQty)) : cells.map((c) => c.current_qty ?? c.currentQty)
+        const quantities = editMode ? (editChannelValues[rowIdxInRows] ?? cells.map((c) => c.current_qty ?? c.currentQty)) : cells.map((c) => c.current_qty ?? c.currentQty)
         return {
           warehouse_location: row.warehouse_location ?? row.warehouseLocation,
           category: row.category,
           spec: row.spec,
           product_name: row.product_name ?? row.productName,
           product_code: row.product_code ?? row.productCode,
+          remark: editMode ? (editRowRemarks[rowIdxInRows] ?? row.remark ?? '') : (row.remark ?? ''),
           channel_quantities: (Array.isArray(quantities) ? quantities : []).map((q) => (q != null && q !== '') ? Number(q) : 0),
         }
       })
@@ -259,6 +271,7 @@ export default function ForecastListPage() {
       toast.success('儲存成功')
       setEditMode(false)
       setEditChannelValues({})
+      setEditRowRemarks({})
       setFormVersions((prev) => [...prev, { versionNo: newVersionNo, version_no: newVersionNo, createdAt: new Date().toISOString(), created_at: new Date().toISOString(), changeReason: changeReason.trim(), change_reason: changeReason.trim() }])
       setSelectedVersionNo(newVersionNo)
       await runQuery()
@@ -277,20 +290,21 @@ export default function ForecastListPage() {
     const BOM = '\uFEFF'
     const chOrder = channelOrder.length ? channelOrder : (rows[0]?.channel_cells ?? rows[0]?.channelCells ?? []).map((_, i) => `通路${i + 1}`)
     const headers = ['庫位', '中類名稱', '貨品規格', '品名', '品號', ...chOrder, '原小計', '更改後小計', '差異', '備註']
-    const dataRows = sortedRows.map((row, rowIdx) => {
+    const dataRows = sortedRows.map((row) => {
+      const rowIdxInRows = rows.indexOf(row)
       const cells = row.channel_cells ?? row.channelCells ?? []
       const prevSum = cells.reduce((s, c) => s + num(c.previous_qty ?? c.previousQty), 0)
-      const currVals = editMode && editChannelValues[rowIdx] ? editChannelValues[rowIdx] : cells.map((c) => c.current_qty ?? c.currentQty)
+      const currVals = editMode && editChannelValues[rowIdxInRows] ? editChannelValues[rowIdxInRows] : cells.map((c) => c.current_qty ?? c.currentQty)
       const currSum = currVals.reduce((s, v) => s + num(v), 0)
       const diff = prevSum - currSum
-      const remark = versionRemark ?? '-'
+      const remark = editMode ? (editRowRemarks[rowIdxInRows] ?? row.remark ?? '-') : (row.remark ?? '-')
       return [
         row.warehouse_location ?? row.warehouseLocation ?? '',
         row.category ?? '',
         row.spec ?? '',
         row.product_name ?? row.productName ?? '',
         row.product_code ?? row.productCode ?? '',
-        ...(editMode && editChannelValues[rowIdx] ? editChannelValues[rowIdx] : cells.map((c) => c.current_qty ?? c.currentQty ?? '')),
+        ...(editMode && editChannelValues[rowIdxInRows] ? editChannelValues[rowIdxInRows] : cells.map((c) => c.current_qty ?? c.currentQty ?? '')),
         prevSum,
         currSum,
         diff,
@@ -417,7 +431,7 @@ export default function ForecastListPage() {
                           </button>
                         </>
                       )}
-                      <button type="button" className="btn btn--outline" onClick={handleExportExcel} disabled={!rows.length}>
+                      <button type="button" className="btn btn--outline" onClick={handleExportExcel} disabled={!rows.length || editMode}>
                         Excel 匯出
                       </button>
                     </div>
@@ -425,8 +439,16 @@ export default function ForecastListPage() {
                       <div className="forecast-empty">該月份尚無預估資料</div>
                     ) : (
                       <>
+                        {versionRemark != null && versionRemark !== '' && (
+                          <p className="forecast-version-reason">
+                            本版修改原因：
+                            <button type="button" className="btn btn--small btn--link" onClick={() => setRemarkModal({ text: versionRemark })}>
+                              檢視
+                            </button>
+                          </p>
+                        )}
                         <div className="forecast-table-wrap forecast-table-wrap--summary">
-                          <table className="forecast-table forecast-table--summary">
+                          <table className={`forecast-table forecast-table--summary${editMode ? ' forecast-table--edit' : ''}`}>
                             <thead>
                               <tr>
                                 <th className={sortKey === 'warehouse_location' ? 'sortable sort-active' : 'sortable'} onClick={() => handleSort('warehouse_location')}>
@@ -448,10 +470,11 @@ export default function ForecastListPage() {
                             <tbody>
                               {pageRows.map((row, idx) => {
                                 const globalIdx = sortedRows.indexOf(row)
+                                const rowIdxInRows = rows.indexOf(row)
                                 const cells = row.channel_cells ?? row.channelCells ?? []
                                 const prevSum = cells.reduce((s, c) => s + num(c.previous_qty ?? c.previousQty), 0)
-                                const currSum = editMode && editChannelValues[globalIdx]
-                                  ? editChannelValues[globalIdx].reduce((s, v) => s + num(v), 0)
+                                const currSum = editMode && editChannelValues[rowIdxInRows]
+                                  ? editChannelValues[rowIdxInRows].reduce((s, v) => s + num(v), 0)
                                   : cells.reduce((s, c) => s + num(c.current_qty ?? c.currentQty), 0)
                                 const diff = prevSum - currSum
                                 return (
@@ -467,8 +490,8 @@ export default function ForecastListPage() {
                                           <input
                                             type="text"
                                             className="quantity-input"
-                                            value={getEditValue(globalIdx, i)}
-                                            onChange={(e) => setEditCell(globalIdx, i, e.target.value)}
+                                            value={getEditValue(rowIdxInRows, i)}
+                                            onChange={(e) => setEditCell(rowIdxInRows, i, e.target.value)}
                                           />
                                         ) : (
                                           cell.current_qty ?? cell.currentQty ?? '-'
@@ -479,17 +502,25 @@ export default function ForecastListPage() {
                                     <td className="align-right">{currSum}</td>
                                     <td className="align-right">{diff}</td>
                                     <td className="forecast-remark-cell">
-                                      {versionRemark ? (
+                                      {editMode ? (
+                                        <input
+                                          type="text"
+                                          className="form-select forecast-remark-input"
+                                          value={editRowRemarks[rowIdxInRows] ?? row.remark ?? ''}
+                                          onChange={(e) => setEditRowRemarks((prev) => ({ ...prev, [rowIdxInRows]: e.target.value }))}
+                                          placeholder="列備註"
+                                        />
+                                      ) : (row.remark ? (
                                         <button
                                           type="button"
                                           className="btn btn--small btn--outline forecast-remark-btn"
-                                          onClick={() => setRemarkModal({ text: versionRemark })}
+                                          onClick={() => setRemarkModal({ text: row.remark, title: '列備註' })}
                                         >
                                           備註
                                         </button>
                                       ) : (
                                         '-'
-                                      )}
+                                      ))}
                                     </td>
                                   </tr>
                                 )
@@ -530,10 +561,10 @@ export default function ForecastListPage() {
           )}
 
           {reasonModal?.open && (
-            <div className="forecast-remark-modal-overlay" onClick={() => setReasonModal(null)} role="presentation">
+            <div className="forecast-remark-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="forecast-reason-dialog-title">
               <div className="forecast-remark-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="forecast-remark-modal-header">
-                  <h3>修改原因</h3>
+                  <h3 id="forecast-reason-dialog-title">銷售預估量修改確認</h3>
                   <button type="button" className="forecast-remark-modal-close" onClick={() => setReasonModal(null)} aria-label="關閉">×</button>
                 </div>
                 <ReasonForm onSubmit={handleReasonSubmit} onCancel={() => setReasonModal(null)} />
@@ -545,7 +576,7 @@ export default function ForecastListPage() {
             <div className="forecast-remark-modal-overlay" onClick={() => setRemarkModal(null)} role="presentation">
               <div className="forecast-remark-modal" onClick={(e) => e.stopPropagation()}>
                 <div className="forecast-remark-modal-header">
-                  <h3>本版備註（修改原因）</h3>
+                  <h3>{remarkModal.title ?? '本版修改原因'}</h3>
                   <button type="button" className="forecast-remark-modal-close" onClick={() => setRemarkModal(null)} aria-label="關閉">×</button>
                 </div>
                 <p className="forecast-remark-modal-list" style={{ margin: 16 }}>{remarkModal.text}</p>
@@ -562,7 +593,10 @@ function ReasonForm({ onSubmit, onCancel }) {
   const [value, setValue] = useState('')
   return (
     <div style={{ padding: 16 }}>
+      <label htmlFor="forecast-reason-input" className="forecast-reason-label">請輸入修改原因</label>
+      <p className="forecast-reason-hint">（修改原因將記錄於系統供後續查詢）</p>
       <textarea
+        id="forecast-reason-input"
         className="form-select"
         value={value}
         onChange={(e) => setValue(e.target.value)}

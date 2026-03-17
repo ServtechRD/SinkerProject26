@@ -12,12 +12,22 @@ function hasPermission(user, perm) {
   return Boolean(user?.permissions && Array.isArray(user.permissions) && user.permissions.includes(perm))
 }
 
+/** 將後端時間轉成台灣時間顯示（後端多為 UTC 或無時區） */
 function formatClosedAt(dateStr) {
   if (!dateStr) return '-'
-  const d = new Date(dateStr)
-  if (isNaN(d.getTime())) return dateStr
-  const pad = (n) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+  const utcStr = typeof dateStr === 'string' && !/Z|[+-]\d{2}:?\d{2}$/.test(dateStr) ? dateStr + 'Z' : dateStr
+  const d = new Date(utcStr)
+  if (isNaN(d.getTime())) return String(dateStr)
+  return d.toLocaleString('zh-TW', {
+    timeZone: 'Asia/Taipei',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
 }
 
 export default function ForecastConfigPage() {

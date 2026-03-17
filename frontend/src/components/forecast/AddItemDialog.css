@@ -5,6 +5,42 @@
   overflow-y: auto;
 }
 
+.dialog--add-item .dialog-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.dialog--add-item .dialog-title {
+  margin: 0;
+}
+
+.dialog--add-item .dialog-close-btn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: #64748b;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.dialog--add-item .dialog-close-btn:hover {
+  color: #334155;
+  background: #f1f5f9;
+}
+
+.dialog--add-item .dialog-close-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .add-item-form {
   display: flex;
   flex-direction: column;

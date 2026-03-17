@@ -36,7 +36,6 @@ export default function RoleListPage() {
                 <th>代碼</th>
                 <th>名稱</th>
                 <th>描述</th>
-                <th>系統角色</th>
                 <th>操作</th>
               </tr>
             </thead>
@@ -47,12 +46,8 @@ export default function RoleListPage() {
                   <td>{r.name}</td>
                   <td>{r.description || '—'}</td>
                   <td>
-                    <span className={`badge badge--${r.isSystem ? 'active' : 'inactive'}`}>
-                      {r.isSystem ? '是' : '否'}
-                    </span>
-                  </td>
-                  <td>
                     <button
+                      type="button"
                       className="btn btn--small btn--secondary"
                       onClick={() => navigate(`/roles/${r.id}/edit`)}
                     >

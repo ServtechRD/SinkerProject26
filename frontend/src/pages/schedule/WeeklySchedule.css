@@ -81,16 +81,58 @@
   margin-bottom: 16px;
 }
 
+/* 分頁樣式：對齊「銷售預估量表單上傳」呈現 */
+.forecast-pagination {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.forecast-pagination .filter-field--inline {
+  flex-shrink: 0;
+}
+
+.forecast-pagination .filter-field--inline .form-select,
+.forecast-pagination .filter-field--inline .form-select--sm {
+  width: auto;
+  min-width: 72px;
+}
+
+.forecast-pagination-info {
+  font-size: 0.875rem;
+  color: #64748b;
+}
+
+.forecast-pagination-buttons {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.forecast-pagination-page {
+  font-size: 0.875rem;
+  color: #475569;
+}
+
 .schedule-pagination-top,
 .schedule-pagination-bottom {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
 }
 
 .schedule-pagination-top {
-  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.schedule-pagination-bottom {
+  margin-bottom: 0;
 }
 
 .schedule-page-size {

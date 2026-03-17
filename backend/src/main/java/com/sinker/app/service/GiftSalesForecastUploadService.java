@@ -19,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -86,14 +87,16 @@ public class GiftSalesForecastUploadService {
             throw new ExcelParseException(isCsv ? "CSV file has no data rows" : "Excel file has no data rows");
         }
 
-        List<String> erpErrors = new ArrayList<>();
+        Set<String> invalidProductCodes = new LinkedHashSet<>();
         for (SalesForecastRow row : rows) {
             if (!erpProductService.validateProduct(row.getProductCode())) {
-                erpErrors.add("Row " + row.getRowNumber() + ": Product " + row.getProductCode() + " not found in ERP");
+                invalidProductCodes.add(row.getProductCode());
             }
         }
-        if (!erpErrors.isEmpty()) {
-            throw new ExcelParseException(erpErrors);
+        if (!invalidProductCodes.isEmpty()) {
+            String codeList = String.join("、", invalidProductCodes);
+            throw new ExcelParseException(List.of(
+                    "以下品號不存在於系統中，無法上傳：" + codeList));
         }
 
         LocalDateTime now = LocalDateTime.now();

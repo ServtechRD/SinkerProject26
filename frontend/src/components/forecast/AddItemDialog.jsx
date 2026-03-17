@@ -66,15 +66,15 @@ export default function AddItemDialog({ open, month, channel, onClose, onSuccess
 
   const validateForm = () => {
     const newErrors = {}
-    if (!formData.productCode.trim()) {
-      newErrors.productCode = '品號為必填'
-    }
-    if (!formData.productName.trim()) {
-      newErrors.productName = '請由品號選擇以帶出品名'
-    }
-    const qty = Number(formData.quantity)
-    if (isNaN(qty) || qty < 0) {
-      newErrors.quantity = '箱數小計不可為負數'
+    const codeTrim = formData.productCode.trim()
+    const nameTrim = formData.productName.trim()
+    if (!codeTrim || !nameTrim) {
+      newErrors.general = '未正確選到品號，無法新增'
+    } else {
+      const qty = Number(formData.quantity)
+      if (isNaN(qty) || qty < 0) {
+        newErrors.quantity = '箱數小計不可為負數'
+      }
     }
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -139,17 +139,27 @@ export default function AddItemDialog({ open, month, channel, onClose, onSuccess
   if (!open) return null
 
   return (
-    <div className="dialog-overlay" onClick={onClose}>
+    <div className="dialog-overlay">
       <div
         className="dialog dialog--add-item"
         role="dialog"
         aria-modal="true"
         aria-labelledby="add-item-title"
-        onClick={(e) => e.stopPropagation()}
       >
-        <h3 id="add-item-title" className="dialog-title">
-          新增項目
-        </h3>
+        <div className="dialog-title-row">
+          <h3 id="add-item-title" className="dialog-title">
+            新增項目
+          </h3>
+          <button
+            type="button"
+            className="dialog-close-btn"
+            onClick={onClose}
+            disabled={submitting}
+            aria-label="關閉"
+          >
+            ×
+          </button>
+        </div>
 
         <form onSubmit={handleSubmit} className="add-item-form">
           {errors.general && (

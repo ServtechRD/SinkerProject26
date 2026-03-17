@@ -67,6 +67,21 @@
   justify-content: flex-end;
 }
 
+.filter-field--date-range .inventory-date-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-field--date-range .inventory-date-range .form-input {
+  min-width: 0;
+}
+
+.inventory-date-range-sep {
+  color: #6b7280;
+  font-size: 14px;
+}
+
 .filter-field label {
   font-size: 14px;
   font-weight: 500;
@@ -108,6 +123,14 @@
   margin-bottom: 16px;
   font-size: 14px;
   color: #374151;
+}
+
+.inventory-info-row {
+  line-height: 1.6;
+}
+
+.inventory-info-row + .inventory-info-row {
+  margin-top: 4px;
 }
 
 .inventory-loading {
@@ -216,6 +239,14 @@
 
 .editable-cell:hover .edit-icon {
   display: inline;
+}
+
+.inventory-modified-input {
+  width: 100%;
+  min-width: 5rem;
+  max-width: 8rem;
+  text-align: right;
+  padding: 4px 8px;
 }
 
 .edit-cell-wrapper {

@@ -178,6 +178,12 @@
   text-align: right;
 }
 
+/* 上下欄跨欄表頭：垂直與水平置中（庫位、中類名稱、貨品規格、品名、品號、原始預估、差異、備註） */
+.production-grid th.production-form-th-span {
+  vertical-align: middle;
+  text-align: center;
+}
+
 .editable-cell {
   cursor: pointer;
   min-width: 5rem;

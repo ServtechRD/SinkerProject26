@@ -394,41 +394,6 @@ export default function WeeklySchedulePage() {
                   Excel 匯出
                 </button>
               </div>
-              <div className="schedule-pagination-top">
-                <select
-                  className="form-select schedule-page-size"
-                  value={resultPageSize}
-                  onChange={(e) => {
-                    setResultPageSize(Number(e.target.value))
-                    setResultPage(1)
-                  }}
-                >
-                  {RESULT_PAGE_SIZE_OPTIONS.map((n) => (
-                    <option key={n} value={n}>
-                      {n} 筆/頁
-                    </option>
-                  ))}
-                </select>
-                <span className="schedule-pagination-info">
-                  第 {resultPage} / {totalPages} 頁，共 {scheduleData.length} 筆
-                </span>
-                <button
-                  type="button"
-                  className="btn btn--outline btn-sm"
-                  disabled={resultPage <= 1}
-                  onClick={() => setResultPage((p) => p - 1)}
-                >
-                  上一頁
-                </button>
-                <button
-                  type="button"
-                  className="btn btn--outline btn-sm"
-                  disabled={resultPage >= totalPages}
-                  onClick={() => setResultPage((p) => p + 1)}
-                >
-                  下一頁
-                </button>
-              </div>
               <div className="schedule-table-wrapper">
                 <table className="schedule-table">
                   <thead>
@@ -466,29 +431,47 @@ export default function WeeklySchedulePage() {
                   </tbody>
                 </table>
               </div>
-              {totalPages > 1 && (
-                <div className="schedule-pagination-bottom">
+              <div className="forecast-pagination">
+                <div className="filter-field filter-field--inline">
+                  <select
+                    className="form-select form-select--sm"
+                    value={resultPageSize}
+                    aria-label="每頁筆數"
+                    onChange={(e) => {
+                      setResultPageSize(Number(e.target.value))
+                      setResultPage(1)
+                    }}
+                  >
+                    {RESULT_PAGE_SIZE_OPTIONS.map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </div>
+                <span className="forecast-pagination-info">
+                  第 {(resultPage - 1) * resultPageSize + 1}–{Math.min(resultPage * resultPageSize, scheduleData.length)} 筆，共 {scheduleData.length} 筆
+                </span>
+                <div className="forecast-pagination-buttons">
                   <button
                     type="button"
-                    className="btn btn--outline btn-sm"
+                    className="btn btn--small btn--outline"
                     disabled={resultPage <= 1}
-                    onClick={() => setResultPage((p) => p - 1)}
+                    onClick={() => setResultPage((p) => Math.max(1, p - 1))}
                   >
                     上一頁
                   </button>
-                  <span>
+                  <span className="forecast-pagination-page">
                     第 {resultPage} / {totalPages} 頁
                   </span>
                   <button
                     type="button"
-                    className="btn btn--outline btn-sm"
+                    className="btn btn--small btn--outline"
                     disabled={resultPage >= totalPages}
-                    onClick={() => setResultPage((p) => p + 1)}
+                    onClick={() => setResultPage((p) => Math.min(totalPages, p + 1))}
                   >
                     下一頁
                   </button>
                 </div>
-              )}
+              </div>
             </>
           ) : (
             <p className="schedule-no-data">查無資料</p>

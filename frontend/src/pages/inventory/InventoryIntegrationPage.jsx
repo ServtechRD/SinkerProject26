@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
   getInventoryIntegration,
   getInventoryVersions,
@@ -74,17 +74,16 @@ export default function InventoryIntegrationPage() {
 
   const [integrationData, setIntegrationData] = useState([])
   const [currentVersion, setCurrentVersion] = useState('')
+  const [queryTime, setQueryTime] = useState(null)
   const [loadingData, setLoadingData] = useState(false)
   const [accessDenied, setAccessDenied] = useState(false)
   const [copyingVersion, setCopyingVersion] = useState(false)
+  const [versionEditMode, setVersionEditMode] = useState(false)
+  const [editModifiedSubtotals, setEditModifiedSubtotals] = useState({})
 
-  const [editingRowId, setEditingRowId] = useState(null)
-  const [editValue, setEditValue] = useState('')
-  const [editError, setEditError] = useState('')
   const [saving, setSaving] = useState(false)
 
   const [sortConfig, setSortConfig] = useState({ key: 'productCode', direction: 'asc' })
-  const inputRef = useRef(null)
 
   const canView = hasPermission(user, 'inventory.view')
   const canEdit = hasPermission(user, 'inventory.edit')
@@ -124,6 +123,7 @@ export default function InventoryIntegrationPage() {
           ? await getInventoryIntegration(null, null, null, selectedVersion)
           : await getInventoryIntegration(month, startDate || null, endDate || null, null)
       setIntegrationData(Array.isArray(data) ? data : [])
+      setQueryTime(new Date())
 
       if (data.length > 0 && data[0].version) {
         setCurrentVersion(data[0].version)
@@ -140,32 +140,77 @@ export default function InventoryIntegrationPage() {
       }
       setIntegrationData([])
       setCurrentVersion('')
+      setQueryTime(null)
     } finally {
       setLoadingData(false)
     }
   }, [month, startDate, endDate, queryMode, selectedVersion, toast])
 
-  const handleCopyVersion = useCallback(async () => {
+  const handleEnterVersionEdit = useCallback(() => {
     if (!currentVersion) {
       toast.error('請先查詢並取得目前版本')
       return
     }
+    const initial = {}
+    integrationData.forEach((row) => {
+      const val = row.modifiedSubtotal ?? row.modified_subtotal
+      initial[row.id] = val != null && val !== '' ? String(val) : ''
+    })
+    setEditModifiedSubtotals(initial)
+    setVersionEditMode(true)
+  }, [currentVersion, integrationData, toast])
+
+  const handleCancelVersionEdit = useCallback(() => {
+    setVersionEditMode(false)
+    setEditModifiedSubtotals({})
+  }, [])
+
+  const handleSaveVersion = useCallback(async () => {
+    if (!currentVersion) return
+    const errors = []
+    const updates = []
+    integrationData.forEach((row) => {
+      const raw = editModifiedSubtotals[row.id]
+      const strVal = raw != null ? String(raw).trim() : ''
+      if (strVal !== '') {
+        const v = validateDecimal(strVal)
+        if (!v.valid) errors.push(`品號 ${row.productCode ?? row.product_code}：${v.error}`)
+      }
+      const newVal = strVal === '' ? null : parseFloat(strVal)
+      const origVal = row.modifiedSubtotal ?? row.modified_subtotal
+      const origNum = origVal != null ? Number(origVal) : null
+      const changed = (origNum !== newVal) || (origNum == null && newVal != null) || (origNum != null && newVal == null)
+      if (changed) updates.push({ rowId: row.id, newVal })
+    })
+    if (errors.length > 0) {
+      toast.error(errors[0])
+      return
+    }
+    setSaving(true)
     setCopyingVersion(true)
     try {
+      for (const { rowId, newVal } of updates) {
+        await updateModifiedSubtotal(rowId, newVal)
+      }
       const res = await copyInventoryVersion(currentVersion)
       const newVer = res?.version
       toast.success('已建立新版次：' + newVer)
       setSelectedVersion(newVer)
       setQueryMode(QUERY_MODE_VERSION)
       setVersionList((prev) => (newVer ? [newVer, ...prev.filter((v) => v !== newVer)] : prev))
-      await getInventoryIntegration(null, null, null, newVer).then(setIntegrationData)
+      const data = await getInventoryIntegration(null, null, null, newVer)
+      setIntegrationData(Array.isArray(data) ? data : [])
       setCurrentVersion(newVer)
+      setQueryTime(new Date())
+      setVersionEditMode(false)
+      setEditModifiedSubtotals({})
     } catch (err) {
-      toast.error(err.response?.data?.message || '建立新版次失敗')
+      toast.error(err.response?.data?.message || '儲存版本失敗')
     } finally {
+      setSaving(false)
       setCopyingVersion(false)
     }
-  }, [currentVersion, toast])
+  }, [currentVersion, integrationData, editModifiedSubtotals, toast])
 
   const validateDecimal = (value) => {
     if (value === '' || value == null) return { valid: true, error: '' }
@@ -176,49 +221,6 @@ export default function InventoryIntegrationPage() {
     const num = parseFloat(value)
     if (isNaN(num)) return { valid: false, error: '請輸入有效數字' }
     return { valid: true, error: '' }
-  }
-
-  const startEdit = (row) => {
-    if (!canEdit) return
-    setEditingRowId(row.id)
-    setEditValue(
-      row.modifiedSubtotal != null && row.modifiedSubtotal !== '' ? String(row.modifiedSubtotal) : ''
-    )
-    setEditError('')
-    setTimeout(() => inputRef.current?.focus(), 0)
-  }
-
-  const cancelEdit = () => {
-    setEditingRowId(null)
-    setEditValue('')
-    setEditError('')
-  }
-
-  const saveEdit = async (rowId) => {
-    const validation = validateDecimal(editValue)
-    if (!validation.valid) {
-      setEditError(validation.error)
-      return
-    }
-    const newVal = editValue === '' ? null : parseFloat(editValue)
-    setSaving(true)
-    try {
-      const updated = await updateModifiedSubtotal(rowId, newVal)
-      const savedVal = updated?.modified_subtotal ?? updated?.modifiedSubtotal
-      setIntegrationData((prev) =>
-        prev.map((r) =>
-          r.id === rowId
-            ? { ...r, modifiedSubtotal: savedVal, modified_subtotal: savedVal }
-            : r
-        )
-      )
-      toast.success('已儲存')
-      cancelEdit()
-    } catch (err) {
-      toast.error(err.response?.data?.message || '儲存失敗')
-    } finally {
-      setSaving(false)
-    }
   }
 
   const handleSort = (key) => {
@@ -263,7 +265,7 @@ export default function InventoryIntegrationPage() {
               checked={queryMode === QUERY_MODE_DATE}
               onChange={() => setQueryMode(QUERY_MODE_DATE)}
             />
-            查詢月份、結存查詢起始日期、結存查詢結束日期
+            查詢月份、結存查詢起訖日期
           </label>
           <label className="inventory-radio-label">
             <input
@@ -289,25 +291,27 @@ export default function InventoryIntegrationPage() {
                   onChange={(e) => setMonth(e.target.value)}
                 />
               </div>
-              <div className="filter-field">
-                <label htmlFor="start-date-input">結存查詢起始日期</label>
-                <input
-                  id="start-date-input"
-                  type="date"
-                  className="form-input"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                />
-              </div>
-              <div className="filter-field">
-                <label htmlFor="end-date-input">結存查詢結束日期</label>
-                <input
-                  id="end-date-input"
-                  type="date"
-                  className="form-input"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                />
+              <div className="filter-field filter-field--date-range">
+                <label htmlFor="start-date-input">結存查詢起訖日期</label>
+                <span className="inventory-date-range">
+                  <input
+                    id="start-date-input"
+                    type="date"
+                    className="form-input"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    aria-label="結存查詢起始日"
+                  />
+                  <span className="inventory-date-range-sep">～</span>
+                  <input
+                    id="end-date-input"
+                    type="date"
+                    className="form-input"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    aria-label="結存查詢結束日"
+                  />
+                </span>
               </div>
             </>
           )}
@@ -346,23 +350,48 @@ export default function InventoryIntegrationPage() {
         </div>
       </div>
 
-      {currentVersion && (
+      {queryTime != null && (
         <div className="inventory-info">
-          目前版本: {currentVersion} | 筆數: {integrationData.length}
+          <div className="inventory-info-row">目前版本: {currentVersion || '-'}</div>
+          <div className="inventory-info-row">
+            查詢時間: {`${queryTime.getFullYear()}-${String(queryTime.getMonth() + 1).padStart(2, '0')}-${String(queryTime.getDate()).padStart(2, '0')} ${String(queryTime.getHours()).padStart(2, '0')}:${String(queryTime.getMinutes()).padStart(2, '0')}:${String(queryTime.getSeconds()).padStart(2, '0')}`}
+            {'　'}
+            筆數: {integrationData.length}
+          </div>
         </div>
       )}
 
       {integrationData.length > 0 && (
         <div className="inventory-result-toolbar">
-          {canEdit && (
+          {canEdit && !versionEditMode && (
             <button
               type="button"
               className="btn btn--outline"
-              onClick={handleCopyVersion}
+              onClick={handleEnterVersionEdit}
               disabled={copyingVersion}
             >
-              {copyingVersion ? '建立中...' : '版本編輯'}
+              版本編輯
             </button>
+          )}
+          {canEdit && versionEditMode && (
+            <>
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={handleSaveVersion}
+                disabled={saving || copyingVersion}
+              >
+                {saving || copyingVersion ? '儲存中...' : '儲存版本'}
+              </button>
+              <button
+                type="button"
+                className="btn btn--outline"
+                onClick={handleCancelVersionEdit}
+                disabled={saving || copyingVersion}
+              >
+                取消
+              </button>
+            </>
           )}
         </div>
       )}
@@ -412,12 +441,16 @@ export default function InventoryIntegrationPage() {
                 <th className="align-right sortable" onClick={() => handleSort('modifiedSubtotal')}>
                   修改後小計 {sortConfig.key === 'modifiedSubtotal' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
                 </th>
-                <th>編輯</th>
               </tr>
             </thead>
             <tbody>
               {sortedData.map((row) => {
-                const isEditing = editingRowId === row.id
+                const subtotalDisplay = row.modifiedSubtotal ?? row.modified_subtotal
+                const editVal = versionEditMode
+                  ? (editModifiedSubtotals[row.id] != null
+                    ? editModifiedSubtotals[row.id]
+                    : (subtotalDisplay != null && subtotalDisplay !== '' ? String(subtotalDisplay) : ''))
+                  : null
                 return (
                   <tr key={row.id}>
                     <td>{row.warehouseLocation ?? row.warehouse_location ?? '-'}</td>
@@ -432,55 +465,18 @@ export default function InventoryIntegrationPage() {
                       {formatNumber(row.productionSubtotal ?? row.production_subtotal)}
                     </td>
                     <td className="align-right">
-                      {isEditing ? (
-                        <div className="edit-cell-wrapper">
-                          <input
-                            ref={inputRef}
-                            type="text"
-                            className={`edit-input ${editError ? 'edit-input--error' : ''}`}
-                            value={editValue}
-                            onChange={(e) => {
-                              setEditValue(e.target.value)
-                              setEditError(validateDecimal(e.target.value).error)
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') saveEdit(row.id)
-                              if (e.key === 'Escape') cancelEdit()
-                            }}
-                          />
-                          {editError && <div className="edit-error">{editError}</div>}
-                          <div className="edit-actions">
-                            <button
-                              type="button"
-                              className="btn btn--small btn--outline"
-                              onClick={cancelEdit}
-                              disabled={saving}
-                            >
-                              取消
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn--small btn--primary"
-                              onClick={() => saveEdit(row.id)}
-                              disabled={saving}
-                            >
-                              {saving ? '儲存中...' : '儲存'}
-                            </button>
-                          </div>
-                        </div>
+                      {versionEditMode ? (
+                        <input
+                          type="text"
+                          className="form-input inventory-modified-input"
+                          value={editVal}
+                          onChange={(e) =>
+                            setEditModifiedSubtotals((prev) => ({ ...prev, [row.id]: e.target.value }))
+                          }
+                          placeholder="修改後小計"
+                        />
                       ) : (
-                        formatNumber(row.modifiedSubtotal ?? row.modified_subtotal)
-                      )}
-                    </td>
-                    <td>
-                      {!isEditing && canEdit && (
-                        <button
-                          type="button"
-                          className="btn btn--small btn--outline"
-                          onClick={() => startEdit(row)}
-                        >
-                          編輯
-                        </button>
+                        formatNumber(subtotalDisplay)
                       )}
                     </td>
                   </tr>

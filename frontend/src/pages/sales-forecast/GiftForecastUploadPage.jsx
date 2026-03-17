@@ -162,7 +162,7 @@ export default function GiftForecastUploadPage() {
 
   const canUploadSection = isOwnerOfChannel && selectedMonth && selectedChannel && isMonthOpen
   const canEditResult = (isOwnerOfChannel && isMonthOpen && canEdit) || (editingNewVersion && canEdit)
-  const canAddResult = (isOwnerOfChannel && isMonthOpen && canCreate) || (editingNewVersion && canCreate)
+  const canAddResult = isOwnerOfChannel && ((isMonthOpen && canCreate) || (editingNewVersion && canCreate))
 
   const selectedVersionIndex = versions.indexOf(selectedVersion)
   const hasPreviousVersion = canUpdateAfterClosed && selectedVersion && selectedVersionIndex >= 0 && selectedVersionIndex < versions.length - 1
@@ -297,6 +297,10 @@ export default function GiftForecastUploadPage() {
 
   const handleUpload = async () => {
     if (!selectedMonth || !selectedChannel || !selectedFile) return
+    if (!isOwnerOfChannel) {
+      toast.error('非負責的通路')
+      return
+    }
     setUploading(true)
     try {
       const response = await uploadGiftForecast(selectedFile, selectedMonth, selectedChannel)
@@ -361,7 +365,8 @@ export default function GiftForecastUploadPage() {
     if (createdItem?.id != null) {
       setLastAddedIds((prev) => new Set([...prev, createdItem.id]))
     }
-    await fetchResultList()
+    // 查詢為空時 selectedVersion 可能為 ''，fetchResultList 會直接 return；改跑 runQuery 重新取版本並載入列表
+    await runQuery()
   }
 
   const handleExportExcel = () => {
@@ -463,7 +468,7 @@ export default function GiftForecastUploadPage() {
 
   return (
     <div className="forecast-upload-page">
-      <h1>禮品銷售預估量表單</h1>
+      <h1>禮品銷售預估量表單上傳</h1>
 
       {loading ? (
         <div className="forecast-loading" role="status">載入中...</div>
@@ -474,7 +479,7 @@ export default function GiftForecastUploadPage() {
             <h2 className="upload-block-title">查詢</h2>
             <div className="upload-block-filters">
               <div className="filter-field">
-                <label htmlFor="query-month">月份</label>
+                <label htmlFor="query-month">*銷售預估量月份</label>
                 <select
                   id="query-month"
                   className="form-select"
@@ -494,7 +499,7 @@ export default function GiftForecastUploadPage() {
                 </select>
               </div>
               <div className="filter-field">
-                <label htmlFor="query-channel">通路</label>
+                <label htmlFor="query-channel">*銷售預估量通路</label>
                 <select
                   id="query-channel"
                   className="form-select"
@@ -530,7 +535,7 @@ export default function GiftForecastUploadPage() {
           <section className="upload-block upload-block--upload">
             <h2 className="upload-block-title">禮品銷售預估量表單上傳</h2>
             <div className="upload-block-current">
-              目前選擇的月份：{selectedMonth ? formatMonth(selectedMonth) : '—'}　通路：{selectedChannel || '—'}
+              銷售預估量月份：{selectedMonth ? formatMonth(selectedMonth) : '—'}　銷售預估量通路：{selectedChannel || '—'}
             </div>
             <div className="upload-form">
               <div className="upload-form-field">
@@ -598,47 +603,6 @@ export default function GiftForecastUploadPage() {
                   <div className="forecast-loading" role="status">載入中...</div>
                 ) : (
                   <>
-                    <div className="upload-result-toolbar">
-                      {forecastData.length > 0 && (
-                        <div className="filter-field filter-field--inline">
-                          <label htmlFor="result-page-size">每頁筆數</label>
-                          <select
-                            id="result-page-size"
-                            className="form-select form-select--sm"
-                            value={resultPageSize}
-                            onChange={(e) => {
-                              const val = Number(e.target.value)
-                              setResultPageSize(val)
-                              setResultPage(1)
-                            }}
-                          >
-                            {RESULT_PAGE_SIZE_OPTIONS.map((n) => (
-                              <option key={n} value={n}>{n}</option>
-                            ))}
-                          </select>
-                        </div>
-                      )}
-                      <div className="upload-result-actions">
-                        {/* 此頁隱藏「和前版差異」等需 update_after_closed 之功能 */}
-                        {canAddResult && (
-                          <button
-                            type="button"
-                            className="btn btn--primary btn--small"
-                            onClick={() => setShowAddDialog(true)}
-                          >
-                            新增項目
-                          </button>
-                        )}
-                        <button
-                          type="button"
-                          className="btn btn--outline btn--small"
-                          onClick={handleExportExcel}
-                          disabled={forecastData.length === 0}
-                        >
-                          匯出 Excel (CSV)
-                        </button>
-                      </div>
-                    </div>
                     {!isMonthOpen && selectedMonth && (
                       <div className="forecast-banner forecast-banner--readonly" role="alert">
                         該月份已結束新增設定，僅可檢視不可編輯與新增。
@@ -650,9 +614,42 @@ export default function GiftForecastUploadPage() {
                       </div>
                     )}
                     {forecastData.length === 0 ? (
-                      <div className="forecast-empty">尚無上傳資料</div>
+                      <>
+                        {canAddResult && (
+                          <div className="forecast-table-toolbar">
+                            <button
+                              type="button"
+                              className="btn btn--primary btn--small"
+                              onClick={() => setShowAddDialog(true)}
+                            >
+                              新增項目
+                            </button>
+                          </div>
+                        )}
+                        <div className="forecast-empty">尚無上傳資料</div>
+                      </>
                     ) : (
                       <>
+                        <div className="forecast-table-toolbar">
+                          {canAddResult && (
+                            <button
+                              type="button"
+                              className="btn btn--primary btn--small"
+                              onClick={() => setShowAddDialog(true)}
+                            >
+                              新增項目
+                            </button>
+                          )}
+                          <div className="forecast-table-toolbar-right">
+                            <button
+                              type="button"
+                              className="btn btn--outline btn--small"
+                              onClick={handleExportExcel}
+                            >
+                              匯出 Excel (CSV)
+                            </button>
+                          </div>
+                        </div>
                         <div className="forecast-table-wrap">
                           <table className="forecast-table">
                             <thead>
@@ -739,34 +736,49 @@ export default function GiftForecastUploadPage() {
                             </tbody>
                           </table>
                         </div>
-                        {forecastData.length > resultPageSize && (
-                          <div className="forecast-pagination">
-                            <span className="forecast-pagination-info">
-                              第 {resultStart + 1}–{Math.min(resultStart + resultPageSize, forecastData.length)} 筆，共 {forecastData.length} 筆
-                            </span>
-                            <div className="forecast-pagination-buttons">
-                              <button
-                                type="button"
-                                className="btn btn--small btn--outline"
-                                disabled={resultPage <= 1}
-                                onClick={() => setResultPage((p) => Math.max(1, p - 1))}
-                              >
-                                上一頁
-                              </button>
-                              <span className="forecast-pagination-page">
-                                第 {resultPage} / {resultTotalPages} 頁
-                              </span>
-                              <button
-                                type="button"
-                                className="btn btn--small btn--outline"
-                                disabled={resultPage >= resultTotalPages}
-                                onClick={() => setResultPage((p) => Math.min(resultTotalPages, p + 1))}
-                              >
-                                下一頁
-                              </button>
-                            </div>
+                        <div className="forecast-pagination">
+                          <div className="filter-field filter-field--inline">
+                            <select
+                              id="result-page-size"
+                              className="form-select form-select--sm"
+                              value={resultPageSize}
+                              aria-label="每頁筆數"
+                              onChange={(e) => {
+                                const val = Number(e.target.value)
+                                setResultPageSize(val)
+                                setResultPage(1)
+                              }}
+                            >
+                              {RESULT_PAGE_SIZE_OPTIONS.map((n) => (
+                                <option key={n} value={n}>{n}</option>
+                              ))}
+                            </select>
                           </div>
-                        )}
+                          <span className="forecast-pagination-info">
+                            第 {resultStart + 1}–{Math.min(resultStart + resultPageSize, forecastData.length)} 筆，共 {forecastData.length} 筆
+                          </span>
+                          <div className="forecast-pagination-buttons">
+                            <button
+                              type="button"
+                              className="btn btn--small btn--outline"
+                              disabled={resultPage <= 1}
+                              onClick={() => setResultPage((p) => Math.max(1, p - 1))}
+                            >
+                              上一頁
+                            </button>
+                            <span className="forecast-pagination-page">
+                              第 {resultPage} / {resultTotalPages} 頁
+                            </span>
+                            <button
+                              type="button"
+                              className="btn btn--small btn--outline"
+                              disabled={resultPage >= resultTotalPages}
+                              onClick={() => setResultPage((p) => Math.min(resultTotalPages, p + 1))}
+                            >
+                              下一頁
+                            </button>
+                          </div>
+                        </div>
                       </>
                     )}
                   </>

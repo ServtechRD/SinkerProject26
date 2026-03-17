@@ -1,25 +1,38 @@
 package com.sinker.app.service;
 
+import com.sinker.app.repository.ProductRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 /**
- * Stub implementation of ERP product validation.
- * Always returns true until real ERP integration is implemented.
+ * Validates product codes against the system product master (product table).
+ * Used by sales forecast and gift forecast upload to ensure 品號 exists before upload.
  */
 @Service
 public class ErpProductService {
 
     private static final Logger log = LoggerFactory.getLogger(ErpProductService.class);
 
+    private final ProductRepository productRepository;
+
+    public ErpProductService(ProductRepository productRepository) {
+        this.productRepository = productRepository;
+    }
+
     /**
-     * Validates that a product code exists in the ERP system.
-     * Currently a stub that always returns true.
-     * TODO: Replace with real ERP API call.
+     * Validates that a product code exists in the system (product table).
+     * Returns false if code is null, blank, or not found.
      */
     public boolean validateProduct(String productCode) {
-        log.debug("ERP stub: validating product code '{}'", productCode);
-        return true;
+        if (!StringUtils.hasText(productCode)) {
+            return false;
+        }
+        boolean exists = productRepository.findByCode(productCode.trim()).isPresent();
+        if (!exists) {
+            log.debug("Product code not found in system: '{}'", productCode);
+        }
+        return exists;
     }
 }

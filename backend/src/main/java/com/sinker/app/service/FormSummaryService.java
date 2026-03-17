@@ -17,6 +17,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -71,11 +74,19 @@ public class FormSummaryService {
         ensureFormVersion1Exists(month, configOpt.get());
         List<SalesForecastFormVersion> list = formVersionRepository.findByMonthOrderByVersionNoDesc(month);
         List<FormVersionListItemDTO> result = new ArrayList<>();
+        DateTimeFormatter displayFmt = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+        ZoneId utc = ZoneId.of("UTC");
+        ZoneId taipei = ZoneId.of("Asia/Taipei");
         for (SalesForecastFormVersion v : list) {
             FormVersionListItemDTO dto = new FormVersionListItemDTO();
             dto.setVersionNo(v.getVersionNo());
             dto.setCreatedAt(v.getCreatedAt());
             dto.setChangeReason(v.getChangeReason());
+            if (v.getCreatedAt() != null) {
+                ZonedDateTime atUtc = v.getCreatedAt().atZone(utc);
+                String display = atUtc.withZoneSameInstant(taipei).toLocalDateTime().format(displayFmt);
+                dto.setCreatedAtDisplay(display);
+            }
             result.add(dto);
         }
         return result;
@@ -177,7 +188,13 @@ public class FormSummaryService {
         SalesForecastFormVersion v1 = new SalesForecastFormVersion();
         v1.setMonth(month);
         v1.setVersionNo(1);
-        v1.setCreatedAt(config.getClosedAt() != null ? config.getClosedAt() : LocalDateTime.now());
+        if (config.getClosedAt() != null) {
+            v1.setCreatedAt(config.getClosedAt());
+        } else {
+            LocalDateTime taipeiNow = LocalDateTime.now(ZoneId.of("Asia/Taipei"));
+            LocalDateTime utcToStore = taipeiNow.atZone(ZoneId.of("Asia/Taipei")).toInstant().atZone(ZoneId.of("UTC")).toLocalDateTime();
+            v1.setCreatedAt(utcToStore);
+        }
         v1.setChangeReason(null);
         formVersionRepository.save(v1);
         for (String channel : CHANNEL_ORDER) {
@@ -233,6 +250,7 @@ public class FormSummaryService {
                 sf.setProductName(row.getProductName());
                 sf.setProductCode(row.getProductCode() != null ? row.getProductCode() : "");
                 sf.setQuantity(qty);
+                sf.setRemark(row.getRemark() != null ? row.getRemark() : "");
                 sf.setIsModified(true);
                 sf.setCreatedAt(now);
                 sf.setUpdatedAt(now);
@@ -345,6 +363,7 @@ public class FormSummaryService {
         dto.setSpec(r.getSpec());
         dto.setProductName(r.getProductName());
         dto.setProductCode(r.getProductCode());
+        dto.setRemark(r.getRemark());
         return dto;
     }
 

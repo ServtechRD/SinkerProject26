@@ -1,6 +1,7 @@
 package com.sinker.app.service;
 
 import com.sinker.app.dto.forecast.UploadResponse;
+import com.sinker.app.dto.reference.ProductDTO;
 import com.sinker.app.entity.SalesForecastConfig;
 import com.sinker.app.exception.ExcelParseException;
 import com.sinker.app.exception.ResourceNotFoundException;
@@ -13,6 +14,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.access.AccessDeniedException;
@@ -26,6 +29,7 @@ import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class SalesForecastUploadServiceTest {
 
     @Mock private SalesForecastRepository forecastRepository;
@@ -46,6 +50,16 @@ class SalesForecastUploadServiceTest {
     void setUp() {
         service = new SalesForecastUploadService(forecastRepository, configRepository,
                 excelParserService, erpProductService, jdbcTemplate);
+        when(erpProductService.findProduct(anyString())).thenAnswer(inv -> {
+            String code = inv.getArgument(0);
+            ProductDTO dto = new ProductDTO();
+            dto.setCode(code);
+            dto.setName("商品");
+            dto.setCategoryName("飲料類");
+            dto.setSpec("600ml*24入");
+            dto.setWarehouseLocation("A01");
+            return Optional.of(dto);
+        });
     }
 
     private MockMultipartFile dummyFile() {

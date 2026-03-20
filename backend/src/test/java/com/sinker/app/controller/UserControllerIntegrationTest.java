@@ -251,7 +251,7 @@ class UserControllerIntegrationTest {
         request.setEmail("testuser_salesch@sinker.local");
         request.setPassword("password123");
         request.setRoleId(salesRoleId);
-        request.setChannels(List.of("PX/大全聯", "家樂福"));
+        request.setChannels(List.of("PX + 大全聯", "家樂福"));
 
         mockMvc.perform(post("/api/users")
                         .header("Authorization", "Bearer " + adminToken)

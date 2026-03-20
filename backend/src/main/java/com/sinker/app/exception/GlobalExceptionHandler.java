@@ -32,6 +32,14 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.BAD_REQUEST, "Bad Request", message, request.getRequestURI());
     }
 
+    @ExceptionHandler(ExternalApiException.class)
+    public ResponseEntity<Map<String, Object>> handleExternalApi(
+            ExternalApiException ex, HttpServletRequest request) {
+        log.warn("External API error: {}", ex.getMessage());
+        return buildErrorResponse(HttpStatus.BAD_GATEWAY, "Bad Gateway",
+                ex.getMessage(), request.getRequestURI());
+    }
+
     private ResponseEntity<Map<String, Object>> buildErrorResponse(
             HttpStatus status, String error, String message, String path) {
         return ResponseEntity.status(status).body(Map.of(

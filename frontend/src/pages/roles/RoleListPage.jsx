@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { listRoles } from '../../api/roles'
+import { listRoles, deleteRole } from '../../api/roles'
 import './RolePages.css'
 
 export default function RoleListPage() {
@@ -10,16 +10,48 @@ export default function RoleListPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    listRoles()
-      .then(setRoles)
-      .catch(() => setError('無法載入角色列表'))
-      .finally(() => setLoading(false))
+    loadRoles()
   }, [])
+
+  async function loadRoles() {
+    setError('')
+    setLoading(true)
+    try {
+      const data = await listRoles()
+      setRoles(data)
+    } catch (err) {
+      setError('無法載入角色列表')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function handleDeleteRole(r) {
+    const ok = window.confirm(`確定要刪除角色「${r.name}」嗎？`)
+    if (!ok) return
+
+    setError('')
+    setLoading(true)
+    try {
+      await deleteRole(r.id)
+      await loadRoles()
+    } catch (err) {
+      setError(err.response?.data?.message || '刪除失敗')
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="role-page">
       <div className="role-page-header">
         <h1>角色管理</h1>
+        <button
+          type="button"
+          className="btn btn--small btn--primary"
+          onClick={() => navigate('/roles/create')}
+        >
+          建立角色
+        </button>
       </div>
 
       {error && <div className="role-error" role="alert">{error}</div>}
@@ -53,6 +85,14 @@ export default function RoleListPage() {
                     >
                       編輯
                     </button>
+                    <button
+                      type="button"
+                      className="btn btn--small btn--danger"
+                      onClick={() => handleDeleteRole(r)}
+                      disabled={loading}
+                    >
+                      刪除
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -63,3 +103,4 @@ export default function RoleListPage() {
     </div>
   )
 }
+

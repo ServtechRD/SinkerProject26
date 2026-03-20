@@ -26,9 +26,9 @@ export default function SemiProductImportPage() {
   const [uploading, setUploading] = useState(false)
   const [downloadingTemplate, setDownloadingTemplate] = useState(false)
   const [showUploadConfirm, setShowUploadConfirm] = useState(false)
-  const [editingId, setEditingId] = useState(null)
-  const [editValue, setEditValue] = useState('')
-  const [editError, setEditError] = useState('')
+  const [editMode, setEditMode] = useState(false)
+  const [draftAdvanceDaysById, setDraftAdvanceDaysById] = useState({})
+  const [draftAdvanceDaysErrorsById, setDraftAdvanceDaysErrorsById] = useState({})
   const [saving, setSaving] = useState(false)
 
   const canView = hasPermission(user, 'semi_product.view')
@@ -102,6 +102,10 @@ export default function SemiProductImportPage() {
       setSelectedFile(null)
       setFileError('')
       await fetchProducts()
+      // 上傳資料後回到預設顯示，避免保留舊的編輯草稿
+      setEditMode(false)
+      setDraftAdvanceDaysById({})
+      setDraftAdvanceDaysErrorsById({})
     } catch (err) {
       if (err.response?.data?.details && Array.isArray(err.response.data.details)) {
         toast.error(err.response.data.details.join('; '))
@@ -115,17 +119,22 @@ export default function SemiProductImportPage() {
     }
   }
 
-  const handleEditStart = (product) => {
+  const handleStartEditAll = () => {
     if (!canEdit) return
-    setEditingId(product.id)
-    setEditValue(String(product.advanceDays ?? ''))
-    setEditError('')
+    const nextDraft = {}
+    products.forEach((p) => {
+      nextDraft[p.id] = String(p.advanceDays ?? '')
+    })
+    setDraftAdvanceDaysById(nextDraft)
+    setDraftAdvanceDaysErrorsById({})
+    setEditMode(true)
   }
 
-  const handleEditCancel = () => {
-    setEditingId(null)
-    setEditValue('')
-    setEditError('')
+  const handleCancelEditAll = () => {
+    setEditMode(false)
+    setDraftAdvanceDaysById({})
+    setDraftAdvanceDaysErrorsById({})
+    setSaving(false)
   }
 
   const validateAdvanceDays = (value) => {
@@ -136,37 +145,60 @@ export default function SemiProductImportPage() {
     return ''
   }
 
-  const handleEditSave = async (productId) => {
-    const error = validateAdvanceDays(editValue)
-    if (error) {
-      setEditError(error)
+  const handleSaveEditAll = async () => {
+    const nextErrors = {}
+    let hasError = false
+
+    products.forEach((p) => {
+      const draft = draftAdvanceDaysById[p.id] ?? ''
+      const err = validateAdvanceDays(draft)
+      if (err) {
+        hasError = true
+        nextErrors[p.id] = err
+      }
+    })
+
+    if (hasError) {
+      setDraftAdvanceDaysErrorsById(nextErrors)
+      toast.error(Object.values(nextErrors)[0] || '更新失敗')
       return
     }
+
+    const changed = products.filter((p) => {
+      const draft = draftAdvanceDaysById[p.id]
+      const nextVal = parseInt(draft, 10)
+      return nextVal !== p.advanceDays
+    })
+
+    if (changed.length === 0) {
+      toast.info('沒有變更')
+      setEditMode(false)
+      setDraftAdvanceDaysById({})
+      setDraftAdvanceDaysErrorsById({})
+      return
+    }
+
     setSaving(true)
     try {
-      const advanceDays = parseInt(editValue, 10)
-      await updateSemiProduct(productId, advanceDays)
-      setProducts((prev) =>
-        prev.map((p) => (p.id === productId ? { ...p, advanceDays } : p))
+      await Promise.all(
+        changed.map((p) => updateSemiProduct(p.id, parseInt(draftAdvanceDaysById[p.id], 10)))
       )
       toast.success('提前日數更新成功')
-      setEditingId(null)
-      setEditValue('')
-      setEditError('')
+      setEditMode(false)
+      setDraftAdvanceDaysById({})
+      setDraftAdvanceDaysErrorsById({})
+      await fetchProducts()
     } catch (err) {
-      if (err.response?.data?.error) {
-        toast.error(err.response.data.error)
-      } else {
-        toast.error('更新失敗')
-      }
+      if (err.response?.data?.error) toast.error(err.response.data.error)
+      else toast.error('更新失敗')
     } finally {
       setSaving(false)
     }
   }
 
-  const handleEditKeyDown = (e, productId) => {
-    if (e.key === 'Enter') handleEditSave(productId)
-    else if (e.key === 'Escape') handleEditCancel()
+  const handleDraftKeyDown = (e) => {
+    if (e.key === 'Enter') handleSaveEditAll()
+    else if (e.key === 'Escape') handleCancelEditAll()
   }
 
   const handleExportCsv = () => {
@@ -209,6 +241,17 @@ export default function SemiProductImportPage() {
   return (
     <div className="semi-product-page">
       <h1>半成品提前採購設定表單-匯入</h1>
+
+      <div className="semi-product-result-toolbar" style={{ justifyContent: 'flex-end', marginBottom: '1rem' }}>
+        <button
+          type="button"
+          className="btn btn--outline"
+          onClick={fetchProducts}
+          disabled={loading}
+        >
+          {loading ? '查詢中...' : '查詢'}
+        </button>
+      </div>
 
       <section className="semi-product-upload-section">
         <h2>上傳區</h2>
@@ -253,14 +296,38 @@ export default function SemiProductImportPage() {
       <section className="semi-product-result-section">
         <h2>目前半成品提前採購設定</h2>
         <div className="semi-product-result-toolbar">
-          <button
-            type="button"
-            className="btn btn--outline"
-            onClick={fetchProducts}
-            disabled={loading}
-          >
-            {loading ? '查詢中...' : '重新查詢'}
-          </button>
+          {canEdit && !editMode && (
+            <button
+              type="button"
+              className="btn btn--outline"
+              onClick={handleStartEditAll}
+              disabled={loading || saving}
+            >
+              編輯
+            </button>
+          )}
+
+          {canEdit && editMode && (
+            <>
+              <button
+                type="button"
+                className="btn btn--primary"
+                onClick={handleSaveEditAll}
+                disabled={saving}
+              >
+                {saving ? '儲存中...' : '儲存'}
+              </button>
+              <button
+                type="button"
+                className="btn btn--outline"
+                onClick={handleCancelEditAll}
+                disabled={saving}
+              >
+                取消
+              </button>
+            </>
+          )}
+
           <button
             type="button"
             className="btn btn--outline"
@@ -285,7 +352,6 @@ export default function SemiProductImportPage() {
                   <th>品號</th>
                   <th>品名</th>
                   <th>提前日數</th>
-                  {canEdit && <th>操作</th>}
                 </tr>
               </thead>
               <tbody>
@@ -294,56 +360,25 @@ export default function SemiProductImportPage() {
                     <td>{product.productCode}</td>
                     <td>{product.productName}</td>
                     <td className="editable-cell">
-                      {editingId === product.id ? (
+                      {editMode ? (
                         <div className="edit-input-wrapper">
                           <input
                             type="text"
-                            className={`edit-input ${editError ? 'edit-input--error' : ''}`}
-                            value={editValue}
-                            onChange={(e) => setEditValue(e.target.value)}
-                            onKeyDown={(e) => handleEditKeyDown(e, product.id)}
+                            className={`edit-input ${draftAdvanceDaysErrorsById[product.id] ? 'edit-input--error' : ''}`}
+                            value={draftAdvanceDaysById[product.id] ?? ''}
+                            onChange={(e) => setDraftAdvanceDaysById((prev) => ({ ...prev, [product.id]: e.target.value }))}
+                            onKeyDown={handleDraftKeyDown}
                             disabled={saving}
-                            autoFocus
                             aria-label="編輯提前日數"
                           />
-                          {editError && <div className="edit-error">{editError}</div>}
+                          {draftAdvanceDaysErrorsById[product.id] && (
+                            <div className="edit-error">{draftAdvanceDaysErrorsById[product.id]}</div>
+                          )}
                         </div>
                       ) : (
                         <span>{product.advanceDays}</span>
                       )}
                     </td>
-                    {canEdit && (
-                      <td>
-                        {editingId === product.id ? (
-                          <>
-                            <button
-                              type="button"
-                              className="btn btn--primary btn-sm"
-                              onClick={() => handleEditSave(product.id)}
-                              disabled={saving}
-                            >
-                              儲存
-                            </button>
-                            <button
-                              type="button"
-                              className="btn btn--outline btn-sm"
-                              onClick={handleEditCancel}
-                              disabled={saving}
-                            >
-                              取消
-                            </button>
-                          </>
-                        ) : (
-                          <button
-                            type="button"
-                            className="btn btn--outline btn-sm"
-                            onClick={() => handleEditStart(product)}
-                          >
-                            編輯
-                          </button>
-                        )}
-                      </td>
-                    )}
                   </tr>
                 ))}
               </tbody>

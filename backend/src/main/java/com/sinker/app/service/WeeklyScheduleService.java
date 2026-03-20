@@ -87,7 +87,7 @@ public class WeeklyScheduleService {
         log.info("Upload complete: weekStart={}, factory={}, rows={}, duration={}ms",
                 weekStart, factory, rows.size(), duration);
 
-        // Trigger PDCA integration asynchronously
+        // Trigger PDCA：外部 recompute HTTP + 解析結果回填 material_demand（見 PdcaApiClientImpl）
         pdcaIntegrationService.triggerPdcaIntegration(entities, weekStart, factory);
 
         return new UploadScheduleResponse(

@@ -352,7 +352,6 @@ export default function InventoryIntegrationPage() {
 
       {queryTime != null && (
         <div className="inventory-info">
-          <div className="inventory-info-row">目前版本: {currentVersion || '-'}</div>
           <div className="inventory-info-row">
             查詢時間: {`${queryTime.getFullYear()}-${String(queryTime.getMonth() + 1).padStart(2, '0')}-${String(queryTime.getDate()).padStart(2, '0')} ${String(queryTime.getHours()).padStart(2, '0')}:${String(queryTime.getMinutes()).padStart(2, '0')}:${String(queryTime.getSeconds()).padStart(2, '0')}`}
             {'　'}

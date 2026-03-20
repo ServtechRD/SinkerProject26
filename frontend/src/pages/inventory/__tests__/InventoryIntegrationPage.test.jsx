@@ -905,7 +905,7 @@ describe('InventoryIntegrationPage', () => {
     })
   })
 
-  it('should show current version and product count after query', async () => {
+  it('should show query time and product count after query', async () => {
     const user = userEvent.setup()
     inventoryApi.getInventoryIntegration.mockResolvedValue(mockData)
 
@@ -915,12 +915,12 @@ describe('InventoryIntegrationPage', () => {
     await user.click(queryButton)
 
     await waitFor(() => {
-      expect(screen.getByText(/目前版本:/)).toBeInTheDocument()
+      expect(screen.getByText(/查詢時間:/)).toBeInTheDocument()
       expect(screen.getByText(/筆數: 2/)).toBeInTheDocument()
     })
   })
 
-  it('should show version block with 目前版本 - when data has no version', async () => {
+  it('should show query time and count when data has no version', async () => {
     const user = userEvent.setup()
     const dataWithoutVersion = mockData.map(d => ({ ...d, version: null }))
     inventoryApi.getInventoryIntegration.mockResolvedValue(dataWithoutVersion)
@@ -935,7 +935,7 @@ describe('InventoryIntegrationPage', () => {
     })
 
     await waitFor(() => {
-      expect(screen.getByText(/目前版本:/)).toBeInTheDocument()
+      expect(screen.getByText(/查詢時間:/)).toBeInTheDocument()
       expect(screen.getByText(/筆數: 2/)).toBeInTheDocument()
     })
   })

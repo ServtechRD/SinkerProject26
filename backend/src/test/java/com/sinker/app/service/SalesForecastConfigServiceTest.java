@@ -27,11 +27,14 @@ class SalesForecastConfigServiceTest {
     @Mock
     private SalesForecastConfigRepository repository;
 
+    @Mock
+    private FormSummaryService formSummaryService;
+
     private SalesForecastConfigService service;
 
     @BeforeEach
     void setUp() {
-        service = new SalesForecastConfigService(repository);
+        service = new SalesForecastConfigService(repository, formSummaryService);
     }
 
     private SalesForecastConfig createConfig(Integer id, String month,

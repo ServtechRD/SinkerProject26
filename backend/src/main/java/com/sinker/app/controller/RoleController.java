@@ -1,6 +1,7 @@
 package com.sinker.app.controller;
 
 import com.sinker.app.dto.role.RoleDetailDTO;
+import com.sinker.app.dto.role.CreateRoleRequest;
 import com.sinker.app.dto.role.UpdateRoleRequest;
 import com.sinker.app.exception.ResourceNotFoundException;
 import com.sinker.app.service.RoleService;
@@ -30,6 +31,16 @@ public class RoleController {
         return ResponseEntity.ok(roleService.getAllRoles());
     }
 
+    @GetMapping("/permissions")
+    @PreAuthorize("hasAuthority('role.view')")
+    public ResponseEntity<Map<String, Object>> listAllPermissionsGroupedByModule() {
+        Map<String, Object> resp = Map.of(
+                "permissionsByModule", roleService.getAllPermissionsGroupedByModule(),
+                "permissions", java.util.List.of()
+        );
+        return ResponseEntity.ok(resp);
+    }
+
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('role.view')")
     public ResponseEntity<RoleDetailDTO> getRole(@PathVariable Long id) {
@@ -41,6 +52,21 @@ public class RoleController {
     public ResponseEntity<RoleDetailDTO> updateRole(@PathVariable Long id,
                                                     @Valid @RequestBody UpdateRoleRequest request) {
         return ResponseEntity.ok(roleService.updateRole(id, request));
+    }
+
+    @PostMapping
+    @PreAuthorize("hasAuthority('role.create')")
+    public ResponseEntity<RoleDetailDTO> createRole(
+            @Valid @RequestBody CreateRoleRequest request) {
+        RoleDetailDTO created = roleService.createRole(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    @DeleteMapping("/{id}")
+    @PreAuthorize("hasAuthority('role.delete')")
+    public ResponseEntity<Void> deleteRole(@PathVariable Long id) {
+        roleService.deleteRole(id);
+        return ResponseEntity.noContent().build();
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)

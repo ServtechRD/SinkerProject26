@@ -37,7 +37,6 @@ public class WeeklyScheduleController {
     }
 
     @GetMapping("/factories")
-    @PreAuthorize("hasAuthority('weekly_schedule.view')")
     public ResponseEntity<List<String>> getFactories() {
         log.info("GET /api/weekly-schedule/factories");
         return ResponseEntity.ok(service.getFactories());

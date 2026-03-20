@@ -120,9 +120,9 @@ describe('RoleEditPage', () => {
   it('clicking permission checkbox toggles', async () => {
     const user = userEvent.setup()
     renderPage()
-    await waitFor(() => expect(screen.getByText('View Users')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('檢視使用者')).toBeInTheDocument())
 
-    const viewUsersLabel = screen.getByText('View Users').closest('label')
+    const viewUsersLabel = screen.getByText('檢視使用者').closest('label')
     const checkbox = viewUsersLabel.querySelector('input[type="checkbox"]')
     expect(checkbox).toBeChecked()
 

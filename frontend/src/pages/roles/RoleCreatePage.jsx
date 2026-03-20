@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
-import { getRoleById, updateRole } from '../../api/roles'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { createRole, getPermissionsGroupedByModule } from '../../api/roles'
 import { useToast } from '../../components/Toast'
 import './RolePages.css'
 
@@ -16,66 +16,7 @@ const MODULE_LABELS = {
   material_demand: '物料需求',
 }
 
-const PERMISSION_NAME_ZH = {
-  // user
-  'user.view': '檢視使用者',
-  'user.create': '建立使用者',
-  'user.edit': '編輯使用者',
-  'user.delete': '刪除使用者',
-
-  // role
-  'role.view': '檢視角色',
-  'role.create': '建立角色',
-  'role.edit': '編輯角色權限',
-  'role.delete': '刪除角色',
-
-  // sales_forecast
-  'sales_forecast.create': '建立銷售預估表單',
-  'sales_forecast.delete': '刪除銷售預估表單',
-  'sales_forecast.edit': '編輯銷售預估表單',
-  'sales_forecast.update_after_closed': '編輯銷售預估量表單(結束新增設定後)',
-  'sales_forecast.upload': '上傳銷售預估量表單',
-  'sales_forecast.view': '檢視所有銷售預估量表單',
-  'sales_forecast.view_own': '檢視個人銷售預估量表單',
-
-  // sales_forecast_config
-  'sales_forecast_config.view': '檢視銷售預估量表單',
-  'sales_forecast_config.edit': '編輯銷售預估量表單',
-
-  // production_plan
-  'production_plan.view': '檢視生產表單',
-  'production_plan.edit': '編輯生產表單',
-
-  // inventory
-  'inventory.view': '檢視庫存銷量預估量整合表單',
-  'inventory.edit': '編輯庫存銷量預估量整合表單',
-
-  // weekly_schedule
-  'weekly_schedule.view': '檢視生產週排程表單',
-  'weekly_schedule.upload': '上傳生產週排程表單',
-  'weekly_schedule.edit': '編輯生產週排程表單',
-
-  // semi_product
-  'semi_product.view': '檢視半成品提前採購設定表單',
-  'semi_product.upload': '上傳半成品提前採購設定表單',
-  'semi_product.edit': '編輯半成品提前採購設定表單',
-
-  // material_demand + related
-  'material_demand.view': '檢視物料需求數量表單',
-  'material_demand.edit': '編輯物料需求數量表單',
-  'material_demand.upload': '上傳物料需求數量表單',
-  'confirm_data_send_erp': '確認本週物料需求數量確認送出給天心ERP',
-
-  // material_purchase (可能的權限模組)
-  'material_purchase.view': '檢視物料採購表單',
-  'material_purchase.trigger_erp': '觸發ERP採購',
-}
-
-// 角色編輯頁面不預設隱藏任何權限項目
-const HIDDEN_PERMISSION_CODES = new Set([])
-
-export default function RoleEditPage() {
-  const { id } = useParams()
+export default function RoleCreatePage() {
   const navigate = useNavigate()
   const toast = useToast()
 
@@ -84,44 +25,31 @@ export default function RoleEditPage() {
   const [apiError, setApiError] = useState('')
   const [errors, setErrors] = useState({})
 
-  const [role, setRole] = useState(null)
+  const [code, setCode] = useState('')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [allPermissions, setAllPermissions] = useState({})
-
   const selectAllRefs = useRef({})
 
   useEffect(() => {
-    getRoleById(id)
+    getPermissionsGroupedByModule()
       .then((data) => {
-        setRole(data)
-        setName(data.name || '')
-        setDescription(data.description || '')
         setAllPermissions(data.permissionsByModule || {})
-        const ids = new Set((data.permissions || []).map((p) => p.id))
-        setSelectedIds(ids)
       })
-      .catch(() => setApiError('無法載入角色資料'))
+      .catch(() => setApiError('無法載入權限資料'))
       .finally(() => setLoading(false))
-  }, [id])
+  }, [])
 
-  // 過濾掉要隱藏的權限，確保全選/半選與渲染都一致
-  const visiblePermissionsByModule = useMemo(() => {
-    const out = {}
-    Object.entries(allPermissions).forEach(([mod, perms]) => {
-      const list = Array.isArray(perms) ? perms : []
-      out[mod] = list.filter((p) => p && !HIDDEN_PERMISSION_CODES.has(p.code))
-    })
-    return out
-  }, [allPermissions])
+  const visiblePermissionsByModule = useMemo(() => allPermissions || {}, [allPermissions])
 
   const updateIndeterminate = useCallback(() => {
     Object.entries(visiblePermissionsByModule).forEach(([mod, perms]) => {
       const ref = selectAllRefs.current[mod]
       if (!ref) return
-      const count = perms.filter((p) => selectedIds.has(p.id)).length
-      ref.indeterminate = count > 0 && count < perms.length
+      const list = Array.isArray(perms) ? perms : []
+      const count = list.filter((p) => selectedIds.has(p.id)).length
+      ref.indeterminate = count > 0 && count < list.length
     })
   }, [visiblePermissionsByModule, selectedIds])
 
@@ -132,11 +60,8 @@ export default function RoleEditPage() {
   function handleToggle(permId) {
     setSelectedIds((prev) => {
       const next = new Set(prev)
-      if (next.has(permId)) {
-        next.delete(permId)
-      } else {
-        next.add(permId)
-      }
+      if (next.has(permId)) next.delete(permId)
+      else next.add(permId)
       return next
     })
   }
@@ -147,11 +72,8 @@ export default function RoleEditPage() {
     setSelectedIds((prev) => {
       const next = new Set(prev)
       perms.forEach((p) => {
-        if (allSelected) {
-          next.delete(p.id)
-        } else {
-          next.add(p.id)
-        }
+        if (allSelected) next.delete(p.id)
+        else next.add(p.id)
       })
       return next
     })
@@ -159,6 +81,7 @@ export default function RoleEditPage() {
 
   function validate() {
     const errs = {}
+    if (!code.trim()) errs.code = '代碼為必填'
     if (!name.trim()) errs.name = '名稱為必填'
     setErrors(errs)
     return Object.keys(errs).length === 0
@@ -170,30 +93,29 @@ export default function RoleEditPage() {
     setSubmitting(true)
     setApiError('')
     try {
-      await updateRole(id, {
+      await createRole({
+        code: code.trim(),
         name: name.trim(),
         description: description.trim() || null,
         permissionIds: Array.from(selectedIds).map((pid) => Number(pid)),
       })
-      toast.success('角色已更新')
+      toast.success('角色已建立')
       navigate('/roles')
     } catch (err) {
-      const msg = err.response?.data?.message || '更新失敗'
-      setApiError(msg)
+      setApiError(err.response?.data?.message || '建立失敗')
     } finally {
       setSubmitting(false)
     }
   }
 
   if (loading) return <div className="role-loading">載入中...</div>
-  if (apiError && !role) return <div className="role-error" role="alert">{apiError}</div>
 
   const moduleOrder = Object.keys(MODULE_LABELS)
   const modules = moduleOrder.filter((m) => visiblePermissionsByModule[m]?.length > 0)
 
   return (
     <div className="role-edit-page">
-      <h1>編輯角色：{role?.name}</h1>
+      <h1>建立角色</h1>
 
       {apiError && <div className="form-api-error" role="alert">{apiError}</div>}
 
@@ -201,8 +123,18 @@ export default function RoleEditPage() {
         <fieldset disabled={submitting} className="role-fieldset">
           <div className="role-info-section">
             <div className="form-group">
-              <label>代碼</label>
-              <input className="form-input" value={role?.code || ''} readOnly disabled />
+              <label htmlFor="role-code">代碼 <span className="required">*</span></label>
+              <input
+                id="role-code"
+                className={`form-input${errors.code ? ' error' : ''}`}
+                value={code}
+                onChange={(e) => {
+                  setCode(e.target.value)
+                  setErrors((prev) => ({ ...prev, code: '' }))
+                }}
+                maxLength={50}
+              />
+              {errors.code && <div className="form-error">{errors.code}</div>}
             </div>
             <div className="form-group">
               <label htmlFor="role-name">名稱 <span className="required">*</span></label>
@@ -210,7 +142,10 @@ export default function RoleEditPage() {
                 id="role-name"
                 className={`form-input${errors.name ? ' error' : ''}`}
                 value={name}
-                onChange={(e) => { setName(e.target.value); setErrors((prev) => ({ ...prev, name: '' })) }}
+                onChange={(e) => {
+                  setName(e.target.value)
+                  setErrors((prev) => ({ ...prev, name: '' }))
+                }}
                 maxLength={100}
               />
               {errors.name && <div className="form-error">{errors.name}</div>}
@@ -233,15 +168,15 @@ export default function RoleEditPage() {
             {modules.map((mod) => {
               const perms = visiblePermissionsByModule[mod]
               const allChecked = perms.every((p) => selectedIds.has(p.id))
-              const noneChecked = perms.every((p) => !selectedIds.has(p.id))
-
               return (
                 <div key={mod} className="permission-module">
                   <div className="module-header">
                     <label className="module-select-all">
                       <input
                         type="checkbox"
-                        ref={(el) => { selectAllRefs.current[mod] = el }}
+                        ref={(el) => {
+                          selectAllRefs.current[mod] = el
+                        }}
                         checked={allChecked}
                         onChange={() => handleModuleSelectAll(mod)}
                         aria-label={`全選 ${MODULE_LABELS[mod] || mod}`}
@@ -257,7 +192,7 @@ export default function RoleEditPage() {
                           checked={selectedIds.has(p.id)}
                           onChange={() => handleToggle(p.id)}
                         />
-                        <span className="permission-name">{PERMISSION_NAME_ZH[p.code] || p.name}</span>
+                        <span className="permission-name">{p.name}</span>
                         <span className="permission-code">{p.code}</span>
                       </label>
                     ))}
@@ -269,9 +204,9 @@ export default function RoleEditPage() {
 
           <div className="form-actions">
             <button type="submit" className="btn btn--primary" disabled={submitting}>
-              {submitting ? '儲存中...' : '儲存'}
+              {submitting ? '建立中...' : '建立'}
             </button>
-            <button type="button" className="btn btn--outline" onClick={() => navigate('/roles')}>
+            <button type="button" className="btn btn--secondary" onClick={() => navigate('/roles')} disabled={submitting}>
               取消
             </button>
           </div>
@@ -280,3 +215,4 @@ export default function RoleEditPage() {
     </div>
   )
 }
+

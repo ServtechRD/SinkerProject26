@@ -16,17 +16,20 @@ WHERE r.code = 'sales' AND p.code IN (
   'sales_forecast_config.view'
 );
 
--- 3. 生管 (production_planner): 銷售預測、預測設定、生產表單、庫存銷量預估量整合表單 全部
+-- 3. 生管 (production_planner): 銷售預設僅保留 sales_forecast.update_after_closed，並加入週排程；保留其他既有模組權限
 DELETE rp FROM role_permissions rp INNER JOIN roles r ON rp.role_id = r.id WHERE r.code = 'production_planner';
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p
-WHERE r.code = 'production_planner' AND p.module IN ('sales_forecast', 'sales_forecast_config', 'production_plan', 'inventory');
+WHERE r.code = 'production_planner' AND (
+  p.module IN ('sales_forecast_config', 'production_plan', 'inventory', 'weekly_schedule')
+  OR p.code = 'sales_forecast.update_after_closed'
+);
 
--- 4. 採購 (procurement): 週排程、半成品設定、物料需求、物料採購 全部
+-- 4. 採購 (procurement): 去除週排程相關權限，保留半成品設定、物料需求、物料採購
 DELETE rp FROM role_permissions rp INNER JOIN roles r ON rp.role_id = r.id WHERE r.code = 'procurement';
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p
-WHERE r.code = 'procurement' AND p.module IN ('weekly_schedule', 'semi_product', 'material_demand', 'material_purchase');
+WHERE r.code = 'procurement' AND p.module IN ('semi_product', 'material_demand', 'material_purchase');
 
 -- 5. 使用者帳號 (若已存在則不重複插入)
 -- 密碼: sales123, pm123, pur123 (bcrypt cost 10)

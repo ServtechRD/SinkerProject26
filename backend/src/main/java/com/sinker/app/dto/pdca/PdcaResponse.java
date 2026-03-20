@@ -1,7 +1,11 @@
 package com.sinker.app.dto.pdca;
 
+import com.fasterxml.jackson.annotation.JsonAlias;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import java.util.List;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class PdcaResponse {
 
     private List<MaterialItem> materials;
@@ -21,13 +25,20 @@ public class PdcaResponse {
         this.materials = materials;
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public static class MaterialItem {
+        @JsonAlias({"material_code"})
         private String materialCode;
+        @JsonAlias({"material_name"})
         private String materialName;
         private String unit;
+        @JsonAlias({"demand_date"})
         private String demandDate;
+        @JsonAlias({"expected_delivery"})
         private Double expectedDelivery;
+        @JsonAlias({"demand_quantity"})
         private Double demandQuantity;
+        @JsonAlias({"estimated_inventory"})
         private Double estimatedInventory;
 
         public MaterialItem() {

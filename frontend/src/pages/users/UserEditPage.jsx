@@ -48,6 +48,17 @@ export default function UserEditPage() {
   const selectedRole = roles.find((r) => String(r.id) === String(form.roleId))
   const isSales = selectedRole?.code === 'sales'
 
+  // sales 角色預設勾選所有通路（當後端回傳 channels 為空時）
+  useEffect(() => {
+    setForm((prev) => {
+      if (isSales) {
+        if (prev.channels && prev.channels.length > 0) return prev
+        return { ...prev, channels: [...CHANNELS] }
+      }
+      return { ...prev, channels: [] }
+    })
+  }, [isSales])
+
   function handleChange(e) {
     const { name, value } = e.target
     setForm((prev) => ({ ...prev, [name]: value }))
@@ -61,6 +72,16 @@ export default function UserEditPage() {
         : [...prev.channels, ch]
       return { ...prev, channels }
     })
+    setErrors((prev) => ({ ...prev, channels: '' }))
+  }
+
+  function handleChannelsSelectAll() {
+    setForm((prev) => ({ ...prev, channels: [...CHANNELS] }))
+    setErrors((prev) => ({ ...prev, channels: '' }))
+  }
+
+  function handleChannelsSelectNone() {
+    setForm((prev) => ({ ...prev, channels: [] }))
     setErrors((prev) => ({ ...prev, channels: '' }))
   }
 
@@ -163,6 +184,24 @@ export default function UserEditPage() {
         {isSales && (
           <div className="form-group">
             <label>通路 <span className="required">*</span></label>
+            <div className="channel-toolbar">
+              <button
+                type="button"
+                className="btn btn--small btn--outline"
+                onClick={handleChannelsSelectAll}
+                disabled={submitting}
+              >
+                全選
+              </button>
+              <button
+                type="button"
+                className="btn btn--small btn--outline"
+                onClick={handleChannelsSelectNone}
+                disabled={submitting}
+              >
+                全不選
+              </button>
+            </div>
             <div className="channel-checkboxes">
               {CHANNELS.map((ch) => (
                 <label key={ch}>

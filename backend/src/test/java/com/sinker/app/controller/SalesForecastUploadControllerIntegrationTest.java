@@ -1,5 +1,6 @@
 package com.sinker.app.controller;
 
+import com.sinker.app.dto.reference.ProductDTO;
 import com.sinker.app.security.JwtTokenProvider;
 import com.sinker.app.service.ErpProductService;
 import org.apache.poi.ss.usermodel.Row;
@@ -22,6 +23,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.io.ByteArrayOutputStream;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.hamcrest.Matchers.*;
 import static org.junit.jupiter.api.Assertions.*;
@@ -54,8 +56,18 @@ class SalesForecastUploadControllerIntegrationTest {
 
     @BeforeEach
     void setUp() {
-        // ERP stub always returns true
+        // ERP stub：上傳後會以 findProduct 帶入主檔欄位
         when(erpProductService.validateProduct(anyString())).thenReturn(true);
+        when(erpProductService.findProduct(anyString())).thenAnswer(inv -> {
+            String code = inv.getArgument(0);
+            ProductDTO dto = new ProductDTO();
+            dto.setCode(code);
+            dto.setName("Test Product");
+            dto.setCategoryName("飲料類");
+            dto.setSpec("600ml*24入");
+            dto.setWarehouseLocation("A01");
+            return Optional.of(dto);
+        });
 
         // Create open test month
         jdbc.update("DELETE FROM sales_forecast_config WHERE month = ?", MONTH);

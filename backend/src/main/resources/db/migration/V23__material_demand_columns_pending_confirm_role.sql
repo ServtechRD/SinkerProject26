@@ -25,9 +25,22 @@ INSERT INTO roles (code, name, description, is_system, is_active) VALUES
 
 INSERT INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p
-WHERE r.code = 'procurement_supervisor' AND p.module IN ('weekly_schedule', 'semi_product', 'material_demand', 'material_purchase');
+WHERE r.code = 'procurement_supervisor' AND p.module IN ('semi_product', 'material_demand', 'material_purchase');
 
 -- 5. admin 也擁有 confirm_data_send_erp
 INSERT IGNORE INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id FROM roles r, permissions p
 WHERE r.code = 'admin' AND p.code = 'confirm_data_send_erp';
+
+-- 6. 預設採購主管帳號：pursup / pursup123 (bcrypt cost 10)
+INSERT INTO users (username, email, hashed_password, full_name, role_id, is_active, is_locked, failed_login_count)
+SELECT 'pursup', 'pursup@sinker.local', '$2b$10$WLPaHJfSQw9KWrB49foJIu8aInpf7XP9Tf4w3Aoae.I4UcyuvIo/.', '採購主管',
+       (SELECT id FROM roles WHERE code = 'procurement_supervisor'), TRUE, FALSE, 0
+WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u.username = 'pursup');
+
+UPDATE users u
+INNER JOIN roles r ON r.code = 'procurement_supervisor'
+SET u.hashed_password = '$2b$10$WLPaHJfSQw9KWrB49foJIu8aInpf7XP9Tf4w3Aoae.I4UcyuvIo/.',
+    u.full_name = '採購主管',
+    u.role_id = r.id
+WHERE u.username = 'pursup';

@@ -16,3 +16,8 @@ app:
   jwt:
     secret: test-secret-key-for-unit-tests-must-be-at-least-32-bytes!
     expiration-ms: 86400000
+  integrations:
+    pdca:
+      enabled: false
+    erp:
+      enabled: false

@@ -3,6 +3,7 @@ package com.sinker.app.service;
 import com.sinker.app.entity.GiftSalesForecast;
 import com.sinker.app.entity.SalesForecastConfig;
 import com.sinker.app.dto.forecast.UploadResponse;
+import com.sinker.app.dto.reference.ProductDTO;
 import com.sinker.app.exception.ExcelParseException;
 import com.sinker.app.exception.ResourceNotFoundException;
 import com.sinker.app.repository.SalesForecastConfigRepository;
@@ -15,12 +16,15 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -89,37 +93,64 @@ public class GiftSalesForecastUploadService {
 
         Set<String> invalidProductCodes = new LinkedHashSet<>();
         for (SalesForecastRow row : rows) {
-            if (!erpProductService.validateProduct(row.getProductCode())) {
-                invalidProductCodes.add(row.getProductCode());
+            String rawCode = row.getProductCode();
+            String trimmed = rawCode != null ? rawCode.trim() : null;
+            if (trimmed == null || !StringUtils.hasText(trimmed) || !erpProductService.validateProduct(trimmed)) {
+                if (StringUtils.hasText(trimmed)) invalidProductCodes.add(trimmed);
+                else invalidProductCodes.add(rawCode != null ? rawCode : "（空白品號）");
             }
         }
         if (!invalidProductCodes.isEmpty()) {
             String codeList = String.join("、", invalidProductCodes);
-            throw new ExcelParseException(List.of(
-                    "以下品號不存在於系統中，無法上傳：" + codeList));
+            throw new ExcelParseException(List.of("以下品號不存在於系統中，無法上傳：" + codeList));
         }
 
         LocalDateTime now = LocalDateTime.now();
         String version = now.format(VERSION_FORMATTER) + "(" + channel + ")";
 
+        // Cache product master to avoid querying same code repeatedly
+        Map<String, ProductDTO> productCache = new HashMap<>();
+
         forecastRepository.deleteByMonthAndChannel(month, channel);
 
         List<GiftSalesForecast> entities = new ArrayList<>();
         for (SalesForecastRow row : rows) {
+            String productCode = row.getProductCode() != null ? row.getProductCode().trim() : null;
+            ProductDTO product = null;
+            if (productCode != null) {
+                product = productCache.computeIfAbsent(productCode, (k) ->
+                        erpProductService.findProduct(k).orElse(null));
+            }
+
             GiftSalesForecast g = new GiftSalesForecast();
             g.setMonth(month);
             g.setChannel(channel);
-            g.setCategory(row.getCategory());
-            g.setSpec(row.getSpec());
-            g.setProductCode(row.getProductCode());
-            g.setProductName(row.getProductName());
-            g.setWarehouseLocation(row.getWarehouseLocation());
+            // If product code exists in DB, always use DB fields to prevent upload mismatch.
+            if (product != null) {
+                g.setCategory(product.getCategoryName());
+                g.setSpec(product.getSpec());
+                g.setProductCode(product.getCode());
+                g.setProductName(product.getName());
+                g.setWarehouseLocation(product.getWarehouseLocation());
+            } else {
+                // 理論上不會發生（已在步驟 validate 過），但仍保護：品號查不到就視為不可上傳
+                if (StringUtils.hasText(productCode)) invalidProductCodes.add(productCode);
+                g.setCategory(row.getCategory());
+                g.setSpec(row.getSpec());
+                g.setProductCode(row.getProductCode());
+                g.setProductName(row.getProductName());
+                g.setWarehouseLocation(row.getWarehouseLocation());
+            }
             g.setQuantity(row.getQuantity());
             g.setVersion(version);
             g.setIsModified(false);
             g.setCreatedAt(now);
             g.setUpdatedAt(now);
             entities.add(g);
+        }
+        if (!invalidProductCodes.isEmpty()) {
+            String codeList = String.join("、", invalidProductCodes);
+            throw new ExcelParseException(List.of("以下品號不存在於系統中，無法上傳：" + codeList));
         }
         forecastRepository.saveAll(entities);
 

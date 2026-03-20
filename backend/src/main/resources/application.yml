@@ -16,6 +16,18 @@ app:
   jwt:
     secret: ${JWT_SECRET:sinker26-dev-secret-key-change-in-production-min-32-bytes!}
     expiration-ms: 86400000
+  # 外部整合：PDCA recompute、ERP 採購單（URL 與帳密請以環境變數或本機設定覆寫）
+  integrations:
+    pdca:
+      enabled: ${PDCA_RECOMPUTE_ENABLED:false}
+      recompute-url: ${PDCA_RECOMPUTE_URL:}
+      username: ${PDCA_USERNAME:}
+      password: ${PDCA_PASSWORD:}
+    erp:
+      enabled: ${ERP_PURCHASE_ORDER_ENABLED:false}
+      purchase-order-url: ${ERP_PURCHASE_ORDER_URL:}
+      username: ${ERP_USERNAME:}
+      password: ${ERP_PASSWORD:}
 
 management:
   endpoints:

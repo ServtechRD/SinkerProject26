@@ -54,7 +54,7 @@ class SalesForecastMigrationTest {
                 "WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'sales_forecast' " +
                 "ORDER BY ORDINAL_POSITION");
 
-        assertEquals(14, columns.size(), "sales_forecast should have 14 columns (V5 + V24 form_version_no)");
+        assertEquals(15, columns.size(), "sales_forecast should have 15 columns (V5 + V24 form_version_no + V25 remark)");
 
         Map<String, Map<String, Object>> colMap = new java.util.LinkedHashMap<>();
         for (Map<String, Object> col : columns) {
@@ -105,6 +105,12 @@ class SalesForecastMigrationTest {
         assertTrue(colMap.containsKey("quantity"), "Column quantity should exist");
         assertEquals("decimal(10,2)", colMap.get("quantity").get("COLUMN_TYPE").toString().toLowerCase());
         assertEquals("NO", colMap.get("quantity").get("IS_NULLABLE").toString());
+
+        // remark: text, nullable (V25)
+        assertTrue(colMap.containsKey("remark"), "Column remark should exist");
+        assertTrue(colMap.get("remark").get("COLUMN_TYPE").toString().toLowerCase().contains("text"),
+                "remark should be TEXT");
+        assertEquals("YES", colMap.get("remark").get("IS_NULLABLE").toString());
 
         // version: varchar(100), not null
         assertTrue(colMap.containsKey("version"), "Column version should exist");

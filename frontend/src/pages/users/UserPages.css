@@ -252,6 +252,14 @@
   margin-top: 4px;
 }
 
+.channel-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+  margin-bottom: 4px;
+}
+
 .channel-checkboxes {
   display: flex;
   flex-wrap: wrap;

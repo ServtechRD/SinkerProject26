@@ -72,70 +72,49 @@ class MaterialDemandControllerIntegrationTest {
 
     @Test
     void testQueryMaterialDemandSuccess() throws Exception {
-        // Insert test data
-        jdbc.update("INSERT INTO material_demand (week_start, factory, material_code, material_name, unit, " +
-                "last_purchase_date, demand_date, expected_delivery, demand_quantity, estimated_inventory) " +
-                "VALUES (?, ?, 'M001', '原料A', 'kg', '2026-02-10', '2026-02-20', 100.50, 500.00, 50.25)",
-                WEEK_START, FACTORY);
-        jdbc.update("INSERT INTO material_demand (week_start, factory, material_code, material_name, unit, " +
-                "demand_date, expected_delivery, demand_quantity, estimated_inventory) " +
-                "VALUES (?, ?, 'M002', '原料B', 'pcs', '2026-02-22', 0.00, 1000.00, 0.00)",
-                WEEK_START, FACTORY);
-
+        // GET 會走 PDCA 同步（測試環境 URL 未設定 → PdcaLocalStub 固定 5 筆），與 DB 預先插入無關
         mockMvc.perform(get("/api/material-demand")
                         .param("week_start", WEEK_START)
                         .param("factory", FACTORY)
                         .header("Authorization", "Bearer " + viewToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(2)))
-                .andExpect(jsonPath("$[0].materialCode", is("M001")))
-                .andExpect(jsonPath("$[0].materialName", is("原料A")))
-                .andExpect(jsonPath("$[0].unit", is("kg")))
-                .andExpect(jsonPath("$[0].lastPurchaseDate", is("2026-02-10")))
+                .andExpect(jsonPath("$", hasSize(5)))
+                .andExpect(jsonPath("$[0].materialCode", is("AA08C")))
+                .andExpect(jsonPath("$[0].materialName", is("關華豆膠(LF20)/25kg/包")))
+                .andExpect(jsonPath("$[0].unit", is("KG")))
+                .andExpect(jsonPath("$[0].lastPurchaseDate").doesNotExist())
                 .andExpect(jsonPath("$[0].demandDate", is("2026-02-20")))
-                .andExpect(jsonPath("$[0].expectedDelivery", is(100.50)))
-                .andExpect(jsonPath("$[0].demandQuantity", is(500.00)))
-                .andExpect(jsonPath("$[0].estimatedInventory", is(50.25)))
-                .andExpect(jsonPath("$[1].materialCode", is("M002")))
-                .andExpect(jsonPath("$[1].materialName", is("原料B")))
-                .andExpect(jsonPath("$[1].lastPurchaseDate").doesNotExist());
+                .andExpect(jsonPath("$[0].expectedDelivery").value(40))
+                .andExpect(jsonPath("$[0].demandQuantity").value(100))
+                .andExpect(jsonPath("$[0].estimatedInventory").value(20))
+                .andExpect(jsonPath("$[4].materialCode", is("EE08C")));
     }
 
     @Test
     void testQueryMaterialDemandOrderedByMaterialCode() throws Exception {
-        // Insert test data in reverse order
-        jdbc.update("INSERT INTO material_demand (week_start, factory, material_code, material_name, unit, " +
-                "demand_date, expected_delivery, demand_quantity, estimated_inventory) " +
-                "VALUES (?, ?, 'M003', '原料C', 'kg', '2026-02-20', 0.00, 300.00, 0.00)",
-                WEEK_START, FACTORY);
-        jdbc.update("INSERT INTO material_demand (week_start, factory, material_code, material_name, unit, " +
-                "demand_date, expected_delivery, demand_quantity, estimated_inventory) " +
-                "VALUES (?, ?, 'M001', '原料A', 'kg', '2026-02-20', 0.00, 100.00, 0.00)",
-                WEEK_START, FACTORY);
-        jdbc.update("INSERT INTO material_demand (week_start, factory, material_code, material_name, unit, " +
-                "demand_date, expected_delivery, demand_quantity, estimated_inventory) " +
-                "VALUES (?, ?, 'M002', '原料B', 'pcs', '2026-02-22', 0.00, 200.00, 0.00)",
-                WEEK_START, FACTORY);
-
+        // PDCA stub 依品號排序回傳（AA08C … EE08C）
         mockMvc.perform(get("/api/material-demand")
                         .param("week_start", WEEK_START)
                         .param("factory", FACTORY)
                         .header("Authorization", "Bearer " + viewToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(3)))
-                .andExpect(jsonPath("$[0].materialCode", is("M001")))
-                .andExpect(jsonPath("$[1].materialCode", is("M002")))
-                .andExpect(jsonPath("$[2].materialCode", is("M003")));
+                .andExpect(jsonPath("$", hasSize(5)))
+                .andExpect(jsonPath("$[0].materialCode", is("AA08C")))
+                .andExpect(jsonPath("$[1].materialCode", is("BA12D")))
+                .andExpect(jsonPath("$[2].materialCode", is("CC05A")))
+                .andExpect(jsonPath("$[3].materialCode", is("DD15B")))
+                .andExpect(jsonPath("$[4].materialCode", is("EE08C")));
     }
 
     @Test
     void testQueryMaterialDemandEmptyResult() throws Exception {
+        // 無週排程時仍回傳 PDCA stub 固定列，不會 0 筆
         mockMvc.perform(get("/api/material-demand")
                         .param("week_start", "2026-12-31")
                         .param("factory", "F999")
                         .header("Authorization", "Bearer " + viewToken))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(0)));
+                .andExpect(jsonPath("$", hasSize(5)));
     }
 
     @Test

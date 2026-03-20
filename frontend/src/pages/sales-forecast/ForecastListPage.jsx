@@ -7,6 +7,7 @@ import {
 } from '../../api/forecast'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../components/Toast'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import './ForecastList.css'
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50]
@@ -28,6 +29,43 @@ function formatMonth(monthStr) {
   const monthIndex = parseInt(month, 10) - 1
   const monthName = monthNames[monthIndex] || ''
   return `${monthStr} (${monthName} ${year})`
+}
+
+/** 僅接受數字／數字字串作為 runQuery 覆寫版號；避免 onClick={runQuery} 把 MouseEvent 當成 versionOverride */
+function normalizeQueryVersionOverride(arg) {
+  if (arg == null) return undefined
+  if (typeof arg === 'number' && Number.isFinite(arg)) return arg
+  if (typeof arg === 'string' && arg.trim() !== '') {
+    const n = parseInt(arg.trim(), 10)
+    return Number.isNaN(n) ? undefined : n
+  }
+  return undefined
+}
+
+/** 解析出 API 用的正整數 version_no；失敗回傳 null */
+function resolveFormVersionNo(raw, formVersions) {
+  if (raw == null) return null
+  if (typeof raw === 'number' && Number.isNaN(raw)) return null
+  const s = String(raw).trim()
+  if (s === '' || s === 'undefined' || s === 'null') return null
+  const parsed = parseInt(s, 10)
+  if (!Number.isNaN(parsed) && parsed >= 1) return parsed
+  const f = Number(s)
+  if (Number.isFinite(f) && f >= 1) return Math.floor(f)
+  if (Array.isArray(formVersions)) {
+    const hit = formVersions.find(
+      (v) =>
+        v.version_no === raw ||
+        v.versionNo === raw ||
+        String(v.version_no ?? v.versionNo) === s,
+    )
+    if (hit != null) {
+      const vn = hit.version_no ?? hit.versionNo
+      const x = Number(vn)
+      if (Number.isFinite(x) && x >= 1) return Math.floor(x)
+    }
+  }
+  return null
 }
 
 function formatVersionOption(v) {
@@ -75,6 +113,11 @@ function num(v) {
   return Number.isNaN(n) ? 0 : n
 }
 
+/** 通路格：目前值是否與前一版不同（用於紅字） */
+function channelValueChangedFromPrev(prevQty, currQty) {
+  return Math.abs(num(currQty) - num(prevQty)) > 1e-9
+}
+
 export default function ForecastListPage() {
   const { user } = useAuth()
   const toast = useToast()
@@ -91,12 +134,14 @@ export default function ForecastListPage() {
   const [channelOrder, setChannelOrder] = useState([])
   const [rows, setRows] = useState([])
   const [versionRemark, setVersionRemark] = useState(null)
+  /** 最近一次成功載入的表單版本號（與 API 一致，用於第 1 版不顯示「變動」紅字） */
+  const [summaryVersionNo, setSummaryVersionNo] = useState(null)
 
   const [editMode, setEditMode] = useState(false)
   const [editChannelValues, setEditChannelValues] = useState({})
   const [editRowRemarks, setEditRowRemarks] = useState({})
   const [saving, setSaving] = useState(false)
-  const [reasonModal, setReasonModal] = useState(null)
+  const [saveConfirmOpen, setSaveConfirmOpen] = useState(false)
   const [remarkModal, setRemarkModal] = useState(null)
 
   const [sortKey, setSortKey] = useState(DEFAULT_SORT_KEY)
@@ -135,41 +180,61 @@ export default function ForecastListPage() {
     if (!selectedMonth || !monthClosed) {
       setFormVersions([])
       setSelectedVersionNo(null)
+      setSummaryVersionNo(null)
       return
     }
     getFormVersions(selectedMonth)
       .then((list) => {
-        setFormVersions(Array.isArray(list) ? list : [])
-        if (Array.isArray(list) && list.length > 0 && selectedVersionNo == null) {
-          setSelectedVersionNo(list[0].version_no ?? list[0].versionNo)
-        }
+        const arr = Array.isArray(list) ? list : []
+        setFormVersions(arr)
+        if (arr.length === 0) return
+        // 用函數式更新，避免 .then 閉包讀到過期的 selectedVersionNo，導致永遠不寫入預設版號
+        setSelectedVersionNo((prev) => {
+          if (prev != null) return prev
+          const vn = resolveFormVersionNo(arr[0].version_no ?? arr[0].versionNo, arr)
+          return vn != null ? vn : prev
+        })
       })
       .catch(() => setFormVersions([]))
   }, [selectedMonth, monthClosed])
 
-  const runQuery = useCallback(async () => {
+  const runQuery = useCallback(async (versionOverride) => {
     if (!selectedMonth || !monthClosed) return
-    if (selectedVersionNo == null) {
+    const explicitVer = normalizeQueryVersionOverride(versionOverride)
+    // 版本清單為非同步載入：使用者可能在 setSelectedVersionNo 生效前就按查詢，此時改以清單第一筆 fallback
+    let raw = explicitVer ?? selectedVersionNo
+    let usedListFallback = false
+    if (raw == null && formVersions.length > 0) {
+      raw = formVersions[0].version_no ?? formVersions[0].versionNo
+      usedListFallback = true
+    }
+    const versionNum = resolveFormVersionNo(raw, formVersions)
+    if (versionNum == null) {
       toast.error('請選擇版本')
       return
+    }
+    if (usedListFallback) {
+      setSelectedVersionNo(versionNum)
     }
     setQueryClicked(true)
     setLoadingQuery(true)
     setRows([])
     setPage(1)
     try {
-      const data = await getFormSummary(selectedMonth, selectedVersionNo)
+      const data = await getFormSummary(selectedMonth, versionNum)
       setChannelOrder(data.channel_order ?? data.channelOrder ?? [])
       setRows(data.rows ?? [])
       setVersionRemark(data.version_remark ?? data.versionRemark ?? null)
+      setSummaryVersionNo(data.version_no ?? data.versionNo ?? versionNum)
     } catch (err) {
       if (err.response?.status === 403) toast.error('您沒有權限檢視此資料')
       else toast.error(err.response?.data?.message || '無法載入表單摘要')
       setRows([])
+      setSummaryVersionNo(null)
     } finally {
       setLoadingQuery(false)
     }
-  }, [selectedMonth, monthClosed, selectedVersionNo, toast])
+  }, [selectedMonth, monthClosed, selectedVersionNo, formVersions, toast])
 
   const sortedRows = useMemo(() => {
     const key = sortKey
@@ -188,6 +253,12 @@ export default function ForecastListPage() {
     return sortedRows.slice(start, start + pageSize)
   }, [sortedRows, page, pageSize])
 
+  /** 第 1 版無「與前一版差異」，不顯示紅字（依最後一次成功載入的 API version_no） */
+  const isFormVersion1 = useMemo(
+    () => summaryVersionNo != null && Number(summaryVersionNo) === 1,
+    [summaryVersionNo],
+  )
+
   const handleSort = (key) => {
     if (sortKey === key) setSortAsc((a) => !a)
     else {
@@ -205,7 +276,8 @@ export default function ForecastListPage() {
     const next = {}
     rows.forEach((row, rowIdx) => {
       const cells = row.channel_cells ?? row.channelCells ?? []
-      next[rowIdx] = cells.map((c) => String(c.current_qty ?? c.currentQty ?? ''))
+      // 編輯時使用銷售數量（current_sales_qty），儲存僅會更新銷售預估上傳
+      next[rowIdx] = cells.map((c) => String(c.current_sales_qty ?? c.currentSalesQty ?? c.current_qty ?? c.currentQty ?? ''))
     })
     setEditChannelValues(next)
     const remarks = {}
@@ -236,23 +308,13 @@ export default function ForecastListPage() {
     return arr[chIdx]
   }
 
-  const handleSaveClick = () => {
-    setReasonModal({ open: true })
-  }
-
-  const handleReasonSubmit = async (changeReason) => {
-    if (!changeReason || !changeReason.trim()) {
-      toast.error('請輸入修改原因')
-      return
-    }
-    setReasonModal(null)
+  const performSave = async (changeReason = '') => {
     setSaving(true)
     try {
-      const channelOrderList = channelOrder.length ? channelOrder : (rows[0]?.channel_cells ?? rows[0]?.channelCells ?? []).map((_, i) => `通路${i + 1}`)
       const payloadRows = sortedRows.map((row) => {
         const rowIdxInRows = rows.indexOf(row)
         const cells = row.channel_cells ?? row.channelCells ?? []
-        const quantities = editMode ? (editChannelValues[rowIdxInRows] ?? cells.map((c) => c.current_qty ?? c.currentQty)) : cells.map((c) => c.current_qty ?? c.currentQty)
+        const quantities = editMode ? (editChannelValues[rowIdxInRows] ?? cells.map((c) => c.current_sales_qty ?? c.currentSalesQty ?? c.current_qty ?? c.currentQty)) : cells.map((c) => c.current_qty ?? c.currentQty)
         return {
           warehouse_location: row.warehouse_location ?? row.warehouseLocation,
           category: row.category,
@@ -264,7 +326,7 @@ export default function ForecastListPage() {
         }
       })
       const res = await saveFormSummaryVersion(selectedMonth, {
-        change_reason: changeReason.trim(),
+        change_reason: (changeReason && changeReason.trim()) ? changeReason.trim() : '',
         rows: payloadRows,
       })
       const newVersionNo = res?.version_no ?? res?.versionNo
@@ -272,14 +334,31 @@ export default function ForecastListPage() {
       setEditMode(false)
       setEditChannelValues({})
       setEditRowRemarks({})
-      setFormVersions((prev) => [...prev, { versionNo: newVersionNo, version_no: newVersionNo, createdAt: new Date().toISOString(), created_at: new Date().toISOString(), changeReason: changeReason.trim(), change_reason: changeReason.trim() }])
+      const [versList, summaryData] = await Promise.all([
+        getFormVersions(selectedMonth),
+        getFormSummary(selectedMonth, newVersionNo),
+      ])
+      setFormVersions(Array.isArray(versList) ? versList : [])
       setSelectedVersionNo(newVersionNo)
-      await runQuery()
+      setChannelOrder(summaryData.channel_order ?? summaryData.channelOrder ?? [])
+      setRows(summaryData.rows ?? [])
+      setVersionRemark(summaryData.version_remark ?? summaryData.versionRemark ?? null)
+      setSummaryVersionNo(summaryData.version_no ?? summaryData.versionNo ?? newVersionNo)
+      setPage(1)
     } catch (err) {
       toast.error(err.response?.data?.message || '儲存失敗')
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleSaveClick = () => {
+    setSaveConfirmOpen(true)
+  }
+
+  const handleSaveConfirm = () => {
+    setSaveConfirmOpen(false)
+    performSave('')
   }
 
   const handleExportExcel = () => {
@@ -297,6 +376,9 @@ export default function ForecastListPage() {
       const currVals = editMode && editChannelValues[rowIdxInRows] ? editChannelValues[rowIdxInRows] : cells.map((c) => c.current_qty ?? c.currentQty)
       const currSum = currVals.reduce((s, v) => s + num(v), 0)
       const diff = prevSum - currSum
+      /** 第 1 版無「與前一版比較」：未編輯時更改後小計、差異固定顯示 0 */
+      const exportAfterSum = isFormVersion1 ? 0 : currSum
+      const exportDiff = isFormVersion1 ? 0 : diff
       const remark = editMode ? (editRowRemarks[rowIdxInRows] ?? row.remark ?? '-') : (row.remark ?? '-')
       return [
         row.warehouse_location ?? row.warehouseLocation ?? '',
@@ -306,8 +388,8 @@ export default function ForecastListPage() {
         row.product_code ?? row.productCode ?? '',
         ...(editMode && editChannelValues[rowIdxInRows] ? editChannelValues[rowIdxInRows] : cells.map((c) => c.current_qty ?? c.currentQty ?? '')),
         prevSum,
-        currSum,
-        diff,
+        exportAfterSum,
+        exportDiff,
         remark,
       ]
     })
@@ -355,6 +437,7 @@ export default function ForecastListPage() {
                   setSelectedMonth(e.target.value)
                   setQueryClicked(false)
                   setSelectedVersionNo(null)
+                  setSummaryVersionNo(null)
                 }}
               >
                 <option value="">請選擇月份</option>
@@ -370,11 +453,17 @@ export default function ForecastListPage() {
               <select
                 id="version-select"
                 className="form-select"
-                value={selectedVersionNo ?? ''}
+                value={selectedVersionNo == null ? '' : String(selectedVersionNo)}
                 onChange={(e) => {
                   const v = e.target.value
-                  setSelectedVersionNo(v === '' ? null : Number(v))
+                  if (v === '') {
+                    setSelectedVersionNo(null)
+                  } else {
+                    const n = parseInt(v, 10)
+                    setSelectedVersionNo(Number.isNaN(n) ? null : n)
+                  }
                   setQueryClicked(false)
+                  setSummaryVersionNo(null)
                 }}
                 disabled={!monthClosed}
               >
@@ -383,11 +472,16 @@ export default function ForecastListPage() {
                 ) : formVersions.length === 0 ? (
                   <option value="">載入版本中...</option>
                 ) : (
-                  formVersions.map((v) => (
-                    <option key={v.version_no ?? v.versionNo} value={v.version_no ?? v.versionNo}>
-                      {formatVersionOption(v)}
-                    </option>
-                  ))
+                  formVersions
+                    .filter((v) => v.version_no != null || v.versionNo != null)
+                    .map((v) => {
+                      const vn = v.version_no ?? v.versionNo
+                      return (
+                        <option key={vn} value={String(vn)}>
+                          {formatVersionOption(v)}
+                        </option>
+                      )
+                    })
                 )}
               </select>
             </div>
@@ -396,7 +490,7 @@ export default function ForecastListPage() {
               <button
                 type="button"
                 className="btn btn--primary"
-                onClick={runQuery}
+                onClick={() => runQuery()}
                 disabled={!selectedMonth || !monthClosed || selectedVersionNo == null || loadingQuery}
               >
                 {loadingQuery ? '查詢中...' : '查詢'}
@@ -477,6 +571,9 @@ export default function ForecastListPage() {
                                   ? editChannelValues[rowIdxInRows].reduce((s, v) => s + num(v), 0)
                                   : cells.reduce((s, c) => s + num(c.current_qty ?? c.currentQty), 0)
                                 const diff = prevSum - currSum
+                                /** 第 1 版：未編輯模式下更改後小計、差異固定為 0 */
+                                const showAfterSum = isFormVersion1 && !editMode ? 0 : currSum
+                                const showDiff = isFormVersion1 && !editMode ? 0 : diff
                                 return (
                                   <tr key={globalIdx}>
                                     <td>{row.warehouse_location ?? row.warehouseLocation ?? '-'}</td>
@@ -484,23 +581,36 @@ export default function ForecastListPage() {
                                     <td>{row.spec ?? '-'}</td>
                                     <td>{row.product_name ?? row.productName ?? '-'}</td>
                                     <td>{row.product_code ?? row.productCode ?? '-'}</td>
-                                    {cells.map((cell, i) => (
-                                      <td key={i} className="align-right">
-                                        {editMode ? (
-                                          <input
-                                            type="text"
-                                            className="quantity-input"
-                                            value={getEditValue(rowIdxInRows, i)}
-                                            onChange={(e) => setEditCell(rowIdxInRows, i, e.target.value)}
-                                          />
-                                        ) : (
-                                          cell.current_qty ?? cell.currentQty ?? '-'
-                                        )}
-                                      </td>
-                                    ))}
+                                    {cells.map((cell, i) => {
+                                      const prevQ = cell.previous_qty ?? cell.previousQty
+                                      const currRaw = editMode
+                                        ? getEditValue(rowIdxInRows, i)
+                                        : (cell.current_qty ?? cell.currentQty)
+                                      const changed = !isFormVersion1 && channelValueChangedFromPrev(prevQ, currRaw)
+                                      return (
+                                        <td key={i} className="align-right forecast-channel-cell">
+                                          {editMode ? (
+                                            <input
+                                              type="text"
+                                              className={`quantity-input${changed ? ' quantity-input--channel-changed' : ''}`}
+                                              value={getEditValue(rowIdxInRows, i)}
+                                              onChange={(e) => setEditCell(rowIdxInRows, i, e.target.value)}
+                                              title={changed ? '與前一版不同' : undefined}
+                                            />
+                                          ) : (
+                                            <span
+                                              className={changed ? 'forecast-channel-value--changed' : undefined}
+                                              title={changed ? '與前一版不同' : undefined}
+                                            >
+                                              {cell.current_qty ?? cell.currentQty ?? '-'}
+                                            </span>
+                                          )}
+                                        </td>
+                                      )
+                                    })}
                                     <td className="align-right">{prevSum}</td>
-                                    <td className="align-right">{currSum}</td>
-                                    <td className="align-right">{diff}</td>
+                                    <td className="align-right">{showAfterSum}</td>
+                                    <td className="align-right">{showDiff}</td>
                                     <td className="forecast-remark-cell">
                                       {editMode ? (
                                         <input
@@ -560,17 +670,15 @@ export default function ForecastListPage() {
             <p className="forecast-hint">該月份尚無預估資料。</p>
           )}
 
-          {reasonModal?.open && (
-            <div className="forecast-remark-modal-overlay" role="dialog" aria-modal="true" aria-labelledby="forecast-reason-dialog-title">
-              <div className="forecast-remark-modal" onClick={(e) => e.stopPropagation()}>
-                <div className="forecast-remark-modal-header">
-                  <h3 id="forecast-reason-dialog-title">銷售預估量修改確認</h3>
-                  <button type="button" className="forecast-remark-modal-close" onClick={() => setReasonModal(null)} aria-label="關閉">×</button>
-                </div>
-                <ReasonForm onSubmit={handleReasonSubmit} onCancel={() => setReasonModal(null)} />
-              </div>
-            </div>
-          )}
+          <ConfirmDialog
+            open={saveConfirmOpen}
+            title="確認儲存"
+            message="是否確認修改？"
+            onConfirm={handleSaveConfirm}
+            onCancel={() => setSaveConfirmOpen(false)}
+            confirmText="是"
+            confirmButtonClass="btn--primary"
+          />
 
           {remarkModal && (
             <div className="forecast-remark-modal-overlay" onClick={() => setRemarkModal(null)} role="presentation">
@@ -585,29 +693,6 @@ export default function ForecastListPage() {
           )}
         </>
       )}
-    </div>
-  )
-}
-
-function ReasonForm({ onSubmit, onCancel }) {
-  const [value, setValue] = useState('')
-  return (
-    <div style={{ padding: 16 }}>
-      <label htmlFor="forecast-reason-input" className="forecast-reason-label">請輸入修改原因</label>
-      <p className="forecast-reason-hint">（修改原因將記錄於系統供後續查詢）</p>
-      <textarea
-        id="forecast-reason-input"
-        className="form-select"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder="請輸入修改原因"
-        rows={4}
-        style={{ width: '100%', resize: 'vertical' }}
-      />
-      <div style={{ marginTop: 12, display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-        <button type="button" className="btn btn--outline" onClick={onCancel}>取消</button>
-        <button type="button" className="btn btn--primary" onClick={() => onSubmit(value)}>確定</button>
-      </div>
     </div>
   )
 }

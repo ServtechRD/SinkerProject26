@@ -28,25 +28,31 @@ public class MaterialDemandService {
     private final MaterialDemandRepository materialDemandRepository;
     private final MaterialDemandExcelParser excelParser;
     private final JdbcTemplate jdbcTemplate;
+    private final PdcaRecomputeService pdcaRecomputeService;
+    private final ErpPurchaseOrderService erpPurchaseOrderService;
+    private final PdcaIntegrationService pdcaIntegrationService;
 
     public MaterialDemandService(MaterialDemandRepository materialDemandRepository,
                                  MaterialDemandExcelParser excelParser,
-                                 JdbcTemplate jdbcTemplate) {
+                                 JdbcTemplate jdbcTemplate,
+                                 PdcaRecomputeService pdcaRecomputeService,
+                                 ErpPurchaseOrderService erpPurchaseOrderService,
+                                 PdcaIntegrationService pdcaIntegrationService) {
         this.materialDemandRepository = materialDemandRepository;
         this.excelParser = excelParser;
         this.jdbcTemplate = jdbcTemplate;
+        this.pdcaRecomputeService = pdcaRecomputeService;
+        this.erpPurchaseOrderService = erpPurchaseOrderService;
+        this.pdcaIntegrationService = pdcaIntegrationService;
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * 查詢：呼叫 PDCA（外部 URL 或 URL 未設定時固定假資料），並覆寫 DB 後回傳。
+     */
+    @Transactional
     public List<MaterialDemandDTO> queryMaterialDemand(LocalDate weekStart, String factory) {
-        log.info("Querying material demand for weekStart: {}, factory: {}", weekStart, factory);
-
-        List<MaterialDemand> demands = materialDemandRepository
-                .findByWeekStartAndFactoryOrderByMaterialCodeAsc(weekStart, factory);
-
-        return demands.stream()
-                .map(MaterialDemandDTO::fromEntity)
-                .collect(Collectors.toList());
+        log.info("Querying material demand via PDCA: weekStart={}, factory={}", weekStart, factory);
+        return pdcaIntegrationService.syncMaterialDemandFromPdca(weekStart, factory);
     }
 
     @Transactional
@@ -62,6 +68,7 @@ public class MaterialDemandService {
         entity.setUpdatedAt(LocalDateTime.now());
         MaterialDemand saved = materialDemandRepository.save(entity);
         markPendingConfirm(saved.getWeekStart(), saved.getFactory());
+        pdcaRecomputeService.recomputeAsync(saved.getWeekStart(), saved.getFactory());
         log.info("Updated material demand id={}", id);
         return MaterialDemandDTO.fromEntity(saved);
     }
@@ -96,6 +103,7 @@ public class MaterialDemandService {
         }).collect(Collectors.toList());
         materialDemandRepository.saveAll(entities);
         log.info("Saved {} material demand records", entities.size());
+        pdcaRecomputeService.recomputeAsync(weekStart, factory);
         return entities.size();
     }
 
@@ -106,9 +114,10 @@ public class MaterialDemandService {
                 weekStart, factory);
     }
 
-    /** 本週資料確認無誤送出至天心 ERP：清除待確認記錄（dummy API） */
+    /** 本週資料確認無誤送出至天心 ERP：先呼叫外部 ERP 採購單建立 API，再清除待確認記錄 */
     @Transactional
     public void confirmSendErp(LocalDate weekStart, String factory) {
+        erpPurchaseOrderService.createPurchaseOrder(weekStart, factory);
         jdbcTemplate.update("DELETE FROM material_demand_pending_confirm WHERE week_start = ? AND factory = ?", weekStart, factory);
         log.info("Confirm send ERP: weekStart={}, factory={}", weekStart, factory);
     }

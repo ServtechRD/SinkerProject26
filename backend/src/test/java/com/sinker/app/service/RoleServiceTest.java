@@ -9,6 +9,7 @@ import com.sinker.app.exception.ResourceNotFoundException;
 import com.sinker.app.repository.PermissionRepository;
 import com.sinker.app.repository.RolePermissionRepository;
 import com.sinker.app.repository.RoleRepository;
+import com.sinker.app.repository.UserRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,11 +39,14 @@ class RoleServiceTest {
     @Mock
     private RolePermissionRepository rolePermissionRepository;
 
+    @Mock
+    private UserRepository userRepository;
+
     private RoleService roleService;
 
     @BeforeEach
     void setUp() {
-        roleService = new RoleService(roleRepository, permissionRepository, rolePermissionRepository);
+        roleService = new RoleService(roleRepository, permissionRepository, rolePermissionRepository, userRepository);
         lenient().when(permissionRepository.findAll(any(Sort.class))).thenReturn(List.of());
     }
 

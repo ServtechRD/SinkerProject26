@@ -6,6 +6,7 @@ import com.sinker.app.dto.forecast.UpdateConfigRequest;
 import com.sinker.app.entity.SalesForecastConfig;
 import com.sinker.app.exception.ResourceNotFoundException;
 import com.sinker.app.repository.SalesForecastConfigRepository;
+import com.sinker.app.service.FormSummaryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -25,9 +26,12 @@ public class SalesForecastConfigService {
     private static final DateTimeFormatter MONTH_FORMAT = DateTimeFormatter.ofPattern("yyyyMM");
 
     private final SalesForecastConfigRepository repository;
+    private final FormSummaryService formSummaryService;
 
-    public SalesForecastConfigService(SalesForecastConfigRepository repository) {
+    public SalesForecastConfigService(SalesForecastConfigRepository repository,
+                                      FormSummaryService formSummaryService) {
         this.repository = repository;
+        this.formSummaryService = formSummaryService;
     }
 
     @Transactional
@@ -113,6 +117,14 @@ public class SalesForecastConfigService {
 
         config.setUpdatedAt(LocalDateTime.now());
         SalesForecastConfig saved = repository.save(config);
+
+        if (Boolean.TRUE.equals(saved.getIsClosed())) {
+            try {
+                formSummaryService.createFormVersion1Snapshot(saved.getMonth(), saved);
+            } catch (Exception ex) {
+                log.warn("Failed to create form version 1 snapshot for month {}: {}", saved.getMonth(), ex.getMessage());
+            }
+        }
         return ConfigResponse.fromEntity(saved);
     }
 
@@ -126,8 +138,13 @@ public class SalesForecastConfigService {
             config.setIsClosed(true);
             config.setClosedAt(now);
             config.setUpdatedAt(now);
-            repository.save(config);
-            log.info("Auto-closed month {} (auto_close_day={})", config.getMonth(), currentDay);
+            SalesForecastConfig saved = repository.save(config);
+            log.info("Auto-closed month {} (auto_close_day={})", saved.getMonth(), currentDay);
+            try {
+                formSummaryService.createFormVersion1Snapshot(saved.getMonth(), saved);
+            } catch (Exception ex) {
+                log.warn("Failed to create form version 1 snapshot for month {}: {}", saved.getMonth(), ex.getMessage());
+            }
         }
 
         return configs.size();

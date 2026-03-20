@@ -362,11 +362,12 @@ export default function GiftForecastUploadPage() {
   const handleAddSuccess = async (createdItem) => {
     toast.success('項目已新增')
     setShowAddDialog(false)
-    if (createdItem?.id != null) {
-      setLastAddedIds((prev) => new Set([...prev, createdItem.id]))
-    }
+    const addedId = createdItem?.id != null ? createdItem.id : null
     // 查詢為空時 selectedVersion 可能為 ''，fetchResultList 會直接 return；改跑 runQuery 重新取版本並載入列表
     await runQuery()
+    if (addedId != null) {
+      setLastAddedIds(new Set([addedId]))
+    }
   }
 
   const handleExportExcel = () => {

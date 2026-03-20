@@ -8,6 +8,7 @@ import UserCreatePage from './pages/users/UserCreatePage'
 import UserEditPage from './pages/users/UserEditPage'
 import RoleListPage from './pages/roles/RoleListPage'
 import RoleEditPage from './pages/roles/RoleEditPage'
+import RoleCreatePage from './pages/roles/RoleCreatePage'
 import ForecastConfigPage from './pages/sales-forecast/ForecastConfigPage'
 import ForecastUploadPage from './pages/sales-forecast/ForecastUploadPage'
 import GiftForecastUploadPage from './pages/sales-forecast/GiftForecastUploadPage'
@@ -39,6 +40,7 @@ export default function AppRoutes() {
         <Route path="users/create" element={<UserCreatePage />} />
         <Route path="users/:id/edit" element={<UserEditPage />} />
         <Route path="roles" element={<RoleListPage />} />
+        <Route path="roles/create" element={<RoleCreatePage />} />
         <Route path="roles/:id/edit" element={<RoleEditPage />} />
         <Route path="sales-forecast/config" element={<ForecastConfigPage />} />
         <Route path="sales-forecast/upload" element={<ForecastUploadPage />} />

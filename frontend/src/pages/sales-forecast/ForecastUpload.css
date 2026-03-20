@@ -225,19 +225,35 @@
   font-weight: 600;
 }
 
-/* 上傳結果：新增項目整列紅字（重新查詢後 lastAddedIds 清空即恢復黑字） */
-.forecast-upload-page .forecast-table tbody tr.row-added td {
+/* 上傳結果：新增項目整列紅字（重新查詢後 lastAddedIds 清空即恢復黑字）；編輯按鈕維持原色 */
+.forecast-upload-page .forecast-table tbody tr.row-added td,
+.forecast-upload-page .forecast-table tbody tr.row-added td .quantity-editable,
+.forecast-upload-page .forecast-table tbody tr.row-added td span,
+.forecast-upload-page .forecast-table tbody tr.row-added td.quantity-cell--zero,
+.forecast-upload-page .forecast-table tbody tr.row-added td input.quantity-input {
   color: #c62828 !important;
   font-weight: 500;
 }
 
-.forecast-upload-page .forecast-table tbody tr.row-added td .quantity-editable,
-.forecast-upload-page .forecast-table tbody tr.row-added td span,
-.forecast-upload-page .forecast-table tbody tr.row-added td.quantity-cell--zero {
-  color: #c62828 !important;
+/* 新增列的編輯按鈕與其他列一致：藍字（僅按鈕，儲存格本身不設邊線色） */
+.forecast-upload-page .forecast-table tbody tr.row-added td.actions-cell {
+  color: #1976d2 !important;
+  font-weight: normal;
+}
+.forecast-upload-page .forecast-table tbody tr.row-added td.actions-cell button,
+.forecast-upload-page .forecast-table tbody tr.row-added td.actions-cell .btn--outline,
+.forecast-upload-page .forecast-table tbody tr.row-added td.actions-cell .btn--primary {
+  color: #1976d2 !important;
+  font-weight: normal;
+  border-color: #1976d2;
+}
+.forecast-upload-page .forecast-table tbody tr.row-added td.actions-cell .btn--primary {
+  background-color: #1976d2;
+  color: #fff !important;
 }
 
-.forecast-upload-page .forecast-table tbody tr.row-added:hover td {
+.forecast-upload-page .forecast-table tbody tr.row-added:hover td:not(.actions-cell),
+.forecast-upload-page .forecast-table tbody tr.row-added:hover td span {
   color: #b71c1c !important;
 }
 

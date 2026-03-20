@@ -6,11 +6,8 @@ import { getWeeklyScheduleFactories } from '../../api/weeklySchedule'
 import {
   getMaterialDemand,
   updateMaterialDemand,
-  uploadMaterialDemand,
-  downloadMaterialDemandTemplate,
   confirmSendErp,
 } from '../../api/materialDemand'
-import FileDropzone from '../../components/forecast/FileDropzone'
 import './MaterialDemand.css'
 
 function getWeekOptions() {
@@ -73,18 +70,12 @@ export default function MaterialDemandFormPage() {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
 
-  const [selectedFile, setSelectedFile] = useState(null)
-  const [fileError, setFileError] = useState('')
-  const [uploading, setUploading] = useState(false)
-  const [downloadingTemplate, setDownloadingTemplate] = useState(false)
-
   const [editMode, setEditMode] = useState(false)
   const [purchaseQuantityById, setPurchaseQuantityById] = useState({})
   const [saving, setSaving] = useState(false)
   const [confirmingErp, setConfirmingErp] = useState(false)
 
   const canView = hasPermission(user, 'material_demand.view')
-  const canUpload = hasPermission(user, 'material_demand.upload')
   const canEdit = hasPermission(user, 'material_demand.edit')
   const canConfirmSendErp = hasPermission(user, 'confirm_data_send_erp')
 
@@ -158,62 +149,6 @@ export default function MaterialDemandFormPage() {
     }
     await runQueryRef()
   }, [weekStart, factory, toast, runQueryRef])
-
-  const handleFileChange = (file) => {
-    setFileError('')
-    if (!file) {
-      setSelectedFile(null)
-      return
-    }
-    if (!file.name.toLowerCase().endsWith('.xlsx')) {
-      setFileError('請上傳 .xlsx 檔案')
-      return
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      setFileError('檔案大小超過 10MB')
-      return
-    }
-    setSelectedFile(file)
-  }
-
-  const handleDownloadTemplate = async () => {
-    if (!factory) {
-      toast.error('請先選擇廠區')
-      return
-    }
-    setDownloadingTemplate(true)
-    try {
-      await downloadMaterialDemandTemplate(factory)
-    } catch (err) {
-      toast.error('下載範本失敗')
-    } finally {
-      setDownloadingTemplate(false)
-    }
-  }
-
-  const handleUpload = async () => {
-    if (!weekStart || !factory || !selectedFile) {
-      toast.error('請選擇生產週、廠區及檔案')
-      return
-    }
-    setUploading(true)
-    try {
-      const res = await uploadMaterialDemand(selectedFile, weekStart, factory)
-      const count = res?.count ?? 0
-      toast.success(`成功上傳 ${count} 筆資料`)
-      setSelectedFile(null)
-      setFileError('')
-      await runQuery()
-    } catch (err) {
-      if (err.response?.data?.details && Array.isArray(err.response.data.details)) {
-        toast.error(err.response.data.details.join('; '))
-      } else {
-        toast.error(err.response?.data?.message || '上傳失敗')
-      }
-    } finally {
-      setUploading(false)
-    }
-  }
 
   const handleEditStart = () => {
     if (!canEdit || !data.length) return
@@ -353,7 +288,7 @@ export default function MaterialDemandFormPage() {
               className="form-select"
               value={weekStart}
               onChange={(e) => setWeekStart(e.target.value)}
-              disabled={loading || uploading || loadingFactories}
+              disabled={loading || loadingFactories}
             >
               {weekOptions.map((opt) => (
                 <option key={opt.value} value={opt.value}>
@@ -368,7 +303,7 @@ export default function MaterialDemandFormPage() {
               className="form-select"
               value={factory}
               onChange={(e) => setFactory(e.target.value)}
-              disabled={loading || uploading || loadingFactories}
+              disabled={loading || loadingFactories}
             >
               <option value="">請選擇廠區</option>
               {factories.map((f) => (
@@ -382,7 +317,7 @@ export default function MaterialDemandFormPage() {
             <button
               type="button"
               className="btn btn--primary"
-              onClick={runQuery}
+              onClick={() => runQuery()}
               disabled={!weekStart || !factory || loading}
             >
               {loading ? '查詢中...' : '查詢'}
@@ -391,51 +326,9 @@ export default function MaterialDemandFormPage() {
         </div>
       </section>
 
-      {canUpload && (
-        <section className="material-demand-block material-demand-block--upload">
-          <h2>上傳區</h2>
-          <p className="material-demand-upload-hint">
-            生產週：{weekStart || '-'}，廠區：{factory || '-'}
-          </p>
-          <div className="upload-area">
-            <FileDropzone
-              file={selectedFile}
-              onFileChange={handleFileChange}
-              error={fileError}
-              disabled={uploading}
-            />
-          </div>
-          <div className="upload-actions">
-            <button
-              type="button"
-              className="btn btn--outline"
-              onClick={handleDownloadTemplate}
-              disabled={!factory || downloadingTemplate}
-            >
-              {downloadingTemplate ? '下載中...' : '範本下載'}
-            </button>
-            <button
-              type="button"
-              className="btn btn--primary"
-              onClick={handleUpload}
-              disabled={!weekStart || !factory || !selectedFile || !!fileError || uploading}
-            >
-              {uploading ? (
-                <>
-                  <span className="upload-spinner" />
-                  上傳中...
-                </>
-              ) : (
-                '上傳'
-              )}
-            </button>
-          </div>
-        </section>
-      )}
-
       {queryClicked && (
         <section className="material-demand-block material-demand-block--result">
-          <h2>上傳結果</h2>
+          <h2>物料需求數量表單 結果</h2>
           <div className="material-demand-result-toolbar">
             {canEdit && !editMode && (
               <button

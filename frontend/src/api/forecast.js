@@ -1,5 +1,37 @@
 import api from './axios'
 
+/**
+ * 將月份參數轉成 YYYYMM 字串，避免誤傳物件時被序列化為 [object Object]。
+ */
+function toMonthString(month) {
+  if (month == null) return ''
+  if (typeof month === 'string' || typeof month === 'number') return String(month)
+  if (typeof month === 'object' && month !== null && month.month != null) {
+    return String(month.month)
+  }
+  return String(month)
+}
+
+/**
+ * 將版本號轉成數字；若為 { version_no } 等物件則取出再轉。
+ */
+function toVersionNoNumber(versionNo) {
+  if (versionNo == null || versionNo === '') return undefined
+  if (typeof versionNo === 'number') {
+    if (Number.isNaN(versionNo) || !Number.isFinite(versionNo)) return undefined
+    return versionNo
+  }
+  if (typeof versionNo === 'string') {
+    const n = parseInt(versionNo, 10)
+    return Number.isNaN(n) ? undefined : n
+  }
+  if (typeof versionNo === 'object' && versionNo !== null) {
+    const v = versionNo.version_no ?? versionNo.versionNo
+    if (v != null) return toVersionNoNumber(v)
+  }
+  return undefined
+}
+
 export function uploadForecast(file, month, channel) {
   const formData = new FormData()
   formData.append('file', file)
@@ -97,19 +129,29 @@ export function getVersionDiff(month, channel, version) {
     .then((r) => r.data)
 }
 
+/**
+ * @param {string|number|object} month YYYYMM
+ * @param {number|null|undefined} versionNo 表單版本（必須帶正整數，關帳後查表單摘要必用，否則後端會走舊版彙總且 version_no 為 null）
+ */
 export function getFormSummary(month, versionNo = null) {
-  const params = { month }
-  if (versionNo != null) params.version_no = versionNo
+  const params = { month: toMonthString(month) }
+  const vn = toVersionNoNumber(versionNo)
+  // 僅在能解析出有效數字時附帶；若漏帶 version_no，後端會當成「未指定版本」走 legacy
+  if (vn !== undefined && vn !== null) params.version_no = vn
   return api.get('/api/sales-forecast/form-summary', { params }).then((r) => r.data)
 }
 
 export function getFormVersions(month) {
-  return api.get('/api/sales-forecast/form-versions', { params: { month } }).then((r) => r.data)
+  return api
+    .get('/api/sales-forecast/form-versions', { params: { month: toMonthString(month) } })
+    .then((r) => r.data)
 }
 
 export function saveFormSummaryVersion(month, payload) {
   return api
-    .post('/api/sales-forecast/form-summary/save-version', payload, { params: { month } })
+    .post('/api/sales-forecast/form-summary/save-version', payload, {
+      params: { month: toMonthString(month) },
+    })
     .then((r) => r.data)
 }
 

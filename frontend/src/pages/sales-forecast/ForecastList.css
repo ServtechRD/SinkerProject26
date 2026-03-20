@@ -498,6 +498,21 @@
   background-color: #e3f2fd;
 }
 
+/* 通路：與前一版不同時，僅將變動後數字以紅字呈現（不另顯示差異值） */
+.forecast-channel-cell {
+  vertical-align: middle;
+}
+
+.forecast-channel-value--changed {
+  color: #c62828;
+  font-weight: 500;
+}
+
+.forecast-channel-cell .quantity-input--channel-changed {
+  color: #c62828;
+  font-weight: 500;
+}
+
 @media (max-width: 768px) {
   .forecast-filters {
     flex-direction: column;

@@ -110,8 +110,7 @@ public class SalesForecastConfigService {
                 config.setIsClosed(true);
                 config.setClosedAt(LocalDateTime.now());
             } else if (wasClosed && !nowClosed) {
-                config.setIsClosed(false);
-                config.setClosedAt(null);
+                throw new IllegalArgumentException("已結束新增的月份無法重新開放");
             }
         }
 

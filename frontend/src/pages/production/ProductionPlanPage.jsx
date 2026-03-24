@@ -306,7 +306,7 @@ export default function ProductionPlanPage() {
             <div className="production-loading" role="status">載入中...</div>
           ) : data.length === 0 ? (
             <div className="production-empty">
-              該區間尚無生產表單資料，或請先選擇版本
+              請生管設定結束新增查詢月份的銷售預估量表單
             </div>
           ) : (
             <div className="production-grid-wrap">

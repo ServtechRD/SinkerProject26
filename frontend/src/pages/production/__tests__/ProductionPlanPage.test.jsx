@@ -143,7 +143,7 @@ describe('ProductionPlanPage', () => {
     await userEvent.click(queryButton)
 
     await waitFor(() => {
-      expect(screen.getByText(/該區間尚無生產表單資料/)).toBeInTheDocument()
+      expect(screen.getByText(/請生管設定結束新增查詢月份的銷售預估量表單/)).toBeInTheDocument()
     })
   })
 
@@ -228,7 +228,7 @@ describe('ProductionPlanPage', () => {
       expect(productionPlanApi.getProductionPlanVersions).toHaveBeenCalled()
     })
     await waitFor(() => {
-      expect(screen.getByText(/該區間尚無生產表單資料/)).toBeInTheDocument()
+      expect(screen.getByText(/請生管設定結束新增查詢月份的銷售預估量表單/)).toBeInTheDocument()
     })
   })
 

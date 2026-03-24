@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react'
 import { updateConfig } from '../../api/forecastConfig'
 import { useToast } from '../../components/Toast'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import './ForecastConfig.css'
+
+const CLOSE_CONFIRM_MESSAGE =
+  '結束新增設定，無法再上傳銷售預估量表單及禮品銷售預估量表單，也無法重新啟用，確定結束？'
 
 export default function EditConfigDialog({ open, config, onClose, onSuccess }) {
   const toast = useToast()
@@ -9,12 +13,14 @@ export default function EditConfigDialog({ open, config, onClose, onSuccess }) {
   const [isClosed, setIsClosed] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [closeConfirmOpen, setCloseConfirmOpen] = useState(false)
 
   useEffect(() => {
     if (config) {
       setAutoCloseDay(String(config.autoCloseDay ?? ''))
       setIsClosed(!!config.isClosed)
       setError('')
+      setCloseConfirmOpen(false)
     }
   }, [config])
 
@@ -57,11 +63,32 @@ export default function EditConfigDialog({ open, config, onClose, onSuccess }) {
 
   function handleClose() {
     setError('')
+    setCloseConfirmOpen(false)
     onClose()
   }
 
+  function handleIsClosedChange(wantClosed) {
+    if (!config || config.isClosed) return
+    if (wantClosed) {
+      setCloseConfirmOpen(true)
+    } else {
+      setIsClosed(false)
+    }
+  }
+
+  function handleCloseConfirmOk() {
+    setIsClosed(true)
+    setCloseConfirmOpen(false)
+  }
+
   return (
-    <div className="dialog-overlay" onClick={handleClose}>
+    <>
+    <div
+      className="dialog-overlay"
+      onClick={() => {
+        if (!closeConfirmOpen) handleClose()
+      }}
+    >
       <div
         className="dialog"
         role="dialog"
@@ -106,12 +133,15 @@ export default function EditConfigDialog({ open, config, onClose, onSuccess }) {
                 id="editIsClosed"
                 type="checkbox"
                 checked={isClosed}
-                onChange={(e) => setIsClosed(e.target.checked)}
-                disabled={loading}
+                onChange={(e) => handleIsClosedChange(e.target.checked)}
+                disabled={loading || !!config.isClosed}
               />
               <span className="fc-switch-slider" />
             </label>
           </div>
+          {config.isClosed && (
+            <div className="form-hint">已結束新增設定，無法再開放；仍可修改自動結束新增設定日期。</div>
+          )}
           <div className="dialog-actions">
             <button
               type="button"
@@ -132,5 +162,16 @@ export default function EditConfigDialog({ open, config, onClose, onSuccess }) {
         </form>
       </div>
     </div>
+
+    <ConfirmDialog
+      open={closeConfirmOpen}
+      title="確認結束新增設定"
+      message={CLOSE_CONFIRM_MESSAGE}
+      onConfirm={handleCloseConfirmOk}
+      onCancel={() => setCloseConfirmOpen(false)}
+      confirmText="確定"
+      confirmButtonClass="btn--primary"
+    />
+    </>
   )
 }

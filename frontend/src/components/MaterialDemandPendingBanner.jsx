@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { getMaterialDemandPendingConfirm } from '../api/materialDemand'
+import { formatMaterialDemandSavedAt } from '../utils/materialDemandDateTime'
 import './MaterialDemandPendingBanner.css'
 
 function hasPermission(user, perm) {
@@ -30,10 +31,18 @@ export default function MaterialDemandPendingBanner() {
           const fac = item.factory != null ? String(item.factory) : ''
           if (!ws || !fac) return null
           const to = `/material-demand/form?week_start=${encodeURIComponent(ws)}&factory=${encodeURIComponent(fac)}`
+          const savedLabel = formatMaterialDemandSavedAt(item.updatedAt ?? item.updated_at)
           return (
-            <Link key={`${ws}-${fac}-${i}`} to={to} className="material-demand-pending-banner__link">
-              {ws} {fac}
-            </Link>
+            <span key={`${ws}-${fac}-${i}`} className="material-demand-pending-banner__item">
+              <Link to={to} className="material-demand-pending-banner__link">
+                {ws} {fac}
+              </Link>
+              {savedLabel && (
+                <span className="material-demand-pending-banner__saved-at">
+                  （最後編輯儲存：{savedLabel}）
+                </span>
+              )}
+            </span>
           )
         })}
       </span>

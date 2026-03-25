@@ -16,7 +16,21 @@
 .material-demand-pending-banner__links {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 8px 12px;
+  align-items: baseline;
+}
+
+.material-demand-pending-banner__item {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.material-demand-pending-banner__saved-at {
+  font-weight: 500;
+  color: #78350f;
+  font-size: 13px;
 }
 
 .material-demand-pending-banner__link {

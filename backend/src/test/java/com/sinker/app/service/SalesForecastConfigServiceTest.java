@@ -187,18 +187,17 @@ class SalesForecastConfigServiceTest {
     }
 
     @Test
-    void testUpdateConfig_ChangeClosedToFalse() {
+    void testUpdateConfig_CannotReopenWhenClosed() {
         SalesForecastConfig config = createConfig(1, "202501", 10, true);
         when(repository.findById(1)).thenReturn(Optional.of(config));
-        when(repository.save(any(SalesForecastConfig.class))).thenAnswer(inv -> inv.getArgument(0));
 
         UpdateConfigRequest request = new UpdateConfigRequest();
         request.setIsClosed(false);
 
-        ConfigResponse response = service.updateConfig(1, request);
-
-        assertFalse(response.getIsClosed());
-        assertNull(response.getClosedAt());
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.updateConfig(1, request));
+        assertTrue(ex.getMessage().contains("無法重新開放"));
+        verify(repository, never()).save(any());
     }
 
     @Test

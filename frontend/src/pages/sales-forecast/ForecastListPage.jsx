@@ -11,7 +11,7 @@ import ConfirmDialog from '../../components/ConfirmDialog'
 import './ForecastList.css'
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50]
-const DEFAULT_SORT_KEY = 'category'
+const DEFAULT_SORT_KEY = 'product_code'
 const DEFAULT_SORT_ASC = true
 
 function hasPermission(user, perm) {
@@ -116,6 +116,20 @@ function num(v) {
 /** 通路格：目前值是否與前一版不同（用於紅字） */
 function channelValueChangedFromPrev(prevQty, currQty) {
   return Math.abs(num(currQty) - num(prevQty)) > 1e-9
+}
+
+/** 編輯列：依各格贈品量（current − sales）不變，加總編輯後銷售，得到與目前版 current_qty 同口徑的列總合 */
+function editedRowCurrentQtyTotal(cells, rowIdxInRows, getEditVal) {
+  return cells.reduce((s, c, i) => {
+    const baseCurr = num(c.current_qty ?? c.currentQty)
+    const baseSales = num(
+      c.current_sales_qty ?? c.currentSalesQty ?? c.current_qty ?? c.currentQty,
+    )
+    const giftPart = baseCurr - baseSales
+    const raw = getEditVal(rowIdxInRows, i)
+    const editedSales = raw === '' || raw == null ? 0 : num(raw)
+    return s + editedSales + giftPart
+  }, 0)
 }
 
 export default function ForecastListPage() {
@@ -372,13 +386,17 @@ export default function ForecastListPage() {
     const dataRows = sortedRows.map((row) => {
       const rowIdxInRows = rows.indexOf(row)
       const cells = row.channel_cells ?? row.channelCells ?? []
-      const prevSum = cells.reduce((s, c) => s + num(c.previous_qty ?? c.previousQty), 0)
-      const currVals = editMode && editChannelValues[rowIdxInRows] ? editChannelValues[rowIdxInRows] : cells.map((c) => c.current_qty ?? c.currentQty)
-      const currSum = currVals.reduce((s, v) => s + num(v), 0)
-      const diff = prevSum - currSum
+      /** 非編輯：原小計欄 = 前一版各通路數量加總；編輯時匯出「原小計」改為本版總合（與畫面編輯模式一致） */
+      const previousVersionSum = cells.reduce((s, c) => s + num(c.previous_qty ?? c.previousQty), 0)
+      const currentVersionSum = cells.reduce((s, c) => s + num(c.current_qty ?? c.currentQty), 0)
+      const afterTotal = editMode && editChannelValues[rowIdxInRows]
+        ? editedRowCurrentQtyTotal(cells, rowIdxInRows, getEditValue)
+        : currentVersionSum
+      const exportOriginal = editMode ? currentVersionSum : previousVersionSum
+      const diff = exportOriginal - afterTotal
       /** 第 1 版無「與前一版比較」：未編輯時更改後小計、差異固定顯示 0 */
-      const exportAfterSum = isFormVersion1 ? 0 : currSum
-      const exportDiff = isFormVersion1 ? 0 : diff
+      const exportAfterSum = isFormVersion1 && !editMode ? 0 : afterTotal
+      const exportDiff = isFormVersion1 && !editMode ? 0 : diff
       const remark = editMode ? (editRowRemarks[rowIdxInRows] ?? row.remark ?? '-') : (row.remark ?? '-')
       return [
         row.warehouse_location ?? row.warehouseLocation ?? '',
@@ -387,7 +405,7 @@ export default function ForecastListPage() {
         row.product_name ?? row.productName ?? '',
         row.product_code ?? row.productCode ?? '',
         ...(editMode && editChannelValues[rowIdxInRows] ? editChannelValues[rowIdxInRows] : cells.map((c) => c.current_qty ?? c.currentQty ?? '')),
-        prevSum,
+        exportOriginal,
         exportAfterSum,
         exportDiff,
         remark,
@@ -566,14 +584,22 @@ export default function ForecastListPage() {
                                 const globalIdx = sortedRows.indexOf(row)
                                 const rowIdxInRows = rows.indexOf(row)
                                 const cells = row.channel_cells ?? row.channelCells ?? []
-                                const prevSum = cells.reduce((s, c) => s + num(c.previous_qty ?? c.previousQty), 0)
-                                const currSum = editMode && editChannelValues[rowIdxInRows]
-                                  ? editChannelValues[rowIdxInRows].reduce((s, v) => s + num(v), 0)
-                                  : cells.reduce((s, c) => s + num(c.current_qty ?? c.currentQty), 0)
-                                const diff = prevSum - currSum
+                                /** 查詢且非編輯：原小計 = 前一版各通路 previous_qty 加總 */
+                                const previousVersionSum = cells.reduce((s, c) => s + num(c.previous_qty ?? c.previousQty), 0)
+                                const currentVersionSum = cells.reduce((s, c) => s + num(c.current_qty ?? c.currentQty), 0)
+                                const editedRowTotal =
+                                  editMode && editChannelValues[rowIdxInRows]
+                                    ? editedRowCurrentQtyTotal(cells, rowIdxInRows, getEditValue)
+                                    : currentVersionSum
+                                const displayOriginalSubtotal = editMode ? currentVersionSum : previousVersionSum
+                                const diff = displayOriginalSubtotal - editedRowTotal
                                 /** 第 1 版：未編輯模式下更改後小計、差異固定為 0 */
-                                const showAfterSum = isFormVersion1 && !editMode ? 0 : currSum
+                                const showAfterSum = isFormVersion1 && !editMode ? 0 : editedRowTotal
                                 const showDiff = isFormVersion1 && !editMode ? 0 : diff
+                                const highlightAfterDiff =
+                                  editMode
+                                    ? Math.abs(currentVersionSum - editedRowTotal) > 1e-9
+                                    : !isFormVersion1 && Math.abs(previousVersionSum - currentVersionSum) > 1e-9
                                 return (
                                   <tr key={globalIdx}>
                                     <td>{row.warehouse_location ?? row.warehouseLocation ?? '-'}</td>
@@ -608,9 +634,9 @@ export default function ForecastListPage() {
                                         </td>
                                       )
                                     })}
-                                    <td className="align-right">{prevSum}</td>
-                                    <td className="align-right">{showAfterSum}</td>
-                                    <td className="align-right">{showDiff}</td>
+                                    <td className="align-right">{displayOriginalSubtotal}</td>
+                                    <td className={`align-right${highlightAfterDiff ? ' forecast-channel-value--changed' : ''}`}>{showAfterSum}</td>
+                                    <td className={`align-right${highlightAfterDiff ? ' forecast-channel-value--changed' : ''}`}>{showDiff}</td>
                                     <td className="forecast-remark-cell">
                                       {editMode ? (
                                         <input

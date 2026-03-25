@@ -39,7 +39,13 @@ export default function SemiProductImportPage() {
     setLoading(true)
     try {
       const data = await listSemiProducts()
-      setProducts(Array.isArray(data) ? data : [])
+      const list = Array.isArray(data) ? data : []
+      setProducts(list)
+      if (list.length === 0) {
+        setEditMode(false)
+        setDraftAdvanceDaysById({})
+        setDraftAdvanceDaysErrorsById({})
+      }
     } catch (err) {
       if (err.response?.status === 403) {
         toast.error('您沒有權限檢視此頁面')
@@ -249,7 +255,7 @@ export default function SemiProductImportPage() {
           onClick={fetchProducts}
           disabled={loading}
         >
-          {loading ? '查詢中...' : '查詢'}
+          {loading ? '重新整理中...' : '重新整理'}
         </button>
       </div>
 
@@ -295,48 +301,49 @@ export default function SemiProductImportPage() {
 
       <section className="semi-product-result-section">
         <h2>目前半成品提前採購設定</h2>
-        <div className="semi-product-result-toolbar">
-          {canEdit && !editMode && (
-            <button
-              type="button"
-              className="btn btn--outline"
-              onClick={handleStartEditAll}
-              disabled={loading || saving}
-            >
-              編輯
-            </button>
-          )}
-
-          {canEdit && editMode && (
-            <>
-              <button
-                type="button"
-                className="btn btn--primary"
-                onClick={handleSaveEditAll}
-                disabled={saving}
-              >
-                {saving ? '儲存中...' : '儲存'}
-              </button>
+        {products.length > 0 && (
+          <div className="semi-product-result-toolbar">
+            {canEdit && !editMode && (
               <button
                 type="button"
                 className="btn btn--outline"
-                onClick={handleCancelEditAll}
-                disabled={saving}
+                onClick={handleStartEditAll}
+                disabled={loading || saving}
               >
-                取消
+                編輯
               </button>
-            </>
-          )}
+            )}
 
-          <button
-            type="button"
-            className="btn btn--outline"
-            onClick={handleExportCsv}
-            disabled={!products.length}
-          >
-            Excel 匯出 (CSV)
-          </button>
-        </div>
+            {canEdit && editMode && (
+              <>
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={handleSaveEditAll}
+                  disabled={saving}
+                >
+                  {saving ? '儲存中...' : '儲存'}
+                </button>
+                <button
+                  type="button"
+                  className="btn btn--outline"
+                  onClick={handleCancelEditAll}
+                  disabled={saving}
+                >
+                  取消
+                </button>
+              </>
+            )}
+
+            <button
+              type="button"
+              className="btn btn--outline"
+              onClick={handleExportCsv}
+            >
+              Excel 匯出 (CSV)
+            </button>
+          </div>
+        )}
 
         {loading ? (
           <div className="semi-product-loading" role="status">

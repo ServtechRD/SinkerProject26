@@ -8,6 +8,7 @@ import {
   updateMaterialDemand,
   confirmSendErp,
 } from '../../api/materialDemand'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import './MaterialDemand.css'
 
 function getWeekOptions() {
@@ -74,6 +75,7 @@ export default function MaterialDemandFormPage() {
   const [purchaseQuantityById, setPurchaseQuantityById] = useState({})
   const [saving, setSaving] = useState(false)
   const [confirmingErp, setConfirmingErp] = useState(false)
+  const [erpConfirmOpen, setErpConfirmOpen] = useState(false)
 
   const canView = hasPermission(user, 'material_demand.view')
   const canEdit = hasPermission(user, 'material_demand.edit')
@@ -206,7 +208,7 @@ export default function MaterialDemandFormPage() {
     }
   }
 
-  const handleConfirmSendErp = async () => {
+  const performConfirmSendErp = async () => {
     if (!weekStart || !factory) return
     setConfirmingErp(true)
     try {
@@ -217,6 +219,14 @@ export default function MaterialDemandFormPage() {
       toast.error(err.response?.data?.message || '送出失敗')
     } finally {
       setConfirmingErp(false)
+    }
+  }
+
+  const handleErpConfirmDialogConfirm = async () => {
+    try {
+      await performConfirmSendErp()
+    } finally {
+      setErpConfirmOpen(false)
     }
   }
 
@@ -364,7 +374,7 @@ export default function MaterialDemandFormPage() {
               <button
                 type="button"
                 className="btn btn--primary"
-                onClick={handleConfirmSendErp}
+                onClick={() => setErpConfirmOpen(true)}
                 disabled={confirmingErp}
               >
                 {confirmingErp ? '送出中...' : '本週資料確認無誤送出至天心ERP'}
@@ -434,6 +444,19 @@ export default function MaterialDemandFormPage() {
           )}
         </section>
       )}
+
+      <ConfirmDialog
+        open={erpConfirmOpen}
+        title="確認送出"
+        message="確定送出？"
+        onConfirm={handleErpConfirmDialogConfirm}
+        onCancel={() => {
+          if (!confirmingErp) setErpConfirmOpen(false)
+        }}
+        loading={confirmingErp}
+        confirmText="確認"
+        confirmButtonClass="btn--primary"
+      />
     </div>
   )
 }

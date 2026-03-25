@@ -26,7 +26,7 @@ describe('Sidebar', () => {
 
     expect(screen.getByText('使用者管理')).toBeInTheDocument()
     expect(screen.getByText('銷售預估量-表單設定')).toBeInTheDocument()
-    expect(screen.getByText('銷售預估量表單上傳-共同編輯界面')).toBeInTheDocument()
+    expect(screen.getByText('銷售預估量表單上傳')).toBeInTheDocument()
     expect(screen.getByText('銷售預估量表單')).toBeInTheDocument()
   })
 

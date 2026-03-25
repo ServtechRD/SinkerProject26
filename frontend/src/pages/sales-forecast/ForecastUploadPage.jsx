@@ -459,7 +459,7 @@ export default function ForecastUploadPage() {
   if (accessDenied || (!loading && !canUpload && !canUpdateAfterClosed)) {
     return (
       <div className="forecast-upload-page">
-        <h1>銷售預估量上傳-共同編輯界面</h1>
+        <h1>銷售預估量表單上傳</h1>
         <div className="forecast-access-denied" role="alert">
           您沒有權限檢視此頁面
         </div>

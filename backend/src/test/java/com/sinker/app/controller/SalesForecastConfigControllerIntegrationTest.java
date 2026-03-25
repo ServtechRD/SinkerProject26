@@ -248,7 +248,7 @@ class SalesForecastConfigControllerIntegrationTest {
     }
 
     @Test
-    void updateConfig_SetOpen() throws Exception {
+    void updateConfig_CannotReopenWhenClosed() throws Exception {
         jdbc.update("INSERT INTO sales_forecast_config (month, auto_close_day, is_closed, closed_at, created_at, updated_at) " +
                 "VALUES ('209901', 10, true, NOW(), NOW(), NOW())");
         Integer id = jdbc.queryForObject(
@@ -261,9 +261,13 @@ class SalesForecastConfigControllerIntegrationTest {
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.isClosed").value(false))
-                .andExpect(jsonPath("$.closedAt").isEmpty());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message", containsString("無法重新開放")));
+
+        Boolean isClosed = jdbc.queryForObject(
+                "SELECT is_closed FROM sales_forecast_config WHERE id = ?",
+                Boolean.class, id);
+        assertTrue(isClosed);
     }
 
     @Test

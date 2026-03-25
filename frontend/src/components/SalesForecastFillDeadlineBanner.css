@@ -1,0 +1,21 @@
+.sales-fill-deadline-banner {
+  padding: 10px 16px;
+  background: #e3f2fd;
+  border-bottom: 1px solid #64b5f6;
+  font-size: 14px;
+  color: #0d47a1;
+}
+
+.sales-fill-deadline-banner__line {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.sales-fill-deadline-banner__line + .sales-fill-deadline-banner__line {
+  margin-top: 8px;
+}
+
+.sales-fill-deadline-banner strong {
+  font-weight: 600;
+  color: #01579b;
+}

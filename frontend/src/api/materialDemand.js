@@ -22,6 +22,12 @@ export function getMaterialDemandPendingConfirm() {
   return api.get('/api/material-demand/pending-confirm').then((r) => r.data)
 }
 
+export function getMaterialDemandLastEditSavedAt(weekStart, factory) {
+  return api
+    .get('/api/material-demand/last-edit-saved-at', { params: { week_start: weekStart, factory } })
+    .then((r) => r.data)
+}
+
 export function uploadMaterialDemand(file, weekStart, factory) {
   const formData = new FormData()
   formData.append('file', file)

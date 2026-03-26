@@ -1,6 +1,7 @@
 package com.sinker.app.controller;
 
 import com.sinker.app.dto.materialdemand.MaterialDemandDTO;
+import com.sinker.app.dto.materialdemand.MaterialDemandPendingConfirmItemDTO;
 import com.sinker.app.dto.materialdemand.MaterialDemandUpdateDTO;
 import com.sinker.app.exception.ExcelParseException;
 import com.sinker.app.exception.ResourceNotFoundException;
@@ -24,6 +25,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -61,6 +63,22 @@ public class MaterialDemandController {
         return ResponseEntity.ok(demands);
     }
 
+    @GetMapping("/last-edit-saved-at")
+    @PreAuthorize("hasAuthority('material_demand.view')")
+    public ResponseEntity<Map<String, Object>> getLastEditSavedAt(
+            @RequestParam("week_start") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart,
+            @RequestParam String factory) {
+        if (weekStart == null) {
+            throw new IllegalArgumentException("Required parameter 'week_start' is missing");
+        }
+        if (factory == null || factory.isEmpty()) {
+            throw new IllegalArgumentException("Required parameter 'factory' is missing");
+        }
+        Map<String, Object> body = new HashMap<>();
+        body.put("lastEditSavedAt", materialDemandService.getLastEditSavedAt(weekStart, factory).orElse(null));
+        return ResponseEntity.ok(body);
+    }
+
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('material_demand.edit')")
     public ResponseEntity<MaterialDemandDTO> update(
@@ -83,7 +101,7 @@ public class MaterialDemandController {
 
     @GetMapping("/pending-confirm")
     @PreAuthorize("hasAuthority('confirm_data_send_erp')")
-    public ResponseEntity<List<Map<String, Object>>> getPendingConfirm() {
+    public ResponseEntity<List<MaterialDemandPendingConfirmItemDTO>> getPendingConfirm() {
         log.info("GET /api/material-demand/pending-confirm");
         return ResponseEntity.ok(materialDemandService.getPendingConfirm());
     }

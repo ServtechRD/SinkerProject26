@@ -4,8 +4,14 @@ import { useToast } from '../../components/Toast'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import './ForecastConfig.css'
 
-const CLOSE_CONFIRM_MESSAGE =
-  '結束新增設定，無法再上傳銷售預估量表單及禮品銷售預估量表單，也無法重新啟用，確定結束？'
+/** 設定檔 YYYYMM → 顯示用 YYYY-MM */
+function formatOpenMonthLabel(monthStr) {
+  const s = String(monthStr ?? '').trim()
+  if (s.length === 6 && /^\d{6}$/.test(s)) {
+    return `${s.slice(0, 4)}-${s.slice(4, 6)}`
+  }
+  return s || '—'
+}
 
 export default function EditConfigDialog({ open, config, onClose, onSuccess }) {
   const toast = useToast()
@@ -25,6 +31,9 @@ export default function EditConfigDialog({ open, config, onClose, onSuccess }) {
   }, [config])
 
   if (!open || !config) return null
+
+  const openMonthLabel = formatOpenMonthLabel(config.month)
+  const closeConfirmMessage = `確定要結束新增設定 ${openMonthLabel} 表單嗎？關閉表單後業務同仁就無法再編輯。`
 
   const dayNum = parseInt(autoCloseDay, 10)
   const dayValid = autoCloseDay !== '' && !isNaN(dayNum) && dayNum >= 1 && dayNum <= 31
@@ -166,7 +175,7 @@ export default function EditConfigDialog({ open, config, onClose, onSuccess }) {
     <ConfirmDialog
       open={closeConfirmOpen}
       title="確認結束新增設定"
-      message={CLOSE_CONFIRM_MESSAGE}
+      message={closeConfirmMessage}
       onConfirm={handleCloseConfirmOk}
       onCancel={() => setCloseConfirmOpen(false)}
       confirmText="確定"

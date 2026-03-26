@@ -1,6 +1,7 @@
 package com.sinker.app.service;
 
 import com.sinker.app.dto.materialdemand.MaterialDemandDTO;
+import com.sinker.app.dto.materialdemand.MaterialDemandPendingConfirmItemDTO;
 import com.sinker.app.dto.materialdemand.MaterialDemandUpdateDTO;
 import com.sinker.app.entity.MaterialDemand;
 import com.sinker.app.exception.ResourceNotFoundException;
@@ -18,6 +19,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -122,9 +124,36 @@ public class MaterialDemandService {
         log.info("Confirm send ERP: weekStart={}, factory={}", weekStart, factory);
     }
 
-    /** 取得所有待確認送出 ERP 的 (week_start, factory) 清單，供採購主管提示用 */
-    public List<Map<String, Object>> getPendingConfirm() {
-        return jdbcTemplate.queryForList("SELECT week_start AS weekStart, factory FROM material_demand_pending_confirm ORDER BY updated_at DESC");
+    /** 取得所有待確認送出 ERP 的 (week_start, factory) 清單，供採購主管提示用（含最後編輯儲存時間） */
+    public List<MaterialDemandPendingConfirmItemDTO> getPendingConfirm() {
+        return jdbcTemplate.query(
+                "SELECT week_start, factory, updated_at FROM material_demand_pending_confirm ORDER BY updated_at DESC",
+                (rs, rowNum) -> {
+                    MaterialDemandPendingConfirmItemDTO dto = new MaterialDemandPendingConfirmItemDTO();
+                    dto.setWeekStart(rs.getObject("week_start", LocalDate.class));
+                    dto.setFactory(rs.getString("factory"));
+                    java.sql.Timestamp ts = rs.getTimestamp("updated_at");
+                    dto.setUpdatedAt(ts != null ? ts.toLocalDateTime() : null);
+                    return dto;
+                });
+    }
+
+    /**
+     * 該週+廠區若有「編輯儲存後待確認 ERP」紀錄，回傳其 updated_at（即最後一次觸發編輯儲存時間）。
+     */
+    public Optional<LocalDateTime> getLastEditSavedAt(LocalDate weekStart, String factory) {
+        List<LocalDateTime> rows = jdbcTemplate.query(
+                "SELECT updated_at FROM material_demand_pending_confirm WHERE week_start = ? AND factory = ?",
+                (rs, rowNum) -> {
+                    java.sql.Timestamp ts = rs.getTimestamp(1);
+                    return ts != null ? ts.toLocalDateTime() : null;
+                },
+                weekStart,
+                factory);
+        if (rows.isEmpty() || rows.get(0) == null) {
+            return Optional.empty();
+        }
+        return Optional.of(rows.get(0));
     }
 
     public byte[] generateTemplate(String factory) {

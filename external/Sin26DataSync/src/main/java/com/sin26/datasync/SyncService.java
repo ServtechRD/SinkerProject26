@@ -24,7 +24,7 @@ public class SyncService {
         String lastCursor = cursorStore.getLastCursor();
         boolean testMode = config.isTestMode();
 
-        System.out.println(LocalDateTime.now() + " 開始同步，游標=" + (lastCursor.isEmpty() ? "(空)" : lastCursor) + "，批次大小=" + batchSize + "，測試模式=" + testMode);
+        System.out.println(LocalDateTime.now() + " 開始同步，游標(PRD_NO)=" + (lastCursor.isEmpty() ? "(空)" : lastCursor) + "，批次大小=" + batchSize + "，測試模式=" + testMode);
 
         int totalFetched = 0;
         int totalWritten = 0;
@@ -65,9 +65,9 @@ public class SyncService {
                         totalWritten += target.upsert(batch);
                     }
 
-                    String nextCursor = batch.get(batch.size() - 1).getIdx1();
+                    String nextCursor = batch.get(batch.size() - 1).getPrdNo();
                     if (nextCursor == null || nextCursor.isEmpty() || nextCursor.equals(lastCursor)) {
-                        System.out.println("  偵測到游標未前進，停止以避免無限迴圈。");
+                        System.out.println("  偵測到游標(PRD_NO)未前進，停止以避免無限迴圈。");
                         break;
                     }
                     lastCursor = nextCursor;
@@ -83,7 +83,7 @@ public class SyncService {
                 if (testMode) {
                     System.out.println("  已寫入 CSV: " + config.getCsvOutputPath());
                 }
-                System.out.println("  本次完成，總抓取 " + totalFetched + " 筆，總處理 " + totalWritten + " 筆，游標=" + lastCursor);
+                System.out.println("  本次完成，總抓取 " + totalFetched + " 筆，總處理 " + totalWritten + " 筆，游標(PRD_NO)=" + lastCursor);
             }
         } catch (SQLException e) {
             System.err.println("  同步失敗: " + e.getMessage());

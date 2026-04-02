@@ -18,5 +18,5 @@ test.mode=false
 # 測試模式時的 CSV 輸出路徑
 csv.output=prdt_export.csv
 
-# 記錄上次同步位置的檔案路徑（用 IDX1 作為游標，已處理過的不重複抓）
+# 記錄上次同步位置的檔案路徑（游標為 PRD_NO；若曾用舊版 IDX1 游標，請刪除此檔或清空後再跑以免漏資料）
 cursor.path=sync_cursor.txt

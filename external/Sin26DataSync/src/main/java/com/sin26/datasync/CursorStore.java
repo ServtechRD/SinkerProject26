@@ -7,7 +7,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 
 /**
- * 將上次處理到的 IDX1 寫入檔案，下次只抓 IDX1 大於此值的資料（已處理的跳過）。
+ * 將上次處理到的 PRD_NO 寫入檔案，下次只抓 PRD_NO 大於此值的資料（已處理的跳過）。
  */
 public class CursorStore {
     private final Path path;
@@ -28,9 +28,9 @@ public class CursorStore {
         }
     }
 
-    public void saveCursor(String idx1) {
+    public void saveCursor(String prdNo) {
         try {
-            Files.writeString(path, idx1 == null ? "" : idx1, StandardCharsets.UTF_8);
+            Files.writeString(path, prdNo == null ? "" : prdNo, StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new RuntimeException("寫入游標失敗: " + path, e);
         }

@@ -1,0 +1,11 @@
+/build
+.gradle
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+*.iml
+.idea
+out
+config.properties
+sync_cursor.txt
+prdt_export.csv
+*.log

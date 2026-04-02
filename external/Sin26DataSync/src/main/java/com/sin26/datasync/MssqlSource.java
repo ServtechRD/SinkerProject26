@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 從 MSSQL 查詢 prdt，依 IDX1 游標分批取回，已處理過的（IDX1 <= lastCursor）跳過。
+ * 從 MSSQL 查詢 prdt，依 PRD_NO 游標分批取回（IDX1 可為空；游標與排序皆用 PRD_NO）。
  */
 public class MssqlSource implements AutoCloseable {
     private final Config config;
@@ -24,13 +24,13 @@ public class MssqlSource implements AutoCloseable {
     }
 
     /**
-     * 抓下一批：IDX1 > lastCursor（字串比較），最多 batchSize 筆。
-     * lastCursor 為空或 null 時從頭開始抓。
+     * 抓下一批：PRD_NO 字串大於 lastCursor，最多 batchSize 筆。
+     * lastCursor 為空或 null 時從頭開始抓。需 prdt.PRD_NO 可排序且作為唯一鍵；若有重複 PRD_NO 請改表或策略。
      */
     public List<Prdt> fetchNextBatch(String lastCursor, int batchSize) throws SQLException {
         String sql = "SELECT PRD_NO, NAME, SPC, IDX1, WH FROM prdt WHERE "
-            + "(CASE WHEN ? = '' THEN 1 ELSE CASE WHEN CAST(IDX1 AS VARCHAR(100)) > ? THEN 1 ELSE 0 END END) = 1 "
-            + "ORDER BY CAST(IDX1 AS VARCHAR(100)) OFFSET 0 ROWS FETCH NEXT ? ROWS ONLY";
+            + "(CASE WHEN ? = '' THEN 1 ELSE CASE WHEN CAST(PRD_NO AS VARCHAR(200)) > ? THEN 1 ELSE 0 END END) = 1 "
+            + "ORDER BY CAST(PRD_NO AS VARCHAR(200)) OFFSET 0 ROWS FETCH NEXT ? ROWS ONLY";
         List<Prdt> list = new ArrayList<>();
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             String lc = lastCursor == null ? "" : lastCursor;

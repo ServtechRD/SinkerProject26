@@ -1,0 +1,47 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'com.sin26'
+version = '1.0.0'
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    // MSSQL Server
+    implementation 'com.microsoft.sqlserver:mssql-jdbc:12.4.2.jre11'
+    // MySQL
+    implementation 'com.mysql:mysql-connector-j:8.2.0'
+}
+
+application {
+    mainClass = 'com.sin26.datasync.Main'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+// 可執行 fat jar（含所有依賴），執行：java -jar build/libs/Sin26DataSync-1.0.0-all.jar
+tasks.register('fatJar', Jar) {
+    archiveBaseName = project.name
+    archiveVersion = project.version
+    archiveClassifier = 'all'
+    manifest {
+        attributes 'Main-Class': 'com.sin26.datasync.Main'
+    }
+    from sourceSets.main.output
+    from(configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) }) {
+        exclude 'META-INF/MANIFEST.MF'
+        exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}

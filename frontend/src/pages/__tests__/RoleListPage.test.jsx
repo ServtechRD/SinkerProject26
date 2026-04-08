@@ -81,16 +81,15 @@ describe('RoleListPage', () => {
       expect(screen.getByText('代碼')).toBeInTheDocument()
       expect(screen.getByText('名稱')).toBeInTheDocument()
       expect(screen.getByText('描述')).toBeInTheDocument()
-      expect(screen.getByText('系統角色')).toBeInTheDocument()
       expect(screen.getByText('操作')).toBeInTheDocument()
     })
   })
 
-  it('shows system role badge', async () => {
+  it('shows edit and delete for each role row', async () => {
     renderPage()
     await waitFor(() => {
-      const badges = screen.getAllByText('是')
-      expect(badges.length).toBe(3)
+      expect(screen.getAllByRole('button', { name: '編輯' }).length).toBe(3)
+      expect(screen.getAllByRole('button', { name: '刪除' }).length).toBe(3)
     })
   })
 

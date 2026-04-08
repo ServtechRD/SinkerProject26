@@ -113,11 +113,11 @@ describe('UserEditPage', () => {
     getUserById.mockResolvedValue({
       ...MOCK_USER,
       role: { id: 2, code: 'sales', name: 'Sales' },
-      channels: ['PX/大全聯'],
+      channels: ['PX + 大全聯'],
     })
     renderPage()
     await waitFor(() => {
-      expect(screen.getByText('PX/大全聯')).toBeInTheDocument()
+      expect(screen.getByText('PX + 大全聯')).toBeInTheDocument()
     })
   })
 })

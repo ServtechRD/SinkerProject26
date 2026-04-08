@@ -547,7 +547,7 @@ describe('InventoryIntegrationPage', () => {
     await user.click(screen.getByRole('button', { name: '儲存版本' }))
 
     await waitFor(() => {
-      expect(screen.getByText(/請輸入有效數字/)).toBeInTheDocument()
+      expect(screen.getByText(/格式錯誤/)).toBeInTheDocument()
     })
     expect(inventoryApi.updateModifiedSubtotal).not.toHaveBeenCalled()
     expect(inventoryApi.copyInventoryVersion).not.toHaveBeenCalled()

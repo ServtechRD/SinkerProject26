@@ -3,6 +3,7 @@ import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import Sidebar from '../Sidebar'
 import { renderWithAuth } from '../../test/helpers'
+import { APP_VERSION } from '../../version'
 
 describe('Sidebar', () => {
   const authValue = {
@@ -38,6 +39,34 @@ describe('Sidebar', () => {
   it('displays user full name', () => {
     renderWithAuth(<Sidebar />, { authValue })
     expect(screen.getByText('System Administrator')).toBeInTheDocument()
+  })
+
+  it('displays username when fullName is missing', () => {
+    renderWithAuth(<Sidebar />, {
+      authValue: {
+        ...authValue,
+        user: { username: 'onlyuser', permissions: authValue.user.permissions },
+      },
+    })
+    expect(screen.getByText('onlyuser')).toBeInTheDocument()
+  })
+
+  it('shows app version in footer', () => {
+    renderWithAuth(<Sidebar />, { authValue })
+    expect(screen.getByText(`版次 ${APP_VERSION}`)).toBeInTheDocument()
+  })
+
+  it('shows inventory link when user has inventory.view', () => {
+    renderWithAuth(<Sidebar />, {
+      authValue: {
+        ...authValue,
+        user: {
+          ...authValue.user,
+          permissions: [...authValue.user.permissions, 'inventory.view'],
+        },
+      },
+    })
+    expect(screen.getByText('庫存銷量預估量整合表單')).toBeInTheDocument()
   })
 
   it('calls logout on button click', async () => {

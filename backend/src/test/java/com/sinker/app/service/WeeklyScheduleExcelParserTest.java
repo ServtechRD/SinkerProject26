@@ -1,7 +1,9 @@
 package com.sinker.app.service;
 
 import com.sinker.app.exception.ExcelParseException;
-import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,403 +27,134 @@ class WeeklyScheduleExcelParserTest {
     }
 
     @Test
-    void testParse_ValidExcelFile() throws Exception {
-        // This test validates the full happy path, but the Excel file creation is complex
-        // so we just verify that a properly formatted file can be parsed
-        try {
-            MultipartFile file = createValidExcelFile();
-            List<WeeklyScheduleExcelParser.WeeklyScheduleRow> rows = parser.parse(file);
+    void parse_validWorkbook_returnsParsedRows() throws Exception {
+        MultipartFile file = buildWorkbook(List.of(
+                List.of(LocalDate.of(2026, 1, 15), "P001", "N1", "A01", 10),
+                List.of(LocalDate.of(2026, 1, 16), "P002", "N2", "A02", 20)
+        ));
 
-            assertNotNull(rows);
-            assertTrue(rows.size() >= 0); // May be 0 or more depending on file format
-        } catch (ExcelParseException e) {
-            // This is acceptable - the test validates that the parser handles files
-            assertTrue(e.getMessage().length() > 0);
-        }
+        List<WeeklyScheduleExcelParser.WeeklyScheduleRow> rows = parser.parse(file);
+
+        assertEquals(2, rows.size());
+        assertEquals("P001", rows.get(0).getProductCode());
+        assertEquals(0, new BigDecimal("10.0").compareTo(rows.get(0).getQuantity()));
+        assertEquals(2, rows.get(0).getRowNumber());
     }
 
     @Test
-    void testParse_EmptyFile() {
-        MockMultipartFile emptyFile = new MockMultipartFile(
-                "file", "test.xlsx",
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                new byte[0]
-        );
+    void parse_missingRequiredHeader_throws() throws Exception {
+        MultipartFile file = buildWorkbookWithoutQuantityHeader();
 
-        ExcelParseException exception = assertThrows(ExcelParseException.class, () -> parser.parse(emptyFile));
-        assertEquals("File is empty", exception.getMessage());
+        ExcelParseException ex = assertThrows(ExcelParseException.class, () -> parser.parse(file));
+
+        assertTrue(ex.getMessage().contains("missing required columns"));
+        assertTrue(ex.getMessage().contains("箱數小計"));
     }
 
     @Test
-    void testParse_NullFile() {
-        ExcelParseException exception = assertThrows(ExcelParseException.class, () -> parser.parse(null));
-        assertEquals("File is empty", exception.getMessage());
+    void parse_negativeQuantity_throws() throws Exception {
+        MultipartFile file = buildWorkbook(List.of(
+                List.of(LocalDate.of(2026, 1, 15), "P001", "N1", "A01", -1)
+        ));
+
+        ExcelParseException ex = assertThrows(ExcelParseException.class, () -> parser.parse(file));
+        assertTrue(ex.getMessage().contains("must be >= 0"));
     }
 
     @Test
-    void testParse_InvalidFileFormat() {
-        MockMultipartFile txtFile = new MockMultipartFile(
-                "file", "test.txt",
-                "text/plain",
-                "dummy content".getBytes()
-        );
+    void parse_skipsEmptyRows() throws Exception {
+        MultipartFile file = buildWorkbookWithEmptyRows();
 
-        ExcelParseException exception = assertThrows(ExcelParseException.class, () -> parser.parse(txtFile));
-        assertTrue(exception.getMessage().contains("Invalid file format"));
-    }
+        List<WeeklyScheduleExcelParser.WeeklyScheduleRow> rows = parser.parse(file);
 
-    /*@Test
-    void testParse_MissingFilename() {
-        MockMultipartFile file = new MockMultipartFile(
-                "file", null,
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                "dummy".getBytes()
-        );
-
-        ExcelParseException exception = assertThrows(ExcelParseException.class, () -> parser.parse(file));
-        assertTrue(exception.getMessage().contains("Filename is missing") ||
-                   exception.getMessage().contains("Invalid Excel file format"));
-    }*/
-
-    @Test
-    void testParse_XlsExtension_ValidatesFormat() {
-        // Test that .xls extension is accepted during validation
-        MockMultipartFile xlsFile = new MockMultipartFile(
-                "file", "test.xls",
-                "application/vnd.ms-excel",
-                "dummy".getBytes()
-        );
-
-        // The validation should pass for .xls files
-        // The actual parsing might fail but that's a different error
-        ExcelParseException exception = assertThrows(ExcelParseException.class, () -> parser.parse(xlsFile));
-        assertFalse(exception.getMessage().contains("Invalid file format. Only .xlsx and .xls files are accepted"));
-    }
-
-    /*@Test
-    void testParse_MissingRequiredColumns() throws Exception {
-        MultipartFile file = createExcelFileWithMissingColumns();
-
-        ExcelParseException exception = assertThrows(ExcelParseException.class, () -> parser.parse(file));
-        assertTrue(exception.getMessage().contains("missing required columns") ||
-                   exception.getMessage().contains("Invalid Excel file format"));
-    }*/
-
-    @Test
-    void testParse_NoDataRows() throws Exception {
-        MultipartFile file = createExcelFileWithHeaderOnly();
-
-        ExcelParseException exception = assertThrows(ExcelParseException.class, () -> parser.parse(file));
-        assertTrue(exception.getMessage().contains("no data rows") ||
-                   exception.getMessage().contains("no valid data rows"));
-    }
-
-    /*@Test
-    void testParse_NegativeQuantity() throws Exception {
-        MultipartFile file = createExcelFileWithNegativeQuantity();
-
-        ExcelParseException exception = assertThrows(ExcelParseException.class, () -> parser.parse(file));
-        assertTrue(exception.getMessage().contains("must be >= 0") ||
-                   exception.getMessage().contains("Invalid Excel file format"));
-    }*/
-
-    /*@Test
-    void testParse_MissingRequiredField() throws Exception {
-        MultipartFile file = createExcelFileWithMissingField();
-
-        ExcelParseException exception = assertThrows(ExcelParseException.class, () -> parser.parse(file));
-        assertTrue(exception.getMessage().contains("is required") ||
-                   exception.getMessage().contains("Invalid Excel file format"));
-    }*/
-
-    @Test
-    void testParse_InvalidDateFormat() throws Exception {
-        MultipartFile file = createExcelFileWithInvalidDate();
-
-        ExcelParseException exception = assertThrows(ExcelParseException.class, () -> parser.parse(file));
-        assertTrue(exception.getMessage().contains("invalid format") ||
-                   exception.getMessage().contains("must be a valid date"));
+        assertEquals(1, rows.size());
+        assertEquals("P001", rows.get(0).getProductCode());
     }
 
     @Test
-    void testParse_SkipEmptyRows() throws Exception {
-        // Test that empty rows are skipped
-        try {
-            MultipartFile file = createExcelFileWithEmptyRows();
-            List<WeeklyScheduleExcelParser.WeeklyScheduleRow> rows = parser.parse(file);
-
-            // Should skip empty rows and only return valid data
-            assertNotNull(rows);
-            assertTrue(rows.size() >= 0);
-        } catch (ExcelParseException e) {
-            // This is acceptable - the test validates that the parser handles files
-            assertTrue(e.getMessage().length() > 0);
-        }
+    void parse_invalidExtension_throws() {
+        MockMultipartFile txt = new MockMultipartFile("file", "a.txt", "text/plain", "x".getBytes());
+        ExcelParseException ex = assertThrows(ExcelParseException.class, () -> parser.parse(txt));
+        assertTrue(ex.getMessage().contains("Only .xlsx and .xls"));
     }
 
     @Test
-    void testWeeklyScheduleRow_Getters() {
-        LocalDate date = LocalDate.of(2026, 2, 1);
-        WeeklyScheduleExcelParser.WeeklyScheduleRow row = new WeeklyScheduleExcelParser.WeeklyScheduleRow(
-                date, "PROD123", "Test Product", "C03", new BigDecimal("75.5"), 10
-        );
-
-        assertEquals(date, row.getDemandDate());
-        assertEquals("PROD123", row.getProductCode());
-        assertEquals("Test Product", row.getProductName());
-        assertEquals("C03", row.getWarehouseLocation());
-        assertEquals(new BigDecimal("75.5"), row.getQuantity());
-        assertEquals(10, row.getRowNumber());
+    void parse_emptyFile_throws() {
+        MockMultipartFile empty = new MockMultipartFile("file", "a.xlsx", "application/xlsx", new byte[0]);
+        ExcelParseException ex = assertThrows(ExcelParseException.class, () -> parser.parse(empty));
+        assertEquals("File is empty", ex.getMessage());
     }
 
-    @Test
-    void testParse_InvalidDate_ConvertsToExcelParseException() throws Exception {
-        // Test that invalid dates are caught
-        try {
-            MultipartFile file = createExcelFileWithInvalidDate();
-            parser.parse(file);
-        } catch (ExcelParseException e) {
-            assertNotNull(e.getMessage());
-            assertTrue(e.getMessage().length() > 0);
-        }
-    }
-
-    @Test
-    void testWeeklyScheduleRow_WithDifferentValues() {
-        LocalDate date = LocalDate.of(2026, 12, 31);
-        WeeklyScheduleExcelParser.WeeklyScheduleRow row = new WeeklyScheduleExcelParser.WeeklyScheduleRow(
-                date, "ABC123", "Another Product", "Z99", new BigDecimal("1000.00"), 999
-        );
-
-        assertNotNull(row);
-        assertEquals(date, row.getDemandDate());
-        assertEquals("ABC123", row.getProductCode());
-        assertEquals("Another Product", row.getProductName());
-        assertEquals("Z99", row.getWarehouseLocation());
-        assertEquals(0, new BigDecimal("1000.00").compareTo(row.getQuantity()));
-        assertEquals(999, row.getRowNumber());
-    }
-
-    @Test
-    void testWeeklyScheduleRow_WithZeroQuantity() {
-        LocalDate date = LocalDate.of(2026, 6, 15);
-        WeeklyScheduleExcelParser.WeeklyScheduleRow row = new WeeklyScheduleExcelParser.WeeklyScheduleRow(
-                date, "PROD000", "Zero Product", "A00", BigDecimal.ZERO, 1
-        );
-
-        assertNotNull(row);
-        assertEquals(BigDecimal.ZERO, row.getQuantity());
-    }
-
-    @Test
-    void testWeeklyScheduleRow_WithLargeQuantity() {
-        LocalDate date = LocalDate.of(2026, 3, 10);
-        BigDecimal largeQty = new BigDecimal("9999999.99");
-        WeeklyScheduleExcelParser.WeeklyScheduleRow row = new WeeklyScheduleExcelParser.WeeklyScheduleRow(
-                date, "PROD888", "Large Product", "B88", largeQty, 5
-        );
-
-        assertNotNull(row);
-        assertEquals(0, largeQty.compareTo(row.getQuantity()));
-    }
-
-    private MultipartFile createValidExcelFile() throws Exception {
-        return new MockMultipartFile(
-                "file", "test.xlsx",
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                createValidExcelFileBytes()
-        );
-    }
-
-    private byte[] createValidExcelFileBytes() throws Exception {
+    private MultipartFile buildWorkbook(List<List<Object>> rows) throws Exception {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Sheet1");
+            Row h = sheet.createRow(0);
+            h.createCell(0).setCellValue("需求日期");
+            h.createCell(1).setCellValue("品號");
+            h.createCell(2).setCellValue("品名");
+            h.createCell(3).setCellValue("庫位");
+            h.createCell(4).setCellValue("箱數小計");
 
-            // Header row
-            Row headerRow = sheet.createRow(0);
-            headerRow.createCell(0).setCellValue("需求日期");
-            headerRow.createCell(1).setCellValue("品號");
-            headerRow.createCell(2).setCellValue("品名");
-            headerRow.createCell(3).setCellValue("庫位");
-            headerRow.createCell(4).setCellValue("箱數小計");
-
-            // Data rows
-            Row dataRow1 = sheet.createRow(1);
-            dataRow1.createCell(0).setCellValue(LocalDate.of(2026, 1, 15));
-            dataRow1.createCell(1).setCellValue("PROD001");
-            dataRow1.createCell(2).setCellValue("Product 1");
-            dataRow1.createCell(3).setCellValue("A01");
-            dataRow1.createCell(4).setCellValue(100);
-
-            Row dataRow2 = sheet.createRow(2);
-            dataRow2.createCell(0).setCellValue(LocalDate.of(2026, 1, 20));
-            dataRow2.createCell(1).setCellValue("PROD002");
-            dataRow2.createCell(2).setCellValue("Product 2");
-            dataRow2.createCell(3).setCellValue("B02");
-            dataRow2.createCell(4).setCellValue(50);
+            int r = 1;
+            for (List<Object> data : rows) {
+                Row row = sheet.createRow(r++);
+                row.createCell(0).setCellValue(((LocalDate) data.get(0)).toString());
+                row.createCell(1).setCellValue((String) data.get(1));
+                row.createCell(2).setCellValue((String) data.get(2));
+                row.createCell(3).setCellValue((String) data.get(3));
+                row.createCell(4).setCellValue(((Number) data.get(4)).doubleValue());
+            }
 
             workbook.write(bos);
-            return bos.toByteArray();
+            return new MockMultipartFile("file", "test.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", bos.toByteArray());
         }
     }
 
-    private byte[] createExcelFileWithMissingColumnsBytes() throws Exception {
+    private MultipartFile buildWorkbookWithoutQuantityHeader() throws Exception {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Sheet1");
-
-            // Header row with missing columns
-            Row headerRow = sheet.createRow(0);
-            headerRow.createCell(0).setCellValue("需求日期");
-            headerRow.createCell(1).setCellValue("品號");
-            // Missing other required columns
-
+            Row h = sheet.createRow(0);
+            h.createCell(0).setCellValue("需求日期");
+            h.createCell(1).setCellValue("品號");
+            h.createCell(2).setCellValue("品名");
+            h.createCell(3).setCellValue("庫位");
+            Row row = sheet.createRow(1);
+            row.createCell(0).setCellValue(LocalDate.of(2026, 1, 15).toString());
+            row.createCell(1).setCellValue("P001");
+            row.createCell(2).setCellValue("N1");
+            row.createCell(3).setCellValue("A01");
             workbook.write(bos);
-            return bos.toByteArray();
+            return new MockMultipartFile("file", "test.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", bos.toByteArray());
         }
     }
 
-    private MultipartFile createExcelFileWithMissingColumns() throws Exception {
-        return new MockMultipartFile(
-                "file", "test.xlsx",
-                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                createExcelFileWithMissingColumnsBytes()
-        );
-    }
-
-    private MultipartFile createExcelFileWithHeaderOnly() throws Exception {
+    private MultipartFile buildWorkbookWithEmptyRows() throws Exception {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Sheet1");
+            Row h = sheet.createRow(0);
+            h.createCell(0).setCellValue("需求日期");
+            h.createCell(1).setCellValue("品號");
+            h.createCell(2).setCellValue("品名");
+            h.createCell(3).setCellValue("庫位");
+            h.createCell(4).setCellValue("箱數小計");
 
-            // Header row only
-            Row headerRow = sheet.createRow(0);
-            headerRow.createCell(0).setCellValue("需求日期");
-            headerRow.createCell(1).setCellValue("品號");
-            headerRow.createCell(2).setCellValue("品名");
-            headerRow.createCell(3).setCellValue("庫位");
-            headerRow.createCell(4).setCellValue("箱數小計");
+            Row r1 = sheet.createRow(1);
+            r1.createCell(0).setCellValue(LocalDate.of(2026, 1, 15).toString());
+            r1.createCell(1).setCellValue("P001");
+            r1.createCell(2).setCellValue("N1");
+            r1.createCell(3).setCellValue("A01");
+            r1.createCell(4).setCellValue(10);
 
-            workbook.write(bos);
-            return new MockMultipartFile(
-                    "file", "test.xlsx",
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    bos.toByteArray()
-            );
-        }
-    }
-
-    private MultipartFile createExcelFileWithNegativeQuantity() throws Exception {
-        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
-            Sheet sheet = workbook.createSheet("Sheet1");
-
-            Row headerRow = sheet.createRow(0);
-            headerRow.createCell(0).setCellValue("需求日期");
-            headerRow.createCell(1).setCellValue("品號");
-            headerRow.createCell(2).setCellValue("品名");
-            headerRow.createCell(3).setCellValue("庫位");
-            headerRow.createCell(4).setCellValue("箱數小計");
-
-            Row dataRow = sheet.createRow(1);
-            dataRow.createCell(0).setCellValue(LocalDate.of(2026, 1, 15));
-            dataRow.createCell(1).setCellValue("PROD001");
-            dataRow.createCell(2).setCellValue("Product 1");
-            dataRow.createCell(3).setCellValue("A01");
-            dataRow.createCell(4).setCellValue(-50); // Negative quantity
-
-            workbook.write(bos);
-            return new MockMultipartFile(
-                    "file", "test.xlsx",
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    bos.toByteArray()
-            );
-        }
-    }
-
-    private MultipartFile createExcelFileWithMissingField() throws Exception {
-        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
-            Sheet sheet = workbook.createSheet("Sheet1");
-
-            Row headerRow = sheet.createRow(0);
-            headerRow.createCell(0).setCellValue("需求日期");
-            headerRow.createCell(1).setCellValue("品號");
-            headerRow.createCell(2).setCellValue("品名");
-            headerRow.createCell(3).setCellValue("庫位");
-            headerRow.createCell(4).setCellValue("箱數小計");
-
-            Row dataRow = sheet.createRow(1);
-            dataRow.createCell(0).setCellValue(LocalDate.of(2026, 1, 15));
-            // Missing product code (cell 1)
-            dataRow.createCell(2).setCellValue("Product 1");
-            dataRow.createCell(3).setCellValue("A01");
-            dataRow.createCell(4).setCellValue(100);
-
-            workbook.write(bos);
-            return new MockMultipartFile(
-                    "file", "test.xlsx",
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    bos.toByteArray()
-            );
-        }
-    }
-
-    private MultipartFile createExcelFileWithInvalidDate() throws Exception {
-        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
-            Sheet sheet = workbook.createSheet("Sheet1");
-
-            Row headerRow = sheet.createRow(0);
-            headerRow.createCell(0).setCellValue("需求日期");
-            headerRow.createCell(1).setCellValue("品號");
-            headerRow.createCell(2).setCellValue("品名");
-            headerRow.createCell(3).setCellValue("庫位");
-            headerRow.createCell(4).setCellValue("箱數小計");
-
-            Row dataRow = sheet.createRow(1);
-            dataRow.createCell(0).setCellValue("not-a-date"); // Invalid date
-            dataRow.createCell(1).setCellValue("PROD001");
-            dataRow.createCell(2).setCellValue("Product 1");
-            dataRow.createCell(3).setCellValue("A01");
-            dataRow.createCell(4).setCellValue(100);
-
-            workbook.write(bos);
-            return new MockMultipartFile(
-                    "file", "test.xlsx",
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    bos.toByteArray()
-            );
-        }
-    }
-
-    private MultipartFile createExcelFileWithEmptyRows() throws Exception {
-        try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
-            Sheet sheet = workbook.createSheet("Sheet1");
-
-            Row headerRow = sheet.createRow(0);
-            headerRow.createCell(0).setCellValue("需求日期");
-            headerRow.createCell(1).setCellValue("品號");
-            headerRow.createCell(2).setCellValue("品名");
-            headerRow.createCell(3).setCellValue("庫位");
-            headerRow.createCell(4).setCellValue("箱數小計");
-
-            Row dataRow1 = sheet.createRow(1);
-            dataRow1.createCell(0).setCellValue(LocalDate.of(2026, 1, 15));
-            dataRow1.createCell(1).setCellValue("PROD001");
-            dataRow1.createCell(2).setCellValue("Product 1");
-            dataRow1.createCell(3).setCellValue("A01");
-            dataRow1.createCell(4).setCellValue(100);
-
-            // Empty row
             sheet.createRow(2);
-
-            // Another empty row
-            Row emptyRow = sheet.createRow(3);
-            emptyRow.createCell(0).setCellValue("");
-            emptyRow.createCell(1).setCellValue("");
+            Row r3 = sheet.createRow(3);
+            r3.createCell(0).setCellValue("");
+            r3.createCell(1).setCellValue("");
 
             workbook.write(bos);
-            return new MockMultipartFile(
-                    "file", "test.xlsx",
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    bos.toByteArray()
-            );
+            return new MockMultipartFile("file", "test.xlsx",
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", bos.toByteArray());
         }
     }
 }

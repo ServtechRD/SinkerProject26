@@ -18,6 +18,6 @@ COPY --from=builder /app/build/libs/*.jar app.jar
 EXPOSE 8080
 
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
-USER appuse
+USER appuser
 
 ENTRYPOINT ["java","-jar","app.jar"]

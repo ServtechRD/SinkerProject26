@@ -20,6 +20,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Sort;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -402,7 +403,7 @@ class RoleServiceTest {
         CreateRoleRequest req = new CreateRoleRequest();
         req.setCode("new_role");
         req.setName("New Role");
-        req.setPermissionIds(List.of(1L, null, 1L));
+        req.setPermissionIds(Arrays.asList(1L, null, 1L));
 
         roleService.createRole(req);
 

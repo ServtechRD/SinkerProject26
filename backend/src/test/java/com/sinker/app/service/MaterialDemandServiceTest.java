@@ -246,7 +246,7 @@ class MaterialDemandServiceTest {
         assertTrue(materialDemandService.getLastEditSavedAt(LocalDate.of(2026, 2, 17), "F1").isEmpty());
 
         when(jdbcTemplate.query(anyString(), any(org.springframework.jdbc.core.RowMapper.class), any(), any()))
-                .thenReturn(List.of((LocalDateTime) null));
+                .thenReturn(Arrays.asList((LocalDateTime) null));
         assertTrue(materialDemandService.getLastEditSavedAt(LocalDate.of(2026, 2, 17), "F1").isEmpty());
     }
 

@@ -130,10 +130,13 @@ describe('UserCreatePage', () => {
     await user.type(screen.getByLabelText(/密碼/), 'password123')
     await user.type(screen.getByLabelText(/姓名/), 'Sales')
     await user.selectOptions(screen.getByLabelText(/角色/), '2')
+    await user.click(screen.getByRole('button', { name: '全不選' }))
 
     await user.click(screen.getByText('建立'))
 
-    expect(screen.getByText('業務角色需選擇至少一個通路')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('業務角色需選擇至少一個通路')).toBeInTheDocument()
+    })
   })
 
   it('validates username length 3-50 and alphanumeric+underscore only', async () => {

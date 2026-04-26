@@ -2,6 +2,8 @@ package com.sinker.app.service;
 
 import com.sinker.app.dto.role.RoleDetailDTO;
 import com.sinker.app.dto.role.UpdateRoleRequest;
+import com.sinker.app.dto.role.CreateRoleRequest;
+import com.sinker.app.dto.role.PermissionDTO;
 import com.sinker.app.entity.Permission;
 import com.sinker.app.entity.Role;
 import com.sinker.app.entity.RolePermission;
@@ -18,12 +20,15 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Sort;
 
 import java.time.LocalDateTime;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 import static org.mockito.Mockito.lenient;
 
@@ -306,5 +311,152 @@ class RoleServiceTest {
         RoleDetailDTO result = roleService.updateRole(1L, request);
 
         assertEquals("Updated System Role", result.getName());
+    }
+
+    // --- createRole ---
+    @Test
+    void createRole_success_withPermissions() {
+        Permission p1 = createTestPermission(1L, "user.view", "View Users", "user");
+        Permission p2 = createTestPermission(2L, "role.view", "View Roles", "role");
+        when(roleRepository.findByCode("custom_role")).thenReturn(Optional.empty());
+        when(permissionRepository.findAllById(List.of(1L, 2L))).thenReturn(List.of(p1, p2));
+        when(roleRepository.save(any(Role.class))).thenAnswer(inv -> {
+            Role r = inv.getArgument(0);
+            r.setId(10L);
+            return r;
+        });
+        when(permissionRepository.findByRoleId(10L)).thenReturn(List.of(p1, p2));
+        when(permissionRepository.findAll(any(Sort.class))).thenReturn(List.of(p1, p2));
+
+        CreateRoleRequest req = new CreateRoleRequest();
+        req.setCode(" custom_role ");
+        req.setName(" Custom Name ");
+        req.setDescription("desc");
+        req.setPermissionIds(List.of(1L, 2L));
+
+        RoleDetailDTO result = roleService.createRole(req);
+
+        assertEquals(10L, result.getId());
+        assertEquals("custom_role", result.getCode());
+        assertEquals("Custom Name", result.getName());
+        verify(rolePermissionRepository, times(2)).save(any(RolePermission.class));
+    }
+
+    @Test
+    void createRole_missingCode_throws() {
+        CreateRoleRequest req = new CreateRoleRequest();
+        req.setCode(" ");
+        req.setName("name");
+        assertThrows(IllegalArgumentException.class, () -> roleService.createRole(req));
+    }
+
+    @Test
+    void createRole_missingName_throws() {
+        CreateRoleRequest req = new CreateRoleRequest();
+        req.setCode("code");
+        req.setName(" ");
+        assertThrows(IllegalArgumentException.class, () -> roleService.createRole(req));
+    }
+
+    @Test
+    void createRole_duplicateCode_throws() {
+        when(roleRepository.findByCode("dup")).thenReturn(Optional.of(createTestRole(1L, "dup", "Dup", false)));
+        CreateRoleRequest req = new CreateRoleRequest();
+        req.setCode("dup");
+        req.setName("name");
+        assertThrows(IllegalArgumentException.class, () -> roleService.createRole(req));
+    }
+
+    @Test
+    void createRole_invalidPermissionIds_throws() {
+        when(roleRepository.findByCode("new_role")).thenReturn(Optional.empty());
+        when(roleRepository.save(any(Role.class))).thenAnswer(inv -> {
+            Role r = inv.getArgument(0);
+            r.setId(20L);
+            return r;
+        });
+        Permission p1 = createTestPermission(1L, "user.view", "View Users", "user");
+        when(permissionRepository.findAllById(List.of(1L, 999L))).thenReturn(List.of(p1));
+
+        CreateRoleRequest req = new CreateRoleRequest();
+        req.setCode("new_role");
+        req.setName("New Role");
+        req.setPermissionIds(List.of(1L, 999L));
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () -> roleService.createRole(req));
+        assertTrue(ex.getMessage().contains("999"));
+    }
+
+    @Test
+    void createRole_permissionIdsDeduplicatesAndFiltersNull() {
+        Permission p1 = createTestPermission(1L, "user.view", "View Users", "user");
+        when(roleRepository.findByCode("new_role")).thenReturn(Optional.empty());
+        when(roleRepository.save(any(Role.class))).thenAnswer(inv -> {
+            Role r = inv.getArgument(0);
+            r.setId(30L);
+            return r;
+        });
+        when(permissionRepository.findAllById(List.of(1L))).thenReturn(List.of(p1));
+        when(permissionRepository.findByRoleId(30L)).thenReturn(List.of(p1));
+        when(permissionRepository.findAll(any(Sort.class))).thenReturn(List.of(p1));
+
+        CreateRoleRequest req = new CreateRoleRequest();
+        req.setCode("new_role");
+        req.setName("New Role");
+        req.setPermissionIds(Arrays.asList(1L, null, 1L));
+
+        roleService.createRole(req);
+
+        verify(rolePermissionRepository, times(1)).save(any(RolePermission.class));
+    }
+
+    // --- getAllPermissionsGroupedByModule ---
+    @Test
+    void getAllPermissionsGroupedByModule_groupsByModule() {
+        Permission p1 = createTestPermission(1L, "user.view", "View Users", "user");
+        Permission p2 = createTestPermission(2L, "user.edit", "Edit Users", "user");
+        Permission p3 = createTestPermission(3L, "role.view", "View Roles", "role");
+        when(permissionRepository.findAll(any(Sort.class))).thenReturn(List.of(p1, p2, p3));
+
+        Map<String, List<PermissionDTO>> result = roleService.getAllPermissionsGroupedByModule();
+
+        assertEquals(Set.of("user", "role"), result.keySet());
+        assertEquals(2, result.get("user").size());
+        assertEquals(1, result.get("role").size());
+    }
+
+    @Test
+    void getAllPermissionsGroupedByModule_emptyReturnsEmptyMap() {
+        when(permissionRepository.findAll(any(Sort.class))).thenReturn(List.of());
+        Map<String, List<PermissionDTO>> result = roleService.getAllPermissionsGroupedByModule();
+        assertTrue(result.isEmpty());
+    }
+
+    // --- deleteRole ---
+    @Test
+    void deleteRole_success_noUsersUsingRole() {
+        Role role = createTestRole(5L, "r1", "Role1", false);
+        when(roleRepository.findById(5L)).thenReturn(Optional.of(role));
+        when(userRepository.countByRole_Id(5L)).thenReturn(0L);
+
+        roleService.deleteRole(5L);
+
+        verify(roleRepository).deleteById(5L);
+    }
+
+    @Test
+    void deleteRole_roleInUse_throws() {
+        Role role = createTestRole(6L, "r2", "Role2", false);
+        when(roleRepository.findById(6L)).thenReturn(Optional.of(role));
+        when(userRepository.countByRole_Id(6L)).thenReturn(3L);
+
+        assertThrows(IllegalArgumentException.class, () -> roleService.deleteRole(6L));
+        verify(roleRepository, never()).deleteById(anyLong());
+    }
+
+    @Test
+    void deleteRole_notFound_throws() {
+        when(roleRepository.findById(99L)).thenReturn(Optional.empty());
+        assertThrows(ResourceNotFoundException.class, () -> roleService.deleteRole(99L));
     }
 }

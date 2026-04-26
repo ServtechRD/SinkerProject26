@@ -1,11 +1,14 @@
 package com.sinker.app.service;
 
 import com.sinker.app.dto.forecast.CreateForecastRequest;
+import com.sinker.app.dto.forecast.CopyVersionResponse;
 import com.sinker.app.dto.forecast.ForecastResponse;
 import com.sinker.app.dto.forecast.UpdateForecastRequest;
+import com.sinker.app.dto.forecast.VersionDiffItemDTO;
 import com.sinker.app.dto.forecast.VersionInfo;
 import com.sinker.app.entity.SalesForecast;
 import com.sinker.app.entity.SalesForecastConfig;
+import com.sinker.app.entity.SalesForecastVersionReason;
 import com.sinker.app.exception.ResourceNotFoundException;
 import com.sinker.app.repository.SalesForecastConfigRepository;
 import com.sinker.app.repository.SalesForecastRepository;
@@ -474,6 +477,84 @@ class SalesForecastServiceTest {
                 service.queryVersions(month, channel, 1L, authorities));
 
         verify(forecastRepository, never()).findDistinctVersionsByMonthAndChannel(anyString(), anyString());
+    }
+
+    @Test
+    void getVersionDiff_success_returnsChangedRowsOnly() {
+        String month = "202601";
+        String channel = "大全聯";
+        when(forecastRepository.findDistinctVersionsByMonthAndChannel(month, channel))
+                .thenReturn(List.of("v3", "v2", "v1"));
+
+        SalesForecast currChanged = createMockForecast(1, month, channel, "飲料類", "P001", "v3");
+        currChanged.setQuantity(new BigDecimal("120"));
+        SalesForecast currSame = createMockForecast(2, month, channel, "零食類", "P002", "v3");
+        currSame.setQuantity(new BigDecimal("80"));
+        SalesForecast prevChanged = createMockForecast(3, month, channel, "飲料類", "P001", "v2");
+        prevChanged.setQuantity(new BigDecimal("100"));
+        SalesForecast prevSame = createMockForecast(4, month, channel, "零食類", "P002", "v2");
+        prevSame.setQuantity(new BigDecimal("80"));
+
+        when(forecastRepository.findByMonthAndChannelAndVersionOrderByCategoryAscSpecAscProductCodeAsc(month, channel, "v3"))
+                .thenReturn(List.of(currChanged, currSame));
+        when(forecastRepository.findByMonthAndChannelAndVersionOrderByCategoryAscSpecAscProductCodeAsc(month, channel, "v2"))
+                .thenReturn(List.of(prevChanged, prevSame));
+
+        List<VersionDiffItemDTO> result = service.getVersionDiff(month, channel, "v3", 1L, Set.of("sales_forecast.view"));
+
+        assertEquals(1, result.size());
+        assertEquals("P001", result.get(0).getProductCode());
+        assertEquals(new BigDecimal("120"), result.get(0).getCurrentQuantity());
+        assertEquals(new BigDecimal("100"), result.get(0).getPreviousQuantity());
+    }
+
+    @Test
+    void copyLatestToNewVersion_success_copiesAllRowsAsUnmodified() {
+        String month = "202601";
+        String channel = "大全聯";
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), anyLong(), eq(channel))).thenReturn(1);
+        SalesForecast src1 = createMockForecast(1, month, channel, "飲料類", "P001", "v1");
+        SalesForecast src2 = createMockForecast(2, month, channel, "零食類", "P002", "v1");
+        when(forecastRepository.findLatestByMonthAndChannel(month, channel)).thenReturn(List.of(src1, src2));
+
+        CopyVersionResponse resp = service.copyLatestToNewVersion(month, channel, 1L, "user");
+
+        assertNotNull(resp.getVersion());
+        verify(forecastRepository, times(2)).save(argThat(row ->
+                row.getVersion().equals(resp.getVersion()) && Boolean.FALSE.equals(row.getIsModified())));
+    }
+
+    @Test
+    void deleteVersion_success_deletesRowsAndReason() {
+        String month = "202601";
+        String channel = "大全聯";
+        String version = "v2";
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), anyLong(), eq(channel))).thenReturn(1);
+        SalesForecastVersionReason reason = new SalesForecastVersionReason();
+        when(versionReasonRepository.findByMonthAndChannelAndVersion(month, channel, version))
+                .thenReturn(Optional.of(reason));
+
+        service.deleteVersion(month, channel, version, 1L, "user");
+
+        verify(forecastRepository).deleteByMonthAndChannelAndVersion(month, channel, version);
+        verify(versionReasonRepository).delete(reason);
+    }
+
+    @Test
+    void saveVersionReason_createsAndUpdatesReason() {
+        String month = "202601";
+        String channel = "大全聯";
+        String version = "v2";
+        when(versionReasonRepository.findByMonthAndChannelAndVersion(month, channel, version))
+                .thenReturn(Optional.empty());
+
+        service.saveVersionReason(month, channel, version, "調整說明");
+
+        verify(versionReasonRepository).save(argThat(v ->
+                month.equals(v.getMonth())
+                        && channel.equals(v.getChannel())
+                        && version.equals(v.getVersion())
+                        && "調整說明".equals(v.getChangeReason())));
     }
 
     private SalesForecast createMockForecast(Integer id, String month, String channel,

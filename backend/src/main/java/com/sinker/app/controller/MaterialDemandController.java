@@ -74,9 +74,41 @@ public class MaterialDemandController {
         if (factory == null || factory.isEmpty()) {
             throw new IllegalArgumentException("Required parameter 'factory' is missing");
         }
+        MaterialDemandPendingConfirmItemDTO item = materialDemandService.getPendingConfirmItem(weekStart, factory);
         Map<String, Object> body = new HashMap<>();
-        body.put("lastEditSavedAt", materialDemandService.getLastEditSavedAt(weekStart, factory).orElse(null));
+        body.put("lastEditSavedAt", item.getUpdatedAt());
+        body.put("reviewStatus", item.getStatus());
         return ResponseEntity.ok(body);
+    }
+
+    @PostMapping("/review-approve")
+    @PreAuthorize("hasAuthority('confirm_data_send_erp')")
+    public ResponseEntity<Map<String, Object>> reviewApprove(
+            @RequestParam("week_start") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart,
+            @RequestParam String factory) {
+        if (weekStart == null) {
+            throw new IllegalArgumentException("Required parameter 'week_start' is missing");
+        }
+        if (factory == null || factory.isEmpty()) {
+            throw new IllegalArgumentException("Required parameter 'factory' is missing");
+        }
+        materialDemandService.reviewApprove(weekStart, factory);
+        return ResponseEntity.ok(Map.of("message", "審核完成"));
+    }
+
+    @PostMapping("/review-reject")
+    @PreAuthorize("hasAuthority('confirm_data_send_erp')")
+    public ResponseEntity<Map<String, Object>> reviewReject(
+            @RequestParam("week_start") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart,
+            @RequestParam String factory) {
+        if (weekStart == null) {
+            throw new IllegalArgumentException("Required parameter 'week_start' is missing");
+        }
+        if (factory == null || factory.isEmpty()) {
+            throw new IllegalArgumentException("Required parameter 'factory' is missing");
+        }
+        materialDemandService.reviewReject(weekStart, factory);
+        return ResponseEntity.ok(Map.of("message", "已退回"));
     }
 
     @PutMapping("/{id}")
@@ -100,10 +132,12 @@ public class MaterialDemandController {
     }
 
     @GetMapping("/pending-confirm")
-    @PreAuthorize("hasAuthority('confirm_data_send_erp')")
-    public ResponseEntity<List<MaterialDemandPendingConfirmItemDTO>> getPendingConfirm() {
-        log.info("GET /api/material-demand/pending-confirm");
-        return ResponseEntity.ok(materialDemandService.getPendingConfirm());
+    @PreAuthorize("hasAuthority('confirm_data_send_erp') or hasRole('PROCUREMENT')")
+    public ResponseEntity<List<MaterialDemandPendingConfirmItemDTO>> getPendingConfirm(
+            @AuthenticationPrincipal JwtUserPrincipal principal) {
+        log.info("GET /api/material-demand/pending-confirm - user={}, role={}",
+                principal.getUserId(), principal.getRoleCode());
+        return ResponseEntity.ok(materialDemandService.getPendingConfirmForRole(principal.getRoleCode()));
     }
 
     @PostMapping("/upload")

@@ -18,6 +18,22 @@ export function confirmSendErp(weekStart, factory) {
     .then((r) => r.data)
 }
 
+export function reviewApproveMaterialDemand(weekStart, factory) {
+  return api
+    .post('/api/material-demand/review-approve', null, {
+      params: { week_start: weekStart, factory },
+    })
+    .then((r) => r.data)
+}
+
+export function reviewRejectMaterialDemand(weekStart, factory) {
+  return api
+    .post('/api/material-demand/review-reject', null, {
+      params: { week_start: weekStart, factory },
+    })
+    .then((r) => r.data)
+}
+
 export function getMaterialDemandPendingConfirm() {
   return api.get('/api/material-demand/pending-confirm').then((r) => r.data)
 }

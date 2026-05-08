@@ -12,11 +12,11 @@ import java.math.BigDecimal;
 public class ExcelTemplateService {
 
     private static final String[] HEADERS = {
-            "中類名稱", "貨品規格", "品號", "品名", "庫位", "箱數小計"
+            "中類名稱", "貨品規格", "品號", "品名", "庫位", "箱數小計", "備註"
     };
 
     private static final Object[] SAMPLE_ROW = {
-            "飲料類", "600ml*24入", "P001", "可口可樂", "A01", new BigDecimal("100.50")
+            "飲料類", "600ml*24入", "P001", "可口可樂", "A01", new BigDecimal("100.50"), ""
     };
 
     public byte[] generateTemplate(String channel) {

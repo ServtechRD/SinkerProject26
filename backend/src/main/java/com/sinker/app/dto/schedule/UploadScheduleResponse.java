@@ -3,6 +3,8 @@ package com.sinker.app.dto.schedule;
 import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 public class UploadScheduleResponse {
 
@@ -15,6 +17,9 @@ public class UploadScheduleResponse {
     private LocalDate weekStart;
 
     private String factory;
+
+    @JsonProperty("changedRowIds")
+    private List<Integer> changedRowIds = new ArrayList<>();
 
     public UploadScheduleResponse() {}
 
@@ -55,5 +60,13 @@ public class UploadScheduleResponse {
 
     public void setFactory(String factory) {
         this.factory = factory;
+    }
+
+    public List<Integer> getChangedRowIds() {
+        return changedRowIds;
+    }
+
+    public void setChangedRowIds(List<Integer> changedRowIds) {
+        this.changedRowIds = changedRowIds != null ? changedRowIds : new ArrayList<>();
     }
 }

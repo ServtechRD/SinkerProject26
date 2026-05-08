@@ -20,19 +20,20 @@ public class WeeklyScheduleExcelParser {
 
     private static final Logger log = LoggerFactory.getLogger(WeeklyScheduleExcelParser.class);
 
-    // Chinese column headers
-    private static final String HEADER_DEMAND_DATE = "需求日期";
-    private static final String HEADER_PRODUCT_CODE = "品號";
-    private static final String HEADER_PRODUCT_NAME = "品名";
-    private static final String HEADER_WAREHOUSE_LOCATION = "庫位";
-    private static final String HEADER_QUANTITY = "箱數小計";
+    private static final String HEADER_DEMAND_DATE = "生產日";
+    private static final String HEADER_WAREHOUSE_LOCATION = "區分";
+    private static final String HEADER_PRODUCT_CODE = "料號";
+    private static final String HEADER_PRODUCT_NAME = "名稱";
+    private static final String HEADER_QUANTITY = "數量";
+    private static final String HEADER_REMARK = "備註";
 
     private static final Set<String> REQUIRED_HEADERS = Set.of(
             HEADER_DEMAND_DATE,
+            HEADER_WAREHOUSE_LOCATION,
             HEADER_PRODUCT_CODE,
             HEADER_PRODUCT_NAME,
-            HEADER_WAREHOUSE_LOCATION,
-            HEADER_QUANTITY
+            HEADER_QUANTITY,
+            HEADER_REMARK
     );
 
     public static class WeeklyScheduleRow {
@@ -172,14 +173,14 @@ public class WeeklyScheduleExcelParser {
     }
 
     private WeeklyScheduleRow parseDataRow(Row row, Map<String, Integer> columnIndices, int rowNumber) {
-        LocalDate demandDate = parseDateCell(row, columnIndices.get(HEADER_DEMAND_DATE), "需求日期");
-        String productCode = parseStringCell(row, columnIndices.get(HEADER_PRODUCT_CODE), "品號");
-        String productName = parseStringCell(row, columnIndices.get(HEADER_PRODUCT_NAME), "品名");
-        String warehouseLocation = parseStringCell(row, columnIndices.get(HEADER_WAREHOUSE_LOCATION), "庫位");
-        BigDecimal quantity = parseNumericCell(row, columnIndices.get(HEADER_QUANTITY), "箱數小計");
+        LocalDate demandDate = parseDateCell(row, columnIndices.get(HEADER_DEMAND_DATE), "生產日");
+        String productCode = parseStringCell(row, columnIndices.get(HEADER_PRODUCT_CODE), "料號");
+        String productName = parseStringCell(row, columnIndices.get(HEADER_PRODUCT_NAME), "名稱");
+        String warehouseLocation = parseStringCell(row, columnIndices.get(HEADER_WAREHOUSE_LOCATION), "區分");
+        BigDecimal quantity = parseNumericCell(row, columnIndices.get(HEADER_QUANTITY), "數量");
 
         if (quantity.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("箱數小計 must be >= 0");
+            throw new IllegalArgumentException("數量 must be >= 0");
         }
 
         return new WeeklyScheduleRow(demandDate, productCode, productName, warehouseLocation, quantity, rowNumber);

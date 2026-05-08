@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom'
 import Sidebar from '../components/Sidebar'
 import MaterialDemandPendingBanner from '../components/MaterialDemandPendingBanner'
+import WeeklyScheduleUploadBanner from '../components/WeeklyScheduleUploadBanner'
 import SalesForecastFillDeadlineBanner from '../components/SalesForecastFillDeadlineBanner'
 import './MainLayout.css'
 
@@ -11,6 +12,7 @@ export default function MainLayout() {
       <main className="main-content" data-testid="main-content">
         <SalesForecastFillDeadlineBanner />
         <MaterialDemandPendingBanner />
+        <WeeklyScheduleUploadBanner />
         <Outlet />
       </main>
     </div>

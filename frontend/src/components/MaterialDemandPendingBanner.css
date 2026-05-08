@@ -27,6 +27,10 @@
   gap: 4px;
 }
 
+.material-demand-pending-banner__item--inline-tight {
+  gap: 0;
+}
+
 .material-demand-pending-banner__saved-at {
   font-weight: 500;
   color: #78350f;

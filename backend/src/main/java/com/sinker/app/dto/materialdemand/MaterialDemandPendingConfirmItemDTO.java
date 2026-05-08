@@ -8,6 +8,8 @@ public class MaterialDemandPendingConfirmItemDTO {
 
     private LocalDate weekStart;
     private String factory;
+    /** 0 待審核、1 審核完成、2 退回 */
+    private Integer status;
     private LocalDateTime updatedAt;
 
     public MaterialDemandPendingConfirmItemDTO() {}
@@ -16,6 +18,14 @@ public class MaterialDemandPendingConfirmItemDTO {
         this.weekStart = weekStart;
         this.factory = factory;
         this.updatedAt = updatedAt;
+    }
+
+    public Integer getStatus() {
+        return status;
+    }
+
+    public void setStatus(Integer status) {
+        this.status = status;
     }
 
     public LocalDate getWeekStart() {

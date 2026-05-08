@@ -148,7 +148,12 @@ class MaterialDemandServiceTest {
         MaterialDemandDTO out = materialDemandService.update(10, dto);
 
         assertEquals(new BigDecimal("9"), out.getPurchaseQuantity());
-        verify(jdbcTemplate).update(contains("material_demand_pending_confirm"), eq(entity.getWeekStart()), eq("F1"));
+        verify(jdbcTemplate).update(
+                contains("material_demand_pending_confirm"),
+                eq(entity.getWeekStart()),
+                eq("F1"),
+                eq(MaterialDemandService.REVIEW_STATUS_PENDING),
+                eq(MaterialDemandService.REVIEW_STATUS_PENDING));
         verify(pdcaRecomputeService).recomputeAsync(entity.getWeekStart(), "F1");
     }
 
@@ -192,6 +197,12 @@ class MaterialDemandServiceTest {
                     && "F1".equals(list.get(0).getFactory());
         }));
         verify(pdcaRecomputeService).recomputeAsync(weekStart, factory);
+        verify(jdbcTemplate).update(
+                contains("material_demand_pending_confirm"),
+                eq(weekStart),
+                eq(factory),
+                eq(MaterialDemandService.REVIEW_STATUS_PENDING),
+                eq(MaterialDemandService.REVIEW_STATUS_PENDING));
     }
 
     @Test
@@ -201,8 +212,9 @@ class MaterialDemandServiceTest {
     }
 
     @Test
-    void getPendingConfirm_mapsResultSetRows() throws Exception {
-        when(jdbcTemplate.query(anyString(), any(org.springframework.jdbc.core.RowMapper.class)))
+    void getPendingConfirmForRole_admin_mapsResultSetRows() throws Exception {
+        when(jdbcTemplate.query(anyString(), any(org.springframework.jdbc.core.RowMapper.class),
+                eq(MaterialDemandService.REVIEW_STATUS_PENDING)))
                 .thenAnswer(invocation -> {
                     @SuppressWarnings("unchecked")
                     org.springframework.jdbc.core.RowMapper<MaterialDemandPendingConfirmItemDTO> mapper =
@@ -210,16 +222,38 @@ class MaterialDemandServiceTest {
                     ResultSet rs = mock(ResultSet.class);
                     when(rs.getObject("week_start", LocalDate.class)).thenReturn(LocalDate.of(2026, 2, 17));
                     when(rs.getString("factory")).thenReturn("F1");
+                    when(rs.getInt("status")).thenReturn(0);
                     when(rs.getTimestamp("updated_at")).thenReturn(Timestamp.valueOf(LocalDateTime.of(2026, 2, 17, 10, 0)));
                     return List.of(mapper.mapRow(rs, 0));
                 });
 
-        List<MaterialDemandPendingConfirmItemDTO> result = materialDemandService.getPendingConfirm();
+        List<MaterialDemandPendingConfirmItemDTO> result = materialDemandService.getPendingConfirmForRole("admin");
 
         assertEquals(1, result.size());
         assertEquals(LocalDate.of(2026, 2, 17), result.get(0).getWeekStart());
         assertEquals("F1", result.get(0).getFactory());
+        assertEquals(Integer.valueOf(0), result.get(0).getStatus());
         assertEquals(LocalDateTime.of(2026, 2, 17, 10, 0), result.get(0).getUpdatedAt());
+    }
+
+    @Test
+    void getPendingConfirmForRole_procurement_queriesApprovedAndRejected() {
+        when(jdbcTemplate.query(anyString(), any(org.springframework.jdbc.core.RowMapper.class),
+                eq(MaterialDemandService.REVIEW_STATUS_APPROVED),
+                eq(MaterialDemandService.REVIEW_STATUS_REJECTED)))
+                .thenReturn(List.of());
+
+        materialDemandService.getPendingConfirmForRole("procurement");
+
+        verify(jdbcTemplate).query(contains("status IN (?, ?)"),
+                any(org.springframework.jdbc.core.RowMapper.class),
+                eq(MaterialDemandService.REVIEW_STATUS_APPROVED),
+                eq(MaterialDemandService.REVIEW_STATUS_REJECTED));
+    }
+
+    @Test
+    void getPendingConfirmForRole_unknownRole_returnsEmpty() {
+        assertTrue(materialDemandService.getPendingConfirmForRole("sales").isEmpty());
     }
 
     @Test
@@ -227,9 +261,13 @@ class MaterialDemandServiceTest {
         when(jdbcTemplate.query(anyString(), any(org.springframework.jdbc.core.RowMapper.class), any(), any()))
                 .thenAnswer(invocation -> {
                     @SuppressWarnings("unchecked")
-                    org.springframework.jdbc.core.RowMapper<LocalDateTime> mapper = invocation.getArgument(1);
+                    org.springframework.jdbc.core.RowMapper<MaterialDemandPendingConfirmItemDTO> mapper =
+                            invocation.getArgument(1);
                     ResultSet rs = mock(ResultSet.class);
-                    when(rs.getTimestamp(1)).thenReturn(Timestamp.valueOf(LocalDateTime.of(2026, 2, 17, 11, 0)));
+                    when(rs.getObject("week_start", LocalDate.class)).thenReturn(LocalDate.of(2026, 2, 17));
+                    when(rs.getString("factory")).thenReturn("F1");
+                    when(rs.getTimestamp("updated_at")).thenReturn(Timestamp.valueOf(LocalDateTime.of(2026, 2, 17, 11, 0)));
+                    when(rs.getInt("status")).thenReturn(0);
                     return List.of(mapper.mapRow(rs, 0));
                 });
 
@@ -245,24 +283,43 @@ class MaterialDemandServiceTest {
                 .thenReturn(List.of());
         assertTrue(materialDemandService.getLastEditSavedAt(LocalDate.of(2026, 2, 17), "F1").isEmpty());
 
+        MaterialDemandPendingConfirmItemDTO nullTime = new MaterialDemandPendingConfirmItemDTO();
+        nullTime.setUpdatedAt(null);
+        nullTime.setStatus(0);
         when(jdbcTemplate.query(anyString(), any(org.springframework.jdbc.core.RowMapper.class), any(), any()))
-                .thenReturn(Arrays.asList((LocalDateTime) null));
+                .thenReturn(List.of(nullTime));
         assertTrue(materialDemandService.getLastEditSavedAt(LocalDate.of(2026, 2, 17), "F1").isEmpty());
     }
 
     @Test
     void confirmSendErp_callsErpAndClearsPending() {
         LocalDate weekStart = LocalDate.of(2026, 2, 17);
+        when(jdbcTemplate.query(contains("SELECT status"), any(org.springframework.jdbc.core.RowMapper.class), any(), any()))
+                .thenReturn(List.of(MaterialDemandService.REVIEW_STATUS_APPROVED));
         materialDemandService.confirmSendErp(weekStart, "F1");
         verify(erpPurchaseOrderService).createPurchaseOrder(weekStart, "F1");
         verify(jdbcTemplate).update(contains("DELETE FROM material_demand_pending_confirm"), eq(weekStart), eq("F1"));
     }
 
     @Test
+    void confirmSendErp_wrongStatus_skipsErp() {
+        LocalDate weekStart = LocalDate.of(2026, 2, 17);
+        when(jdbcTemplate.query(contains("SELECT status"), any(org.springframework.jdbc.core.RowMapper.class), any(), any()))
+                .thenReturn(List.of(MaterialDemandService.REVIEW_STATUS_PENDING));
+        assertThrows(IllegalArgumentException.class, () -> materialDemandService.confirmSendErp(weekStart, "F1"));
+        verify(erpPurchaseOrderService, never()).createPurchaseOrder(any(), any());
+    }
+
+    @Test
     void markPendingConfirm_executesUpsert() {
         LocalDate weekStart = LocalDate.of(2026, 2, 17);
         materialDemandService.markPendingConfirm(weekStart, "F1");
-        verify(jdbcTemplate).update(contains("INSERT INTO material_demand_pending_confirm"), eq(weekStart), eq("F1"));
+        verify(jdbcTemplate).update(
+                contains("INSERT INTO material_demand_pending_confirm"),
+                eq(weekStart),
+                eq("F1"),
+                eq(MaterialDemandService.REVIEW_STATUS_PENDING),
+                eq(MaterialDemandService.REVIEW_STATUS_PENDING));
     }
 
     @Test

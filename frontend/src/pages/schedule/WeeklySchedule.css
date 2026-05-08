@@ -201,6 +201,11 @@
   color: #1e293b;
 }
 
+.schedule-table td.schedule-value--changed {
+  color: #c62828;
+  font-weight: 600;
+}
+
 .schedule-table tbody tr:hover {
   background: #f8fafc;
 }

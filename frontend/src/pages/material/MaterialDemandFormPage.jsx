@@ -8,6 +8,8 @@ import {
   getMaterialDemandLastEditSavedAt,
   updateMaterialDemand,
   confirmSendErp,
+  reviewApproveMaterialDemand,
+  reviewRejectMaterialDemand,
 } from '../../api/materialDemand'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { formatMaterialDemandSavedAt } from '../../utils/materialDemandDateTime'
@@ -46,6 +48,10 @@ function formatDemandNumeric(v) {
   return n.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })
 }
 
+/** 與後端 material_demand_pending_confirm.status 一致：0 待審核、1 審核完成、2 退回 */
+const REVIEW_STATUS_PENDING = 0
+const REVIEW_STATUS_APPROVED = 1
+
 /** 預計庫存量 = 現有庫存 + 預交量 - 需求量（後端已計算，此處僅供顯示一致） */
 function computedEstimatedInventory(row) {
   const cur = Number(row.currentStock)
@@ -83,10 +89,27 @@ export default function MaterialDemandFormPage() {
   const [erpConfirmOpen, setErpConfirmOpen] = useState(false)
   /** 後端 lastEditSavedAt 原始值（待確認 ERP 時才有，即最後一次編輯儲存觸發時間） */
   const [lastEditSavedRaw, setLastEditSavedRaw] = useState(null)
+  /** 0 待審核、1 審核完成、2 退回；無待確認列時為 null */
+  const [reviewStatus, setReviewStatus] = useState(null)
+  const [reviewApproveOpen, setReviewApproveOpen] = useState(false)
+  const [reviewRejectOpen, setReviewRejectOpen] = useState(false)
+  const [reviewActionLoading, setReviewActionLoading] = useState(false)
 
   const canView = hasPermission(user, 'material_demand.view')
   const canEdit = hasPermission(user, 'material_demand.edit')
   const canConfirmSendErp = hasPermission(user, 'confirm_data_send_erp')
+
+  const applyPendingMeta = useCallback((meta) => {
+    const raw = meta?.lastEditSavedAt
+    setLastEditSavedRaw(raw != null && raw !== '' ? raw : null)
+    const st = meta?.reviewStatus
+    if (st === null || st === undefined || st === '') {
+      setReviewStatus(null)
+      return
+    }
+    const n = Number(st)
+    setReviewStatus(Number.isNaN(n) ? null : n)
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -121,25 +144,27 @@ export default function MaterialDemandFormPage() {
     setQueryClicked(true)
     setLoading(true)
     setLastEditSavedRaw(null)
+    setReviewStatus(null)
     getMaterialDemand(paramWeek, paramFactory)
       .then(async (result) => {
         setData(Array.isArray(result) ? result : [])
         if (!result?.length) toast.info('查無資料')
         try {
           const meta = await getMaterialDemandLastEditSavedAt(paramWeek, paramFactory)
-          const raw = meta?.lastEditSavedAt
-          setLastEditSavedRaw(raw != null && raw !== '' ? raw : null)
+          applyPendingMeta(meta)
         } catch {
           setLastEditSavedRaw(null)
+          setReviewStatus(null)
         }
       })
       .catch(() => {
         setData([])
         setLastEditSavedRaw(null)
+        setReviewStatus(null)
         toast.error('查詢失敗')
       })
       .finally(() => setLoading(false))
-  }, [paramWeek, paramFactory, factories, toast])
+  }, [paramWeek, paramFactory, factories, toast, applyPendingMeta])
 
   const runQueryRef = useCallback(async () => {
     if (!weekStart || !factory) return
@@ -148,26 +173,28 @@ export default function MaterialDemandFormPage() {
     setEditMode(false)
     setPurchaseQuantityById({})
     setLastEditSavedRaw(null)
+    setReviewStatus(null)
     try {
       const result = await getMaterialDemand(weekStart, factory)
       setData(Array.isArray(result) ? result : [])
       if (!result?.length) toast.info('查無資料')
       try {
         const meta = await getMaterialDemandLastEditSavedAt(weekStart, factory)
-        const raw = meta?.lastEditSavedAt
-        setLastEditSavedRaw(raw != null && raw !== '' ? raw : null)
+        applyPendingMeta(meta)
       } catch {
         setLastEditSavedRaw(null)
+        setReviewStatus(null)
       }
     } catch (err) {
       if (err.response?.status === 403) toast.error('您沒有權限檢視物料需求')
       else toast.error('查詢失敗')
       setData([])
       setLastEditSavedRaw(null)
+      setReviewStatus(null)
     } finally {
       setLoading(false)
     }
-  }, [weekStart, factory, toast])
+  }, [weekStart, factory, toast, applyPendingMeta])
 
   const runQuery = useCallback(async () => {
     if (!weekStart || !factory) {
@@ -252,6 +279,50 @@ export default function MaterialDemandFormPage() {
       await performConfirmSendErp()
     } finally {
       setErpConfirmOpen(false)
+    }
+  }
+
+  const performReviewApprove = async () => {
+    if (!weekStart || !factory) return
+    setReviewActionLoading(true)
+    try {
+      await reviewApproveMaterialDemand(weekStart, factory)
+      toast.success('已審核完成')
+      await runQueryRef()
+    } catch (err) {
+      toast.error(err.response?.data?.message || '審核失敗')
+    } finally {
+      setReviewActionLoading(false)
+    }
+  }
+
+  const performReviewReject = async () => {
+    if (!weekStart || !factory) return
+    setReviewActionLoading(true)
+    try {
+      await reviewRejectMaterialDemand(weekStart, factory)
+      toast.success('已退回')
+      await runQueryRef()
+    } catch (err) {
+      toast.error(err.response?.data?.message || '退回失敗')
+    } finally {
+      setReviewActionLoading(false)
+    }
+  }
+
+  const handleReviewApproveDialogConfirm = async () => {
+    try {
+      await performReviewApprove()
+    } finally {
+      setReviewApproveOpen(false)
+    }
+  }
+
+  const handleReviewRejectDialogConfirm = async () => {
+    try {
+      await performReviewReject()
+    } finally {
+      setReviewRejectOpen(false)
     }
   }
 
@@ -404,16 +475,42 @@ export default function MaterialDemandFormPage() {
                 </button>
               </>
             )}
-            {canConfirmSendErp && !editMode && data.length > 0 && (
-              <button
-                type="button"
-                className="btn btn--primary"
-                onClick={() => setErpConfirmOpen(true)}
-                disabled={confirmingErp}
-              >
-                {confirmingErp ? '送出中...' : '本週資料確認無誤送出至天心ERP'}
-              </button>
-            )}
+            {canConfirmSendErp &&
+              !editMode &&
+              data.length > 0 &&
+              reviewStatus === REVIEW_STATUS_PENDING && (
+                <>
+                  <button
+                    type="button"
+                    className="btn btn--primary"
+                    onClick={() => setReviewApproveOpen(true)}
+                    disabled={reviewActionLoading}
+                  >
+                    審核
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn--outline"
+                    onClick={() => setReviewRejectOpen(true)}
+                    disabled={reviewActionLoading}
+                  >
+                    退回
+                  </button>
+                </>
+              )}
+            {canConfirmSendErp &&
+              !editMode &&
+              data.length > 0 &&
+              reviewStatus === REVIEW_STATUS_APPROVED && (
+                <button
+                  type="button"
+                  className="btn btn--primary"
+                  onClick={() => setErpConfirmOpen(true)}
+                  disabled={confirmingErp}
+                >
+                  {confirmingErp ? '送出中...' : '本週資料確認無誤送出至天心ERP'}
+                </button>
+              )}
             <button
               type="button"
               className="btn btn--outline"
@@ -479,6 +576,30 @@ export default function MaterialDemandFormPage() {
         </section>
       )}
 
+      <ConfirmDialog
+        open={reviewApproveOpen}
+        title="審核"
+        message="確定標記為審核完成？完成後可送出至天心ERP。"
+        onConfirm={handleReviewApproveDialogConfirm}
+        onCancel={() => {
+          if (!reviewActionLoading) setReviewApproveOpen(false)
+        }}
+        loading={reviewActionLoading}
+        confirmText="確認"
+        confirmButtonClass="btn--primary"
+      />
+      <ConfirmDialog
+        open={reviewRejectOpen}
+        title="退回"
+        message="確定退回？採購人員可修改後重新送審。"
+        onConfirm={handleReviewRejectDialogConfirm}
+        onCancel={() => {
+          if (!reviewActionLoading) setReviewRejectOpen(false)
+        }}
+        loading={reviewActionLoading}
+        confirmText="確認退回"
+        confirmButtonClass="btn--outline"
+      />
       <ConfirmDialog
         open={erpConfirmOpen}
         title="確認送出"

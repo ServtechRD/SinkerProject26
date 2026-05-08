@@ -11,7 +11,7 @@ const navItems = [
   { to: '/gift-sales-forecast/upload', label: '禮品銷售預估量表單上傳', permission: 'sales_forecast.upload' },
   { to: '/sales-forecast', label: '銷售預估量表單', permission: 'sales_forecast.update_after_closed', end: true },
   { to: '/inventory-integration', label: '庫存銷量預估量整合表單', permission: 'inventory.view' },
-  { to: '/production-plan', label: '生產表單', permission: 'production_plan.view' },
+  { to: '/production-plan', label: '預估總表', permission: 'production_plan.view' },
   { to: '/weekly-schedule', label: '生產週排程表單-匯入', permission: 'weekly_schedule.view' },
   { to: '/semi-product/import', label: '半成品提前採購設定表單-匯入', permission: 'semi_product.view' },
   { to: '/material-demand/form', label: '物料需求數量表單', permission: 'material_demand.view' },

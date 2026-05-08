@@ -15,6 +15,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -244,6 +245,7 @@ public class FormSummaryService {
         formVersionRepository.save(v1);
 
         Map<String, FormSummaryRowDTO> keyToRow = new TreeMap<>();
+        Map<String, String> remarkChannelByProductKey = new LinkedHashMap<>();
         Map<String, BigDecimal>[] qtyByChannel = new Map[CHANNEL_ORDER.size()];
         for (int i = 0; i < CHANNEL_ORDER.size(); i++) {
             qtyByChannel[i] = new LinkedHashMap<>();
@@ -257,6 +259,9 @@ public class FormSummaryService {
                 for (SalesForecast r : salesRows) {
                     String pk = productKey(r);
                     keyToRow.putIfAbsent(pk, rowFrom(r));
+                    if (!remarkChannelByProductKey.containsKey(pk) && StringUtils.hasText(r.getRemark())) {
+                        remarkChannelByProductKey.put(pk, channel);
+                    }
                     qtyByChannel[chIdx].put(pk, r.getQuantity());
                 }
             }
@@ -264,6 +269,9 @@ public class FormSummaryService {
             for (GiftSalesForecast g : giftRows) {
                 String pk = productKeyGift(g);
                 keyToRow.putIfAbsent(pk, rowFromGift(g));
+                if (!remarkChannelByProductKey.containsKey(pk) && StringUtils.hasText(g.getRemark())) {
+                    remarkChannelByProductKey.put(pk, channel);
+                }
                 BigDecimal existing = qtyByChannel[chIdx].getOrDefault(pk, BigDecimal.ZERO);
                 qtyByChannel[chIdx].put(pk, existing.add(g.getQuantity()));
             }
@@ -288,7 +296,12 @@ public class FormSummaryService {
                 sf.setProductName(row.getProductName());
                 sf.setProductCode(row.getProductCode() != null ? row.getProductCode() : "");
                 sf.setQuantity(qty);
-                sf.setRemark(row.getRemark() != null ? row.getRemark() : "");
+                String remarkSourceChannel = remarkChannelByProductKey.get(pk);
+                if (StringUtils.hasText(row.getRemark()) && channel.equals(remarkSourceChannel)) {
+                    sf.setRemark(row.getRemark());
+                } else {
+                    sf.setRemark("");
+                }
                 sf.setIsModified(false);
                 sf.setCreatedAt(now);
                 sf.setUpdatedAt(now);
@@ -310,6 +323,20 @@ public class FormSummaryService {
         ensureFormVersion1Exists(month, config);
         List<SalesForecastFormVersion> existing = formVersionRepository.findByMonthOrderByVersionNoDesc(month);
         int nextNo = existing.isEmpty() ? 2 : existing.get(0).getVersionNo() + 1;
+        Integer baseVersionNo = existing.isEmpty() ? null : existing.get(0).getVersionNo();
+
+        Map<String, String> remarkChannelByProductKey = new LinkedHashMap<>();
+        if (baseVersionNo != null) {
+            List<SalesForecast> baseRows = forecastRepository.findByMonthAndFormVersionNoOrderByChannelCategorySpecProductCode(
+                    month, baseVersionNo
+            );
+            for (SalesForecast base : baseRows) {
+                String key = productKey(base);
+                if (!remarkChannelByProductKey.containsKey(key) && StringUtils.hasText(base.getRemark())) {
+                    remarkChannelByProductKey.put(key, base.getChannel());
+                }
+            }
+        }
 
         SalesForecastFormVersion newVer = new SalesForecastFormVersion();
         newVer.setMonth(month);
@@ -342,7 +369,14 @@ public class FormSummaryService {
                 sf.setProductName(row.getProductName());
                 sf.setProductCode(row.getProductCode() != null ? row.getProductCode() : "");
                 sf.setQuantity(qty);
-                sf.setRemark(row.getRemark() != null ? row.getRemark() : "");
+                String rowRemark = row.getRemark() != null ? row.getRemark() : "";
+                String productKey = productKey(row);
+                String remarkSourceChannel = remarkChannelByProductKey.get(productKey);
+                if (StringUtils.hasText(rowRemark) && channel.equals(remarkSourceChannel)) {
+                    sf.setRemark(rowRemark);
+                } else {
+                    sf.setRemark("");
+                }
                 sf.setIsModified(true);
                 sf.setCreatedAt(now);
                 sf.setUpdatedAt(now);
@@ -472,6 +506,14 @@ public class FormSummaryService {
                 + (g.getProductCode() != null ? g.getProductCode() : "");
     }
 
+    private static String productKey(SaveFormSummaryVersionRequest.FormSummaryRowEditDTO row) {
+        return (row.getWarehouseLocation() != null ? row.getWarehouseLocation() : "") + "|"
+                + (row.getCategory() != null ? row.getCategory() : "") + "|"
+                + (row.getSpec() != null ? row.getSpec() : "") + "|"
+                + (row.getProductName() != null ? row.getProductName() : "") + "|"
+                + (row.getProductCode() != null ? row.getProductCode() : "");
+    }
+
     private static FormSummaryRowDTO rowFrom(SalesForecast r) {
         FormSummaryRowDTO dto = new FormSummaryRowDTO();
         dto.setWarehouseLocation(r.getWarehouseLocation());
@@ -490,7 +532,7 @@ public class FormSummaryService {
         dto.setSpec(g.getSpec());
         dto.setProductName(g.getProductName());
         dto.setProductCode(g.getProductCode());
-        dto.setRemark(null);
+        dto.setRemark(g.getRemark());
         return dto;
     }
 

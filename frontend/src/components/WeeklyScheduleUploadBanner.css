@@ -1,0 +1,59 @@
+/* 生產週排程上傳後通知 */
+
+.weekly-schedule-upload-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 10px 16px;
+  background: #fff3cd;
+  border-top: 1px solid #e0c36a;
+  border-bottom: 1px solid #e0c36a;
+  font-size: 14px;
+  color: #856404;
+}
+
+.weekly-schedule-upload-banner__title {
+  font-weight: 600;
+  color: #856404;
+}
+
+.weekly-schedule-upload-banner__row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+
+.weekly-schedule-upload-banner__link {
+  color: #856404;
+  text-decoration: underline;
+  font-weight: 500;
+}
+
+.weekly-schedule-upload-banner__link:hover {
+  color: #533f03;
+}
+
+.weekly-schedule-upload-banner__saved-at {
+  font-weight: 500;
+  color: #664d03;
+  font-size: 13px;
+}
+
+.weekly-schedule-upload-banner__dismiss {
+  margin-left: auto;
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: #856404;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.weekly-schedule-upload-banner__dismiss:hover {
+  background: rgba(0, 0, 0, 0.06);
+}

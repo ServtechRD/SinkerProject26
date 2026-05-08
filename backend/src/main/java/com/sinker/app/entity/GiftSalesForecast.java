@@ -36,6 +36,9 @@ public class GiftSalesForecast {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal quantity;
 
+    @Column(length = 65535)
+    private String remark;
+
     @Column(nullable = false, length = 100)
     private String version;
 
@@ -74,6 +77,9 @@ public class GiftSalesForecast {
 
     public BigDecimal getQuantity() { return quantity; }
     public void setQuantity(BigDecimal quantity) { this.quantity = quantity; }
+
+    public String getRemark() { return remark; }
+    public void setRemark(String remark) { this.remark = remark; }
 
     public String getVersion() { return version; }
     public void setVersion(String version) { this.version = version; }

@@ -142,6 +142,7 @@ public class GiftSalesForecastUploadService {
                 g.setWarehouseLocation(row.getWarehouseLocation());
             }
             g.setQuantity(row.getQuantity());
+            g.setRemark(row.getRemark() != null ? row.getRemark() : "");
             g.setVersion(version);
             g.setIsModified(false);
             g.setCreatedAt(now);

@@ -74,13 +74,15 @@ describe('materialDemand API', () => {
   })
 
   it('getMaterialDemandLastEditSavedAt calls GET /api/material-demand/last-edit-saved-at', async () => {
-    api.get.mockResolvedValue({ data: { lastEditSavedAt: '2026-03-24T10:00:00' } })
+    api.get.mockResolvedValue({
+      data: { lastEditSavedAt: '2026-03-24T10:00:00', reviewStatus: 0 },
+    })
 
     const result = await getMaterialDemandLastEditSavedAt('2026-02-17', 'F1')
 
     expect(api.get).toHaveBeenCalledWith('/api/material-demand/last-edit-saved-at', {
       params: { week_start: '2026-02-17', factory: 'F1' },
     })
-    expect(result).toEqual({ lastEditSavedAt: '2026-03-24T10:00:00' })
+    expect(result).toEqual({ lastEditSavedAt: '2026-03-24T10:00:00', reviewStatus: 0 })
   })
 })

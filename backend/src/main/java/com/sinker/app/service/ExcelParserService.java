@@ -28,6 +28,7 @@ public class ExcelParserService {
     private static final int COL_PRODUCT_NAME = 3;
     private static final int COL_WAREHOUSE_LOCATION = 4;
     private static final int COL_QUANTITY = 5;
+    private static final int COL_REMARK = 6;
     private static final int MIN_COLUMNS = 6;
 
     public static class SalesForecastRow {
@@ -37,17 +38,19 @@ public class ExcelParserService {
         private final String productName;
         private final String warehouseLocation;
         private final BigDecimal quantity;
+        private final String remark;
         private final int rowNumber;
 
         public SalesForecastRow(String category, String spec, String productCode,
                                 String productName, String warehouseLocation,
-                                BigDecimal quantity, int rowNumber) {
+                                BigDecimal quantity, String remark, int rowNumber) {
             this.category = category;
             this.spec = spec;
             this.productCode = productCode;
             this.productName = productName;
             this.warehouseLocation = warehouseLocation;
             this.quantity = quantity;
+            this.remark = remark;
             this.rowNumber = rowNumber;
         }
 
@@ -57,6 +60,7 @@ public class ExcelParserService {
         public String getProductName() { return productName; }
         public String getWarehouseLocation() { return warehouseLocation; }
         public BigDecimal getQuantity() { return quantity; }
+        public String getRemark() { return remark; }
         public int getRowNumber() { return rowNumber; }
     }
 
@@ -89,7 +93,7 @@ public class ExcelParserService {
     }
 
     /**
-     * Parse CSV with headers: 中類名稱, 貨品規格, 品號, 品名, 庫位, 箱數小計.
+     * Parse CSV with headers: 中類名稱, 貨品規格, 品號, 品名, 庫位, 箱數小計, 備註.
      */
     public List<SalesForecastRow> parseCsv(MultipartFile file) {
         if (file == null || file.isEmpty()) {
@@ -120,6 +124,8 @@ public class ExcelParserService {
                     String productCode = parts[2] != null ? parts[2].trim() : null;
                     String productName = parts[3] != null ? parts[3].trim() : null;
                     String warehouseLocation = parts[4] != null ? parts[4].trim() : null;
+                    String remark = parts.length > COL_REMARK && parts[COL_REMARK] != null
+                            ? parts[COL_REMARK].trim() : "";
                     if (productCode == null || productCode.isEmpty()) continue;
                     BigDecimal quantity = BigDecimal.ZERO;
                     if (parts.length > 5 && parts[5] != null && !parts[5].trim().isEmpty()) {
@@ -135,7 +141,7 @@ public class ExcelParserService {
                         continue;
                     }
                     rows.add(new SalesForecastRow(category, spec, productCode, productName,
-                            warehouseLocation, quantity, lineNum));
+                            warehouseLocation, quantity, remark, lineNum));
                 } catch (Exception e) {
                     errors.add("第" + lineNum + "列: " + e.getMessage());
                 }
@@ -219,6 +225,7 @@ public class ExcelParserService {
         String productCode = getStringCell(row, COL_PRODUCT_CODE);
         String productName = getStringCell(row, COL_PRODUCT_NAME);
         String warehouseLocation = getStringCell(row, COL_WAREHOUSE_LOCATION);
+        String remark = getStringCell(row, COL_REMARK);
 
         if (productCode == null || productCode.isBlank()) {
             throw new ExcelParseException("Row " + rowNumber + ": 品號 (product_code) is required");
@@ -227,7 +234,7 @@ public class ExcelParserService {
         BigDecimal quantity = parseQuantity(row, rowNumber);
 
         return new SalesForecastRow(category, spec, productCode, productName,
-                warehouseLocation, quantity, rowNumber);
+                warehouseLocation, quantity, remark != null ? remark : "", rowNumber);
     }
 
     private BigDecimal parseQuantity(Row row, int rowNumber) {

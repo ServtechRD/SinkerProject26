@@ -46,7 +46,10 @@
 }
 
 .inventory-result-toolbar {
-  margin-bottom: 12px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
 }
 
 .inventory-filters {
@@ -160,6 +163,8 @@
 
 .inventory-table-wrap {
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: calc(100vh - 320px);
   border: 1px solid #e5e7eb;
   border-radius: 8px;
   background-color: white;
@@ -167,15 +172,20 @@
 
 .inventory-integration-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   min-width: 1400px;
 }
 
 .inventory-integration-table thead {
   background-color: #f3f4f6;
+}
+
+.inventory-integration-table thead th {
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 60;
+  background-color: #f3f4f6;
 }
 
 .inventory-integration-table th {
@@ -203,6 +213,62 @@
   color: #374151;
   border-bottom: 1px solid #e5e7eb;
   white-space: nowrap;
+  background: #fff;
+}
+
+.inventory-integration-table .inventory-sticky-col {
+  position: sticky;
+  background: #fff;
+}
+
+.inventory-integration-table tbody td.inventory-sticky-col--warehouse {
+  left: var(--sticky-left-warehouse, 0px);
+  z-index: 20;
+}
+
+.inventory-integration-table tbody td.inventory-sticky-col--category {
+  left: var(--sticky-left-category, 0px);
+  z-index: 18;
+}
+
+.inventory-integration-table tbody td.inventory-sticky-col--spec {
+  left: var(--sticky-left-spec, 0px);
+  z-index: 16;
+}
+
+.inventory-integration-table tbody td.inventory-sticky-col--product-code {
+  left: var(--sticky-left-product-code, 0px);
+  z-index: 14;
+}
+
+.inventory-integration-table tbody td.inventory-sticky-col--product-name {
+  left: var(--sticky-left-product-name, 0px);
+  z-index: 12;
+}
+
+.inventory-integration-table th.inventory-sticky-col--warehouse {
+  left: var(--sticky-left-warehouse, 0px);
+  z-index: 90;
+}
+
+.inventory-integration-table th.inventory-sticky-col--category {
+  left: var(--sticky-left-category, 0px);
+  z-index: 85;
+}
+
+.inventory-integration-table th.inventory-sticky-col--spec {
+  left: var(--sticky-left-spec, 0px);
+  z-index: 80;
+}
+
+.inventory-integration-table th.inventory-sticky-col--product-code {
+  left: var(--sticky-left-product-code, 0px);
+  z-index: 75;
+}
+
+.inventory-integration-table th.inventory-sticky-col--product-name {
+  left: var(--sticky-left-product-name, 0px);
+  z-index: 70;
 }
 
 .inventory-integration-table tbody tr:hover {

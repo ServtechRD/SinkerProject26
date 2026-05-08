@@ -357,47 +357,117 @@
   border-radius: 4px;
 }
 
-.forecast-table-wrap {
+.forecast-list-page .forecast-table-wrap {
   overflow-x: auto;
+  overflow-y: auto;
+  /* 讓表格在視窗內可上下滾動，避免使用者必須滑到頁面最底才看得到滾輪 */
+  max-height: calc(100vh - 320px);
   border: 1px solid #ddd;
   border-radius: 4px;
 }
 
-.forecast-table {
+.forecast-list-page .forecast-table {
   width: 100%;
-  border-collapse: collapse;
+  /* sticky + 凍結欄在 Chrome 對 collapse 相容性較差，改 separate 較穩定 */
+  border-collapse: separate;
+  border-spacing: 0;
   font-size: 14px;
 }
 
-.forecast-table thead {
+.forecast-list-page .forecast-table thead {
   background-color: #f5f5f5;
 }
 
-.forecast-table th,
-.forecast-table td {
+.forecast-list-page .forecast-table thead th {
+  position: sticky;
+  top: 0;
+  background-color: #f5f5f5;
+  z-index: 60;
+}
+
+.forecast-list-page .forecast-table .forecast-sticky-col {
+  position: sticky;
+  background: #fff;
+}
+
+.forecast-list-page .forecast-table thead .forecast-sticky-col {
+  background-color: #f5f5f5;
+}
+
+.forecast-list-page .forecast-table tbody td.forecast-sticky-col--warehouse {
+  left: var(--sticky-left-warehouse, 0px);
+  z-index: 20;
+}
+
+.forecast-list-page .forecast-table tbody td.forecast-sticky-col--category {
+  left: var(--sticky-left-category, 0px);
+  z-index: 18;
+}
+
+.forecast-list-page .forecast-table tbody td.forecast-sticky-col--spec {
+  left: var(--sticky-left-spec, 0px);
+  z-index: 16;
+}
+
+.forecast-list-page .forecast-table tbody td.forecast-sticky-col--product-name {
+  left: var(--sticky-left-product-name, 0px);
+  z-index: 14;
+}
+
+/* 凍結欄位表頭層級需高於 tbody sticky cell，避免往下捲動時被資料列覆蓋 */
+.forecast-list-page .forecast-table th.forecast-sticky-col--warehouse {
+  left: var(--sticky-left-warehouse, 0px);
+  z-index: 90;
+}
+
+.forecast-list-page .forecast-table th.forecast-sticky-col--category {
+  left: var(--sticky-left-category, 0px);
+  z-index: 85;
+}
+
+.forecast-list-page .forecast-table th.forecast-sticky-col--spec {
+  left: var(--sticky-left-spec, 0px);
+  z-index: 80;
+}
+
+.forecast-list-page .forecast-table th.forecast-sticky-col--product-name {
+  left: var(--sticky-left-product-name, 0px);
+  z-index: 75;
+}
+
+/* 表頭（thead）需明確 top:0，避免與 left sticky 規則造成垂直置頂行為不一致 */
+.forecast-list-page .forecast-table thead th.forecast-sticky-col--warehouse,
+.forecast-list-page .forecast-table thead th.forecast-sticky-col--category,
+.forecast-list-page .forecast-table thead th.forecast-sticky-col--spec,
+.forecast-list-page .forecast-table thead th.forecast-sticky-col--product-name {
+  top: 0;
+}
+
+.forecast-list-page .forecast-table th,
+.forecast-list-page .forecast-table td {
   padding: 12px 16px;
   text-align: left;
   border-bottom: 1px solid #ddd;
 }
 
-.forecast-table th {
+.forecast-list-page .forecast-table th {
   font-weight: 600;
   color: #333;
 }
 
-.forecast-table tbody tr:hover {
+.forecast-list-page .forecast-table tbody tr:hover {
   background-color: #fafafa;
 }
 
-.forecast-table tbody tr:last-child td {
+.forecast-list-page .forecast-table tbody tr:last-child td {
   border-bottom: none;
 }
 
-.forecast-table .align-right {
+.forecast-list-page .forecast-table .align-right {
   text-align: right;
 }
 
-.forecast-table .actions-cell {
+.forecast-list-page .forecast-table .actions-cell {
   text-align: right;
   width: 100px;
 }
@@ -526,5 +596,9 @@
     flex-direction: column;
     align-items: flex-start;
     gap: 16px;
+  }
+
+  .forecast-table-wrap {
+    max-height: calc(100vh - 260px);
   }
 }

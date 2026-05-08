@@ -19,12 +19,12 @@ public class AutoCloseScheduler {
         this.service = service;
     }
 
-    @Scheduled(cron = "0 0 0 * * *")
+    @Scheduled(cron = "0 45 7 * * ?")
     public void autoCloseMonths() {
-        int currentDay = LocalDate.now().getDayOfMonth();
-        log.info("AutoCloseScheduler running - current day of month: {}", currentDay);
+        LocalDate currentDate = LocalDate.now();
+        log.info("AutoCloseScheduler running - current date: {}", currentDate);
 
-        int closedCount = service.autoCloseMatchingMonths(currentDay);
+        int closedCount = service.autoCloseMatchingMonths(currentDate);
         log.info("AutoCloseScheduler completed - {} month(s) auto-closed", closedCount);
     }
 }

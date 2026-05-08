@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useLayoutEffect, useRef } from 'react'
 import { listConfigs } from '../../api/forecastConfig'
 import {
   getFormSummary,
@@ -163,6 +163,19 @@ export default function ForecastListPage() {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
 
+  // 固定左側四欄：用表頭實際寬度計算 sticky 的 left 偏移，
+  // 以維持原本 table 自動排版的欄寬（避免文字重疊）。
+  const warehouseThRef = useRef(null)
+  const categoryThRef = useRef(null)
+  const specThRef = useRef(null)
+  const productNameThRef = useRef(null)
+  const [stickyLeft, setStickyLeft] = useState({
+    warehouse: 0,
+    category: 0,
+    spec: 0,
+    productName: 0,
+  })
+
   const canView = hasPermission(user, 'sales_forecast.update_after_closed')
 
   const selectedConfig = useMemo(
@@ -286,6 +299,53 @@ export default function ForecastListPage() {
     if (page > totalPages && totalPages >= 1) setPage(totalPages)
   }, [page, totalPages])
 
+  useLayoutEffect(() => {
+    const wh = warehouseThRef.current
+    const cat = categoryThRef.current
+    const spec = specThRef.current
+    const pn = productNameThRef.current
+    if (!wh || !cat || !spec || !pn) return
+
+    const whW = wh.offsetWidth
+    const catW = cat.offsetWidth
+    const specW = spec.offsetWidth
+    setStickyLeft({
+      warehouse: 0,
+      category: whW,
+      spec: whW + catW,
+      productName: whW + catW + specW,
+    })
+  }, [
+    rows.length,
+    channelOrder.length,
+    editMode,
+    pageSize,
+    sortKey,
+    sortAsc,
+  ])
+
+  useEffect(() => {
+    const onResize = () => {
+      const wh = warehouseThRef.current
+      const cat = categoryThRef.current
+      const spec = specThRef.current
+      const pn = productNameThRef.current
+      if (!wh || !cat || !spec || !pn) return
+
+      const whW = wh.offsetWidth
+      const catW = cat.offsetWidth
+      const specW = spec.offsetWidth
+      setStickyLeft({
+        warehouse: 0,
+        category: whW,
+        spec: whW + catW,
+        productName: whW + catW + specW,
+      })
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   const handleEditStart = () => {
     const next = {}
     rows.forEach((row, rowIdx) => {
@@ -393,9 +453,9 @@ export default function ForecastListPage() {
         ? editedRowCurrentQtyTotal(cells, rowIdxInRows, getEditValue)
         : currentVersionSum
       const exportOriginal = editMode ? currentVersionSum : previousVersionSum
-      const diff = exportOriginal - afterTotal
-      /** 第 1 版無「與前一版比較」：未編輯時更改後小計、差異固定顯示 0 */
-      const exportAfterSum = isFormVersion1 && !editMode ? 0 : afterTotal
+      const diff = afterTotal - exportOriginal  
+      /** 第 1 版無前一版可比：差異仍為 0；更改後小計顯示本版列總（與畫面一致） */
+      const exportAfterSum = afterTotal
       const exportDiff = isFormVersion1 && !editMode ? 0 : diff
       const remark = editMode ? (editRowRemarks[rowIdxInRows] ?? row.remark ?? '-') : (row.remark ?? '-')
       return [
@@ -559,16 +619,46 @@ export default function ForecastListPage() {
                             </button>
                           </p>
                         )}
-                        <div className="forecast-table-wrap forecast-table-wrap--summary">
+                        <div
+                          className="forecast-table-wrap forecast-table-wrap--summary"
+                          style={{
+                            '--sticky-left-warehouse': `${stickyLeft.warehouse}px`,
+                            '--sticky-left-category': `${stickyLeft.category}px`,
+                            '--sticky-left-spec': `${stickyLeft.spec}px`,
+                            '--sticky-left-product-name': `${stickyLeft.productName}px`,
+                          }}
+                        >
                           <table className={`forecast-table forecast-table--summary${editMode ? ' forecast-table--edit' : ''}`}>
                             <thead>
                               <tr>
-                                <th className={sortKey === 'warehouse_location' ? 'sortable sort-active' : 'sortable'} onClick={() => handleSort('warehouse_location')}>
+                                <th
+                                  className={`${sortKey === 'warehouse_location' ? 'sortable sort-active' : 'sortable'} forecast-sticky-col forecast-sticky-col--warehouse`}
+                                  ref={warehouseThRef}
+                                  onClick={() => handleSort('warehouse_location')}
+                                >
                                   庫位 {sortKey === 'warehouse_location' && (sortAsc ? '↑' : '↓')}
                                 </th>
-                                <th className={sortKey === 'category' ? 'sortable sort-active' : 'sortable'} onClick={() => handleSort('category')}>中類名稱 {sortKey === 'category' && (sortAsc ? '↑' : '↓')}</th>
-                                <th className={sortKey === 'spec' ? 'sortable sort-active' : 'sortable'} onClick={() => handleSort('spec')}>貨品規格 {sortKey === 'spec' && (sortAsc ? '↑' : '↓')}</th>
-                                <th className={sortKey === 'product_name' ? 'sortable sort-active' : 'sortable'} onClick={() => handleSort('product_name')}>品名 {sortKey === 'product_name' && (sortAsc ? '↑' : '↓')}</th>
+                                <th
+                                  className={`${sortKey === 'category' ? 'sortable sort-active' : 'sortable'} forecast-sticky-col forecast-sticky-col--category`}
+                                  ref={categoryThRef}
+                                  onClick={() => handleSort('category')}
+                                >
+                                  中類名稱 {sortKey === 'category' && (sortAsc ? '↑' : '↓')}
+                                </th>
+                                <th
+                                  className={`${sortKey === 'spec' ? 'sortable sort-active' : 'sortable'} forecast-sticky-col forecast-sticky-col--spec`}
+                                  ref={specThRef}
+                                  onClick={() => handleSort('spec')}
+                                >
+                                  貨品規格 {sortKey === 'spec' && (sortAsc ? '↑' : '↓')}
+                                </th>
+                                <th
+                                  className={`${sortKey === 'product_name' ? 'sortable sort-active' : 'sortable'} forecast-sticky-col forecast-sticky-col--product-name`}
+                                  ref={productNameThRef}
+                                  onClick={() => handleSort('product_name')}
+                                >
+                                  品名 {sortKey === 'product_name' && (sortAsc ? '↑' : '↓')}
+                                </th>
                                 <th className={sortKey === 'product_code' ? 'sortable sort-active' : 'sortable'} onClick={() => handleSort('product_code')}>品號 {sortKey === 'product_code' && (sortAsc ? '↑' : '↓')}</th>
                                 {(channelOrder || []).map((ch) => (
                                   <th key={ch} className="align-right channel-value-header">{ch}</th>
@@ -592,9 +682,9 @@ export default function ForecastListPage() {
                                     ? editedRowCurrentQtyTotal(cells, rowIdxInRows, getEditValue)
                                     : currentVersionSum
                                 const displayOriginalSubtotal = editMode ? currentVersionSum : previousVersionSum
-                                const diff = displayOriginalSubtotal - editedRowTotal
-                                /** 第 1 版：未編輯模式下更改後小計、差異固定為 0 */
-                                const showAfterSum = isFormVersion1 && !editMode ? 0 : editedRowTotal
+                                const diff = editedRowTotal - displayOriginalSubtotal
+                                /** 第 1 版：仍顯示本版更改後（列）小計；差異因無前一版固定為 0 */
+                                const showAfterSum = editedRowTotal
                                 const showDiff = isFormVersion1 && !editMode ? 0 : diff
                                 const highlightAfterDiff =
                                   editMode
@@ -602,10 +692,10 @@ export default function ForecastListPage() {
                                     : !isFormVersion1 && Math.abs(previousVersionSum - currentVersionSum) > 1e-9
                                 return (
                                   <tr key={globalIdx}>
-                                    <td>{row.warehouse_location ?? row.warehouseLocation ?? '-'}</td>
-                                    <td>{row.category ?? '-'}</td>
-                                    <td>{row.spec ?? '-'}</td>
-                                    <td>{row.product_name ?? row.productName ?? '-'}</td>
+                                    <td className="forecast-sticky-col forecast-sticky-col--warehouse">{row.warehouse_location ?? row.warehouseLocation ?? '-'}</td>
+                                    <td className="forecast-sticky-col forecast-sticky-col--category">{row.category ?? '-'}</td>
+                                    <td className="forecast-sticky-col forecast-sticky-col--spec">{row.spec ?? '-'}</td>
+                                    <td className="forecast-sticky-col forecast-sticky-col--product-name">{row.product_name ?? row.productName ?? '-'}</td>
                                     <td>{row.product_code ?? row.productCode ?? '-'}</td>
                                     {cells.map((cell, i) => {
                                       const prevQ = cell.previous_qty ?? cell.previousQty
@@ -646,17 +736,9 @@ export default function ForecastListPage() {
                                           onChange={(e) => setEditRowRemarks((prev) => ({ ...prev, [rowIdxInRows]: e.target.value }))}
                                           placeholder="列備註"
                                         />
-                                      ) : (row.remark ? (
-                                        <button
-                                          type="button"
-                                          className="btn btn--small btn--outline forecast-remark-btn"
-                                          onClick={() => setRemarkModal({ text: row.remark, title: '列備註' })}
-                                        >
-                                          備註
-                                        </button>
                                       ) : (
-                                        '-'
-                                      ))}
+                                        (row.remark ?? '-')
+                                      )}
                                     </td>
                                   </tr>
                                 )

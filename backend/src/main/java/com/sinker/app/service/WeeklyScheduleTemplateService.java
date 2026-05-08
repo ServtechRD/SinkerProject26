@@ -9,7 +9,7 @@ import java.io.IOException;
 public class WeeklyScheduleTemplateService {
 
     private static final String[] HEADERS = {
-            "需求日期", "品號", "品名", "庫位", "箱數小計"
+            "生產日", "區分", "料號", "名稱", "數量", "備註"
     };
 
     public static byte[] generateTemplate() {

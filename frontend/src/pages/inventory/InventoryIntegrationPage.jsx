@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useLayoutEffect, useRef } from 'react'
 import {
   getInventoryIntegration,
   getInventoryVersions,
@@ -25,6 +25,15 @@ function formatNumber(value) {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
+}
+
+function escapeCsvCell(val) {
+  if (val == null) return ''
+  const s = String(val)
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    return '"' + s.replace(/"/g, '""') + '"'
+  }
+  return s
 }
 
 function getCurrentMonth() {
@@ -84,6 +93,18 @@ export default function InventoryIntegrationPage() {
   const [saving, setSaving] = useState(false)
 
   const [sortConfig, setSortConfig] = useState({ key: 'productCode', direction: 'asc' })
+  const warehouseThRef = useRef(null)
+  const categoryThRef = useRef(null)
+  const specThRef = useRef(null)
+  const productCodeThRef = useRef(null)
+  const productNameThRef = useRef(null)
+  const [stickyLeft, setStickyLeft] = useState({
+    warehouse: 0,
+    category: 0,
+    spec: 0,
+    productCode: 0,
+    productName: 0,
+  })
 
   const canView = hasPermission(user, 'inventory.view')
   const canEdit = hasPermission(user, 'inventory.edit')
@@ -239,6 +260,85 @@ export default function InventoryIntegrationPage() {
     return sortConfig.direction === 'asc' ? cmp : -cmp
   })
 
+  const handleExportExcel = useCallback(() => {
+    if (!integrationData.length) {
+      toast.info('無資料可匯出')
+      return
+    }
+
+    const headers = ['庫位', '中類名稱', '貨品規格', '品號', '品名', '銷貨數量', '結存', '預估量', '生產小計', '修改後小計']
+    const dataRows = sortedData.map((row) => [
+      row.warehouseLocation ?? row.warehouse_location ?? '',
+      row.category ?? '',
+      row.spec ?? '',
+      row.productCode ?? row.product_code ?? '',
+      row.productName ?? row.product_name ?? '',
+      row.salesQuantity ?? row.sales_quantity ?? '',
+      row.inventoryBalance ?? row.inventory_balance ?? '',
+      row.forecastQuantity ?? row.forecast_quantity ?? '',
+      row.productionSubtotal ?? row.production_subtotal ?? '',
+      formatNumber(row.modifiedSubtotal ?? row.modified_subtotal),
+    ])
+
+    const BOM = '\uFEFF'
+    const csv = BOM + [headers.map(escapeCsvCell).join(','), ...dataRows.map((r) => r.map(escapeCsvCell).join(','))].join('\r\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `庫存銷量預估量整合表單_${queryMode === QUERY_MODE_VERSION ? (selectedVersion || currentVersion || 'latest') : month}.csv`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  }, [integrationData.length, sortedData, toast, queryMode, selectedVersion, currentVersion, month])
+
+  useLayoutEffect(() => {
+    const wh = warehouseThRef.current
+    const cat = categoryThRef.current
+    const spec = specThRef.current
+    const pc = productCodeThRef.current
+    const pn = productNameThRef.current
+    if (!wh || !cat || !spec || !pc || !pn) return
+
+    const whW = wh.offsetWidth
+    const catW = cat.offsetWidth
+    const specW = spec.offsetWidth
+    const pcW = pc.offsetWidth
+    setStickyLeft({
+      warehouse: 0,
+      category: whW,
+      spec: whW + catW,
+      productCode: whW + catW + specW,
+      productName: whW + catW + specW + pcW,
+    })
+  }, [integrationData.length, sortConfig.key, sortConfig.direction, versionEditMode])
+
+  useEffect(() => {
+    const onResize = () => {
+      const wh = warehouseThRef.current
+      const cat = categoryThRef.current
+      const spec = specThRef.current
+      const pc = productCodeThRef.current
+      const pn = productNameThRef.current
+      if (!wh || !cat || !spec || !pc || !pn) return
+
+      const whW = wh.offsetWidth
+      const catW = cat.offsetWidth
+      const specW = spec.offsetWidth
+      const pcW = pc.offsetWidth
+      setStickyLeft({
+        warehouse: 0,
+        category: whW,
+        spec: whW + catW,
+        productCode: whW + catW + specW,
+        productName: whW + catW + specW + pcW,
+      })
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   if (accessDenied || !canView) {
     return (
       <div className="inventory-integration-page">
@@ -392,6 +492,14 @@ export default function InventoryIntegrationPage() {
               </button>
             </>
           )}
+          <button
+            type="button"
+            className="btn btn--outline"
+            onClick={handleExportExcel}
+            disabled={!integrationData.length || versionEditMode}
+          >
+            Excel 匯出
+          </button>
         </div>
       )}
 
@@ -402,24 +510,53 @@ export default function InventoryIntegrationPage() {
       ) : integrationData.length === 0 ? (
         <div className="inventory-empty">請選擇查詢條件後點擊「查詢」顯示結果</div>
       ) : (
-        <div className="inventory-table-wrap">
+        <div
+          className="inventory-table-wrap inventory-table-wrap--sticky"
+          style={{
+            '--sticky-left-warehouse': `${stickyLeft.warehouse}px`,
+            '--sticky-left-category': `${stickyLeft.category}px`,
+            '--sticky-left-spec': `${stickyLeft.spec}px`,
+            '--sticky-left-product-code': `${stickyLeft.productCode}px`,
+            '--sticky-left-product-name': `${stickyLeft.productName}px`,
+          }}
+        >
           <table className="inventory-integration-table">
             <thead>
               <tr>
-                <th onClick={() => handleSort('warehouseLocation')} className="sortable">
+                <th
+                  onClick={() => handleSort('warehouseLocation')}
+                  className="sortable inventory-sticky-col inventory-sticky-col--warehouse"
+                  ref={warehouseThRef}
+                >
                   庫位 {sortConfig.key === 'warehouseLocation' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
                 </th>
-                <th onClick={() => handleSort('category')} className="sortable">
+                <th
+                  onClick={() => handleSort('category')}
+                  className="sortable inventory-sticky-col inventory-sticky-col--category"
+                  ref={categoryThRef}
+                >
                   中類名稱 {sortConfig.key === 'category' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
                 </th>
-                <th onClick={() => handleSort('spec')} className="sortable">
+                <th
+                  onClick={() => handleSort('spec')}
+                  className="sortable inventory-sticky-col inventory-sticky-col--spec"
+                  ref={specThRef}
+                >
                   貨品規格 {sortConfig.key === 'spec' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
                 </th>
-                <th onClick={() => handleSort('productName')} className="sortable">
-                  品名 {sortConfig.key === 'productName' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
-                </th>
-                <th onClick={() => handleSort('productCode')} className="sortable">
+                <th
+                  onClick={() => handleSort('productCode')}
+                  className="sortable inventory-sticky-col inventory-sticky-col--product-code"
+                  ref={productCodeThRef}
+                >
                   品號 {sortConfig.key === 'productCode' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
+                </th>
+                <th
+                  onClick={() => handleSort('productName')}
+                  className="sortable inventory-sticky-col inventory-sticky-col--product-name"
+                  ref={productNameThRef}
+                >
+                  品名 {sortConfig.key === 'productName' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
                 </th>
                 <th className="align-right sortable" onClick={() => handleSort('salesQuantity')}>
                   銷貨數量 {sortConfig.key === 'salesQuantity' && (sortConfig.direction === 'asc' ? '▲' : '▼')}
@@ -452,11 +589,11 @@ export default function InventoryIntegrationPage() {
                   : null
                 return (
                   <tr key={row.id}>
-                    <td>{row.warehouseLocation ?? row.warehouse_location ?? '-'}</td>
-                    <td>{row.category ?? '-'}</td>
-                    <td>{row.spec ?? '-'}</td>
-                    <td>{row.productName ?? row.product_name ?? '-'}</td>
-                    <td>{row.productCode ?? row.product_code ?? '-'}</td>
+                    <td className="inventory-sticky-col inventory-sticky-col--warehouse">{row.warehouseLocation ?? row.warehouse_location ?? '-'}</td>
+                    <td className="inventory-sticky-col inventory-sticky-col--category">{row.category ?? '-'}</td>
+                    <td className="inventory-sticky-col inventory-sticky-col--spec">{row.spec ?? '-'}</td>
+                    <td className="inventory-sticky-col inventory-sticky-col--product-code">{row.productCode ?? row.product_code ?? '-'}</td>
+                    <td className="inventory-sticky-col inventory-sticky-col--product-name">{row.productName ?? row.product_name ?? '-'}</td>
                     <td className="align-right">{formatNumber(row.salesQuantity ?? row.sales_quantity)}</td>
                     <td className="align-right">{formatNumber(row.inventoryBalance ?? row.inventory_balance)}</td>
                     <td className="align-right">{formatNumber(row.forecastQuantity ?? row.forecast_quantity)}</td>

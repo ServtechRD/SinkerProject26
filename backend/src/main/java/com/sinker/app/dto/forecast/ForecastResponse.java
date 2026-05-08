@@ -21,6 +21,7 @@ public class ForecastResponse {
     @JsonProperty("warehouse_location")
     private String warehouseLocation;
     private BigDecimal quantity;
+    private String remark;
     private String version;
     @JsonProperty("is_modified")
     private Boolean isModified;
@@ -40,6 +41,7 @@ public class ForecastResponse {
         response.setProductName(entity.getProductName());
         response.setWarehouseLocation(entity.getWarehouseLocation());
         response.setQuantity(entity.getQuantity());
+        response.setRemark(entity.getRemark());
         response.setVersion(entity.getVersion());
         response.setIsModified(entity.getIsModified());
         response.setCreatedAt(entity.getCreatedAt());
@@ -58,6 +60,7 @@ public class ForecastResponse {
         response.setProductName(entity.getProductName());
         response.setWarehouseLocation(entity.getWarehouseLocation());
         response.setQuantity(entity.getQuantity());
+        response.setRemark(entity.getRemark());
         response.setVersion(entity.getVersion());
         response.setIsModified(entity.getIsModified());
         response.setCreatedAt(entity.getCreatedAt());
@@ -91,6 +94,9 @@ public class ForecastResponse {
 
     public BigDecimal getQuantity() { return quantity; }
     public void setQuantity(BigDecimal quantity) { this.quantity = quantity; }
+
+    public String getRemark() { return remark; }
+    public void setRemark(String remark) { this.remark = remark; }
 
     public String getVersion() { return version; }
     public void setVersion(String version) { this.version = version; }

@@ -17,7 +17,9 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -59,6 +61,19 @@ public class WeeklyScheduleService {
             throw new IllegalArgumentException("Excel file has no valid data rows");
         }
 
+        // 3.5 Capture old data before replacement for diff detection
+        List<WeeklySchedule> existingRows = repository.findByWeekStartAndFactoryOrderByDemandDateAscProductCodeAsc(
+                weekStart, factory);
+        Map<String, WeeklySchedule> existingByBusinessKey = new HashMap<>();
+        for (WeeklySchedule existing : existingRows) {
+            existingByBusinessKey.put(buildBusinessKey(
+                    existing.getDemandDate(),
+                    existing.getProductCode(),
+                    existing.getProductName(),
+                    existing.getWarehouseLocation()
+            ), existing);
+        }
+
         // 4. Delete existing data for week_start + factory
         repository.deleteByWeekStartAndFactory(weekStart, factory);
         log.info("Deleted existing data for weekStart={}, factory={}", weekStart, factory);
@@ -83,6 +98,23 @@ public class WeeklyScheduleService {
 
         repository.saveAll(entities);
 
+        List<Integer> changedRowIds = entities.stream()
+                .filter(entity -> {
+                    WeeklySchedule previous = existingByBusinessKey.get(buildBusinessKey(
+                            entity.getDemandDate(),
+                            entity.getProductCode(),
+                            entity.getProductName(),
+                            entity.getWarehouseLocation()
+                    ));
+                    if (previous == null) return true;
+                    return previous.getQuantity() == null
+                            ? entity.getQuantity() != null
+                            : previous.getQuantity().compareTo(entity.getQuantity()) != 0;
+                })
+                .map(WeeklySchedule::getId)
+                .filter(java.util.Objects::nonNull)
+                .collect(Collectors.toList());
+
         long duration = System.currentTimeMillis() - startTime;
         log.info("Upload complete: weekStart={}, factory={}, rows={}, duration={}ms",
                 weekStart, factory, rows.size(), duration);
@@ -90,12 +122,14 @@ public class WeeklyScheduleService {
         // Trigger PDCA：外部 recompute HTTP + 解析結果回填 material_demand（見 PdcaApiClientImpl）
         pdcaIntegrationService.triggerPdcaIntegration(entities, weekStart, factory);
 
-        return new UploadScheduleResponse(
+        UploadScheduleResponse response = new UploadScheduleResponse(
                 "Upload successful",
                 rows.size(),
                 weekStart,
                 factory
         );
+        response.setChangedRowIds(changedRowIds);
+        return response;
     }
 
     public java.util.List<String> getFactories() {
@@ -176,5 +210,13 @@ public class WeeklyScheduleService {
             throw new IllegalArgumentException(
                     "week_start must be a Monday. Provided date: " + weekStart + " (" + dayName + ")");
         }
+    }
+
+    private String buildBusinessKey(LocalDate demandDate, String productCode, String productName, String warehouseLocation) {
+        return String.join("|",
+                demandDate != null ? demandDate.toString() : "",
+                productCode != null ? productCode : "",
+                productName != null ? productName : "",
+                warehouseLocation != null ? warehouseLocation : "");
     }
 }

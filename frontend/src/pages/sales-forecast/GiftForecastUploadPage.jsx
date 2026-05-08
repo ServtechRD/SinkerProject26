@@ -64,7 +64,7 @@ function escapeCsvCell(val) {
 
 function downloadDefaultForecastTemplate(channel) {
   const BOM = '\uFEFF'
-  const headers = ['中類名稱', '貨品規格', '品號', '品名', '庫位', '箱數小計']
+  const headers = ['中類名稱', '貨品規格', '品號', '品名', '庫位', '箱數小計', '備註']
   const csv = BOM + headers.join(',') + '\r\n'
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
   const url = window.URL.createObjectURL(blob)
@@ -78,7 +78,7 @@ function downloadDefaultForecastTemplate(channel) {
 }
 
 function downloadForecastCsv(data, filename) {
-  const headers = ['中類名稱', '貨品規格', '品號', '品名', '庫位', '箱數小計']
+  const headers = ['中類名稱', '貨品規格', '品號', '品名', '庫位', '箱數小計', '備註']
   const rows = data.map((item) => [
     item.category ?? '',
     item.spec ?? '',
@@ -86,6 +86,7 @@ function downloadForecastCsv(data, filename) {
     (item.product_name ?? item.productName) ?? '',
     (item.warehouse_location ?? item.warehouseLocation) ?? '',
     item.quantity ?? '',
+    item.remark ?? '',
   ])
   const csvContent = [
     headers.map(escapeCsvCell).join(','),
@@ -661,6 +662,7 @@ export default function GiftForecastUploadPage() {
                                 <th>品名</th>
                                 <th>庫位</th>
                                 <th className="align-right">箱數小計</th>
+                                <th>備註</th>
                                 {canEditResult && <th className="actions-cell">編輯</th>}
                               </tr>
                             </thead>
@@ -699,6 +701,7 @@ export default function GiftForecastUploadPage() {
                                         </span>
                                       )}
                                     </td>
+                                    <td>{item.remark || '-'}</td>
                                     {canEditResult && (
                                       <td className="actions-cell">
                                         {isEditing ? (

@@ -155,6 +155,7 @@ public class SalesForecastUploadService {
                 sf.setWarehouseLocation(row.getWarehouseLocation());
             }
             sf.setQuantity(row.getQuantity());
+            sf.setRemark(row.getRemark() != null ? row.getRemark() : "");
             sf.setVersion(version);
             sf.setIsModified(false);
             sf.setCreatedAt(now);

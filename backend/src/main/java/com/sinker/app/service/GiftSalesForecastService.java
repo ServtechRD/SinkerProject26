@@ -222,6 +222,7 @@ public class GiftSalesForecastService {
             copy.setProductName(src.getProductName());
             copy.setWarehouseLocation(src.getWarehouseLocation());
             copy.setQuantity(src.getQuantity());
+            copy.setRemark(src.getRemark());
             copy.setVersion(newVersion);
             copy.setIsModified(false);
             copy.setCreatedAt(now);

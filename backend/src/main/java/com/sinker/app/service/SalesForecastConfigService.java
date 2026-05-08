@@ -13,6 +13,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
@@ -128,17 +129,25 @@ public class SalesForecastConfigService {
     }
 
     @Transactional
-    public int autoCloseMatchingMonths(int currentDay) {
+    public int autoCloseMatchingMonths(LocalDate currentDate) {
+        int currentDay = currentDate.getDayOfMonth();
         List<SalesForecastConfig> configs =
                 repository.findByIsClosedFalseAndAutoCloseDay(currentDay);
+        String targetMonth = YearMonth.from(currentDate).plusMonths(1).format(MONTH_FORMAT);
 
         LocalDateTime now = LocalDateTime.now();
+        int closedCount = 0;
         for (SalesForecastConfig config : configs) {
+            if (!targetMonth.equals(config.getMonth())) {
+                continue;
+            }
             config.setIsClosed(true);
             config.setClosedAt(now);
             config.setUpdatedAt(now);
             SalesForecastConfig saved = repository.save(config);
-            log.info("Auto-closed month {} (auto_close_day={})", saved.getMonth(), currentDay);
+            closedCount++;
+            log.info("Auto-closed month {} (previous-month rule, close day={})",
+                    saved.getMonth(), currentDay);
             try {
                 formSummaryService.createFormVersion1Snapshot(saved.getMonth(), saved);
             } catch (Exception ex) {
@@ -146,7 +155,7 @@ public class SalesForecastConfigService {
             }
         }
 
-        return configs.size();
+        return closedCount;
     }
 
     private YearMonth parseMonth(String monthStr) {

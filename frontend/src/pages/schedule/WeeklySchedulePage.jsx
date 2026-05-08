@@ -9,6 +9,7 @@ import {
   downloadWeeklyScheduleTemplate,
 } from '../../api/weeklySchedule'
 import FileDropzone from '../../components/forecast/FileDropzone'
+import { showWeeklyScheduleUploadNotice } from '../../state/weeklyScheduleUploadNoticeStore'
 import './WeeklySchedule.css'
 
 function getWeekOptions() {
@@ -49,6 +50,7 @@ export default function WeeklySchedulePage() {
   const [factory, setFactory] = useState('')
   const [queryClicked, setQueryClicked] = useState(false)
   const [scheduleData, setScheduleData] = useState([])
+  const [changedRowIds, setChangedRowIds] = useState([])
   const [loading, setLoading] = useState(false)
 
   const [selectedFile, setSelectedFile] = useState(null)
@@ -86,6 +88,16 @@ export default function WeeklySchedulePage() {
     if (defaultWeek && !weekStart) setWeekStart(defaultWeek)
   }, [defaultWeek, weekStart])
 
+  useEffect(() => {
+    if (window.location.hash !== '#weekly-schedule-upload-anchor') return undefined
+    const scrollToAnchor = () => {
+      document.getElementById('weekly-schedule-upload-anchor')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+    scrollToAnchor()
+    const t = window.setTimeout(scrollToAnchor, 400)
+    return () => window.clearTimeout(t)
+  }, [])
+
   const canView = hasPermission(user, 'weekly_schedule.view')
   const canUpload = hasPermission(user, 'weekly_schedule.upload')
   const canEdit = hasPermission(user, 'weekly_schedule.edit')
@@ -100,6 +112,7 @@ export default function WeeklySchedulePage() {
     try {
       const data = await getWeeklySchedule(weekStart, factory)
       setScheduleData(Array.isArray(data) ? data : [])
+      setChangedRowIds([])
       setResultPage(1)
       if (!data?.length) toast.info('查無資料')
     } catch (err) {
@@ -156,11 +169,14 @@ export default function WeeklySchedulePage() {
     try {
       const response = await uploadWeeklySchedule(selectedFile, weekStart, factory)
       const count = response?.recordsInserted ?? response?.rows_inserted ?? response?.count ?? 0
+      const changedIds = Array.isArray(response?.changedRowIds) ? response.changedRowIds : []
       toast.success(`成功上傳 ${count} 筆資料`)
+      showWeeklyScheduleUploadNotice({ weekStart, factory, savedAt: new Date() })
       setSelectedFile(null)
       setFileError('')
       const data = await getWeeklySchedule(weekStart, factory)
       setScheduleData(Array.isArray(data) ? data : [])
+      setChangedRowIds(changedIds)
       setQueryClicked(true)
     } catch (err) {
       if (err.response?.data?.details && Array.isArray(err.response.data.details)) {
@@ -230,15 +246,16 @@ export default function WeeklySchedulePage() {
       return
     }
     const BOM = '\uFEFF'
-    const headers = ['需求日期', '品號', '品名', '庫位', '箱數小計']
+    const headers = ['生產日', '區分', '料號', '名稱', '數量', '備註']
     const csvRows = [headers.join(',')]
     rows.forEach((row) => {
       const demandDate = row.demandDate ?? ''
+      const warehouseLocation = row.warehouseLocation ?? ''
       const productCode = row.productCode ?? ''
       const productName = row.productName ?? ''
-      const warehouseLocation = row.warehouseLocation ?? ''
       const qty = row.quantity != null ? row.quantity : ''
-      csvRows.push([demandDate, productCode, productName, warehouseLocation, qty].join(','))
+      const remark = row.remark ?? ''
+      csvRows.push([demandDate, warehouseLocation, productCode, productName, qty, remark].join(','))
     })
     const blob = new Blob([BOM + csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8' })
     const url = window.URL.createObjectURL(blob)
@@ -318,7 +335,7 @@ export default function WeeklySchedulePage() {
       </section>
 
       {canUpload && (
-        <section className="schedule-block schedule-block--upload">
+        <section id="weekly-schedule-upload-anchor" className="schedule-block schedule-block--upload">
           <h2>上傳區</h2>
           <p className="schedule-upload-hint">
             生產週：{weekStart || '-'}，廠區：{factory || '-'}
@@ -398,21 +415,24 @@ export default function WeeklySchedulePage() {
                 <table className="schedule-table">
                   <thead>
                     <tr>
-                      <th>需求日期</th>
-                      <th>品號</th>
-                      <th>品名</th>
-                      <th>庫位</th>
-                      <th>箱數小計</th>
+                      <th>生產日</th>
+                      <th>區分</th>
+                      <th>料號</th>
+                      <th>名稱</th>
+                      <th>數量</th>
+                      <th>備註</th>
                     </tr>
                   </thead>
                   <tbody>
                     {pageRows.map((row) => (
                       <tr key={row.id}>
                         <td>{row.demandDate ?? '-'}</td>
+                        <td>{row.warehouseLocation ?? '-'}</td>
                         <td>{row.productCode ?? '-'}</td>
                         <td>{row.productName ?? '-'}</td>
-                        <td>{row.warehouseLocation ?? '-'}</td>
-                        <td className={canEdit ? 'editable-quantity-cell' : ''}>
+                        <td
+                          className={`${canEdit ? 'editable-quantity-cell' : ''}${changedRowIds.includes(row.id) ? ' schedule-value--changed' : ''}`}
+                        >
                           {editingMode ? (
                             <input
                               type="number"
@@ -426,6 +446,7 @@ export default function WeeklySchedulePage() {
                             row.quantity ?? '-'
                           )}
                         </td>
+                        <td>{row.remark ?? '-'}</td>
                       </tr>
                     ))}
                   </tbody>

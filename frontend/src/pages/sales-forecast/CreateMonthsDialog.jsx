@@ -1,36 +1,31 @@
 import { useState } from 'react'
-import { createMonths } from '../../api/forecastConfig'
+import { createMonth } from '../../api/forecastConfig'
 import { useToast } from '../../components/Toast'
 import './ForecastConfig.css'
 
-const MONTH_PATTERN = /^\d{6}$/
-const DAY_OPTIONS = Array.from({ length: 31 }, (_, i) => i + 1)
-
-function isValidMonth(val) {
-  if (!MONTH_PATTERN.test(val)) return false
-  const mm = parseInt(val.slice(4), 10)
-  return mm >= 1 && mm <= 12
+function getTodayString() {
+  const d = new Date()
+  const yyyy = d.getFullYear()
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${yyyy}-${mm}-${dd}`
 }
 
 export default function CreateMonthsDialog({ open, onClose, onSuccess }) {
   const toast = useToast()
-  const [startMonth, setStartMonth] = useState('')
-  const [endMonth, setEndMonth] = useState('')
-  const [autoCloseDay, setAutoCloseDay] = useState(10)
+  const [month, setMonth] = useState('')
+  const [autoCloseDate, setAutoCloseDate] = useState('')
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState({})
 
   if (!open) return null
 
+  const today = getTodayString()
+
   function validate() {
     const errs = {}
-    if (!startMonth) errs.startMonth = '必填'
-    else if (!isValidMonth(startMonth)) errs.startMonth = '格式無效，請輸入 YYYYMM'
-    if (!endMonth) errs.endMonth = '必填'
-    else if (!isValidMonth(endMonth)) errs.endMonth = '格式無效，請輸入 YYYYMM'
-    if (!errs.startMonth && !errs.endMonth && startMonth > endMonth) {
-      errs.endMonth = '結束月份不可早於起始月份'
-    }
+    if (!month) errs.month = '必填'
+    if (!autoCloseDate) errs.autoCloseDate = '必填'
     return errs
   }
 
@@ -46,18 +41,19 @@ export default function CreateMonthsDialog({ open, onClose, onSuccess }) {
     }
     setLoading(true)
     try {
-      const result = await createMonths(startMonth, endMonth, autoCloseDay)
-      toast.success(`已成功建立 ${result.createdCount} 個月份`)
-      setStartMonth('')
-      setEndMonth('')
-      setAutoCloseDay(10)
+      // type="month" 回傳 YYYY-MM，後端要求 YYYYMM
+      const monthValue = month.replace('-', '')
+      await createMonth(monthValue, autoCloseDate)
+      toast.success('月份建立成功')
+      setMonth('')
+      setAutoCloseDate('')
       setErrors({})
       onSuccess()
     } catch (err) {
       const status = err.response?.status
       const message = err.response?.data?.message
       if (status === 409) {
-        toast.error(message || '部分月份已存在')
+        toast.error(message || '該月份已存在')
       } else if (status === 400) {
         toast.error(message || '輸入資料無效')
       } else {
@@ -69,9 +65,8 @@ export default function CreateMonthsDialog({ open, onClose, onSuccess }) {
   }
 
   function handleClose() {
-    setStartMonth('')
-    setEndMonth('')
-    setAutoCloseDay(10)
+    setMonth('')
+    setAutoCloseDate('')
     setErrors({})
     onClose()
   }
@@ -89,55 +84,35 @@ export default function CreateMonthsDialog({ open, onClose, onSuccess }) {
         <h3 id="create-dialog-title" className="dialog-title">新增填寫月份</h3>
         <form onSubmit={handleSubmit}>
           <div className="fc-dialog-field">
-            <label htmlFor="startMonth">起始月份</label>
+            <label htmlFor="month">填寫月份</label>
             <input
-              id="startMonth"
-              className={`form-input${errors.startMonth ? ' error' : ''}`}
-              type="text"
-              placeholder="YYYYMM (例如 202601)"
-              value={startMonth}
+              id="month"
+              className={`form-input${errors.month ? ' error' : ''}`}
+              type="month"
+              value={month}
               onChange={(e) => {
-                setStartMonth(e.target.value)
-                setErrors((prev) => ({ ...prev, startMonth: undefined }))
+                setMonth(e.target.value)
+                setErrors((prev) => ({ ...prev, month: undefined }))
               }}
-              maxLength={6}
               disabled={loading}
             />
-            {errors.startMonth && <div className="form-error">{errors.startMonth}</div>}
+            {errors.month && <div className="form-error">{errors.month}</div>}
           </div>
           <div className="fc-dialog-field">
-            <label htmlFor="endMonth">結束月份</label>
+            <label htmlFor="autoCloseDate">系統自動結束新增設定日期</label>
             <input
-              id="endMonth"
-              className={`form-input${errors.endMonth ? ' error' : ''}`}
-              type="text"
-              placeholder="YYYYMM (例如 202603)"
-              value={endMonth}
+              id="autoCloseDate"
+              className={`form-input${errors.autoCloseDate ? ' error' : ''}`}
+              type="date"
+              value={autoCloseDate}
+              min={today}
               onChange={(e) => {
-                setEndMonth(e.target.value)
-                setErrors((prev) => ({ ...prev, endMonth: undefined }))
+                setAutoCloseDate(e.target.value)
+                setErrors((prev) => ({ ...prev, autoCloseDate: undefined }))
               }}
-              maxLength={6}
               disabled={loading}
             />
-            {errors.endMonth && <div className="form-error">{errors.endMonth}</div>}
-          </div>
-          <div className="fc-dialog-field">
-            <label htmlFor="autoCloseDay">系統自動結束新增設定時間</label>
-            <div className="fc-dialog-field-row">
-              <select
-                id="autoCloseDay"
-                className="form-input form-select"
-                value={autoCloseDay}
-                onChange={(e) => setAutoCloseDay(Number(e.target.value))}
-                disabled={loading}
-              >
-                {DAY_OPTIONS.map((d) => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
-              <span className="fc-dialog-hint">每月 {String(autoCloseDay).padStart(2, '0')} 日 00:00:00</span>
-            </div>
+            {errors.autoCloseDate && <div className="form-error">{errors.autoCloseDate}</div>}
           </div>
           <div className="dialog-actions">
             <button

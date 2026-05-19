@@ -1,7 +1,6 @@
 package com.sinker.app.service;
 
 import com.sinker.app.dto.forecast.ConfigResponse;
-import com.sinker.app.dto.forecast.CreateMonthsResponse;
 import com.sinker.app.dto.forecast.UpdateConfigRequest;
 import com.sinker.app.entity.SalesForecastConfig;
 import com.sinker.app.exception.ResourceNotFoundException;
@@ -17,7 +16,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
 
 @Service
@@ -36,50 +34,27 @@ public class SalesForecastConfigService {
     }
 
     @Transactional
-    public CreateMonthsResponse batchCreateMonths(String startMonth, String endMonth, Integer autoCloseDay) {
-        YearMonth start = parseMonth(startMonth);
-        YearMonth end = parseMonth(endMonth);
+    public ConfigResponse createMonth(String monthStr, LocalDate autoCloseDate) {
+        YearMonth ym = parseMonth(monthStr);
+        String formattedMonth = ym.format(MONTH_FORMAT);
 
-        if (start.isAfter(end)) {
-            throw new IllegalArgumentException("start_month must not be after end_month");
+        if (repository.existsByMonth(formattedMonth)) {
+            throw new DuplicateMonthException("Month already exists: " + formattedMonth);
         }
 
-        int day = (autoCloseDay != null && autoCloseDay >= 1 && autoCloseDay <= 31)
-                ? autoCloseDay : 10;
-
-        List<String> createdMonths = new ArrayList<>();
-        List<String> skippedMonths = new ArrayList<>();
-        YearMonth current = start;
-
-        while (!current.isAfter(end)) {
-            String monthStr = current.format(MONTH_FORMAT);
-            if (repository.existsByMonth(monthStr)) {
-                skippedMonths.add(monthStr);
-                log.info("Month {} already exists, skipping", monthStr);
-            } else {
-                SalesForecastConfig config = new SalesForecastConfig();
-                config.setMonth(monthStr);
-                config.setAutoCloseDay(day);
-                config.setIsClosed(false);
-                config.setCreatedAt(LocalDateTime.now());
-                config.setUpdatedAt(LocalDateTime.now());
-                try {
-                    repository.save(config);
-                    createdMonths.add(monthStr);
-                    log.info("Created forecast config for month {}", monthStr);
-                } catch (DataIntegrityViolationException e) {
-                    skippedMonths.add(monthStr);
-                    log.warn("Duplicate month {} detected during save, skipping", monthStr);
-                }
-            }
-            current = current.plusMonths(1);
+        SalesForecastConfig config = new SalesForecastConfig();
+        config.setMonth(formattedMonth);
+        config.setAutoCloseDate(autoCloseDate);
+        config.setIsClosed(false);
+        config.setCreatedAt(LocalDateTime.now());
+        config.setUpdatedAt(LocalDateTime.now());
+        try {
+            SalesForecastConfig saved = repository.save(config);
+            log.info("Created forecast config for month {}", formattedMonth);
+            return ConfigResponse.fromEntity(saved);
+        } catch (DataIntegrityViolationException e) {
+            throw new DuplicateMonthException("Month already exists: " + formattedMonth);
         }
-
-        if (createdMonths.isEmpty() && !skippedMonths.isEmpty()) {
-            throw new DuplicateMonthException("All months already exist: " + skippedMonths);
-        }
-
-        return new CreateMonthsResponse(createdMonths.size(), createdMonths);
     }
 
     @Transactional(readOnly = true)
@@ -95,12 +70,13 @@ public class SalesForecastConfigService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Forecast config not found with id: " + id));
 
-        if (request.getAutoCloseDay() != null) {
-            if (request.getAutoCloseDay() < 1 || request.getAutoCloseDay() > 31) {
-                throw new IllegalArgumentException(
-                        "auto_close_day must be between 1 and 31");
+        if (request.getAutoCloseDate() != null) {
+            try {
+                LocalDate date = LocalDate.parse(request.getAutoCloseDate());
+                config.setAutoCloseDate(date);
+            } catch (Exception e) {
+                throw new IllegalArgumentException("autoCloseDate format must be YYYY-MM-DD");
             }
-            config.setAutoCloseDay(request.getAutoCloseDay());
         }
 
         if (request.getIsClosed() != null) {
@@ -130,24 +106,18 @@ public class SalesForecastConfigService {
 
     @Transactional
     public int autoCloseMatchingMonths(LocalDate currentDate) {
-        int currentDay = currentDate.getDayOfMonth();
         List<SalesForecastConfig> configs =
-                repository.findByIsClosedFalseAndAutoCloseDay(currentDay);
-        String targetMonth = YearMonth.from(currentDate).plusMonths(1).format(MONTH_FORMAT);
+                repository.findByIsClosedFalseAndAutoCloseDate(currentDate);
 
         LocalDateTime now = LocalDateTime.now();
         int closedCount = 0;
         for (SalesForecastConfig config : configs) {
-            if (!targetMonth.equals(config.getMonth())) {
-                continue;
-            }
             config.setIsClosed(true);
             config.setClosedAt(now);
             config.setUpdatedAt(now);
             SalesForecastConfig saved = repository.save(config);
             closedCount++;
-            log.info("Auto-closed month {} (previous-month rule, close day={})",
-                    saved.getMonth(), currentDay);
+            log.info("Auto-closed month {} (auto_close_date={})", saved.getMonth(), currentDate);
             try {
                 formSummaryService.createFormVersion1Snapshot(saved.getMonth(), saved);
             } catch (Exception ex) {

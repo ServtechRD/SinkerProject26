@@ -15,7 +15,7 @@ function formatOpenMonthLabel(monthStr) {
 
 export default function EditConfigDialog({ open, config, onClose, onSuccess }) {
   const toast = useToast()
-  const [autoCloseDay, setAutoCloseDay] = useState('')
+  const [autoCloseDate, setAutoCloseDate] = useState('')
   const [isClosed, setIsClosed] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -23,7 +23,7 @@ export default function EditConfigDialog({ open, config, onClose, onSuccess }) {
 
   useEffect(() => {
     if (config) {
-      setAutoCloseDay(String(config.autoCloseDay ?? ''))
+      setAutoCloseDate(config.autoCloseDate ?? '')
       setIsClosed(!!config.isClosed)
       setError('')
       setCloseConfirmOpen(false)
@@ -35,14 +35,13 @@ export default function EditConfigDialog({ open, config, onClose, onSuccess }) {
   const openMonthLabel = formatOpenMonthLabel(config.month)
   const closeConfirmMessage = `確定要結束新增設定 ${openMonthLabel} 表單嗎？關閉表單後業務同仁就無法再編輯。`
 
-  const dayNum = parseInt(autoCloseDay, 10)
-  const dayValid = autoCloseDay !== '' && !isNaN(dayNum) && dayNum >= 1 && dayNum <= 31
-  const dayError = autoCloseDay !== '' && !dayValid ? '自動結束新增設定日期需為 1-31' : ''
+  const dateValid = autoCloseDate !== ''
+  const dateError = !dateValid && autoCloseDate !== '' ? '請選擇有效日期' : ''
 
   const hasChanges =
-    (dayValid && dayNum !== config.autoCloseDay) || isClosed !== !!config.isClosed
+    (dateValid && autoCloseDate !== (config.autoCloseDate ?? '')) || isClosed !== !!config.isClosed
 
-  const canSubmit = !loading && dayValid && !dayError && hasChanges
+  const canSubmit = !loading && dateValid && !dateError && hasChanges
 
   async function handleSubmit(e) {
     e.preventDefault()
@@ -51,7 +50,7 @@ export default function EditConfigDialog({ open, config, onClose, onSuccess }) {
     setError('')
     try {
       await updateConfig(config.id, {
-        autoCloseDay: dayNum,
+        autoCloseDate,
         isClosed,
       })
       toast.success('設定已更新')
@@ -121,19 +120,16 @@ export default function EditConfigDialog({ open, config, onClose, onSuccess }) {
             />
           </div>
           <div className="fc-dialog-field">
-            <label htmlFor="editAutoCloseDay">自動結束新增設定日期</label>
+            <label htmlFor="editAutoCloseDate">自動結束新增設定日期</label>
             <input
-              id="editAutoCloseDay"
-              className={`form-input${dayError ? ' error' : ''}`}
-              type="number"
-              min={1}
-              max={31}
-              value={autoCloseDay}
-              onChange={(e) => setAutoCloseDay(e.target.value)}
+              id="editAutoCloseDate"
+              className={`form-input${dateError ? ' error' : ''}`}
+              type="date"
+              value={autoCloseDate}
+              onChange={(e) => setAutoCloseDate(e.target.value)}
               disabled={loading}
             />
-            {dayError && <div className="form-error">{dayError}</div>}
-            <div className="form-hint">輸入 1-31 的數字</div>
+            {dateError && <div className="form-error">{dateError}</div>}
           </div>
           <div className="fc-switch-row">
             <label htmlFor="editIsClosed">結束新增設定</label>

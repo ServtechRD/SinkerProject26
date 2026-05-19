@@ -2,13 +2,14 @@ package com.sinker.app.dto.forecast;
 
 import com.sinker.app.entity.SalesForecastConfig;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public class ConfigResponse {
 
     private Integer id;
     private String month;
-    private Integer autoCloseDay;
+    private LocalDate autoCloseDate;
     private Boolean isClosed;
     private LocalDateTime closedAt;
     private LocalDateTime createdAt;
@@ -18,7 +19,7 @@ public class ConfigResponse {
         ConfigResponse dto = new ConfigResponse();
         dto.setId(entity.getId());
         dto.setMonth(entity.getMonth());
-        dto.setAutoCloseDay(entity.getAutoCloseDay());
+        dto.setAutoCloseDate(entity.getAutoCloseDate());
         dto.setIsClosed(entity.getIsClosed());
         dto.setClosedAt(entity.getClosedAt());
         dto.setCreatedAt(entity.getCreatedAt());
@@ -32,8 +33,8 @@ public class ConfigResponse {
     public String getMonth() { return month; }
     public void setMonth(String month) { this.month = month; }
 
-    public Integer getAutoCloseDay() { return autoCloseDay; }
-    public void setAutoCloseDay(Integer autoCloseDay) { this.autoCloseDay = autoCloseDay; }
+    public LocalDate getAutoCloseDate() { return autoCloseDate; }
+    public void setAutoCloseDate(LocalDate autoCloseDate) { this.autoCloseDate = autoCloseDate; }
 
     public Boolean getIsClosed() { return isClosed; }
     public void setIsClosed(Boolean isClosed) { this.isClosed = isClosed; }

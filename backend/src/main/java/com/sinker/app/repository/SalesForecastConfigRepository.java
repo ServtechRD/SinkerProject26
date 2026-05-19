@@ -14,5 +14,5 @@ public interface SalesForecastConfigRepository extends JpaRepository<SalesForeca
 
     List<SalesForecastConfig> findAllByOrderByMonthDesc();
 
-    List<SalesForecastConfig> findByIsClosedFalseAndAutoCloseDay(Integer autoCloseDay);
+    List<SalesForecastConfig> findByIsClosedFalseAndAutoCloseDate(java.time.LocalDate autoCloseDate);
 }

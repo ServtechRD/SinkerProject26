@@ -2,7 +2,6 @@ package com.sinker.app.controller;
 
 import com.sinker.app.dto.forecast.ConfigResponse;
 import com.sinker.app.dto.forecast.CreateMonthsRequest;
-import com.sinker.app.dto.forecast.CreateMonthsResponse;
 import com.sinker.app.dto.forecast.UpdateConfigRequest;
 import com.sinker.app.exception.ResourceNotFoundException;
 import com.sinker.app.service.SalesForecastConfigService;
@@ -15,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -33,12 +33,12 @@ public class SalesForecastConfigController {
 
     @PostMapping
     @PreAuthorize("hasAuthority('sales_forecast_config.edit')")
-    public ResponseEntity<CreateMonthsResponse> createMonths(
+    public ResponseEntity<ConfigResponse> createMonth(
             @Valid @RequestBody CreateMonthsRequest request) {
-        log.info("POST /api/sales-forecast/config - Creating months from {} to {}, autoCloseDay={}",
-                request.getStartMonth(), request.getEndMonth(), request.getAutoCloseDay());
-        CreateMonthsResponse response = service.batchCreateMonths(
-                request.getStartMonth(), request.getEndMonth(), request.getAutoCloseDay());
+        log.info("POST /api/sales-forecast/config - Creating month {}, autoCloseDate={}",
+                request.getMonth(), request.getAutoCloseDate());
+        LocalDate autoCloseDate = LocalDate.parse(request.getAutoCloseDate());
+        ConfigResponse response = service.createMonth(request.getMonth(), autoCloseDate);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 

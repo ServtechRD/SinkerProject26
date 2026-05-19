@@ -1,7 +1,5 @@
 package com.sinker.app.dto.forecast;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 
@@ -9,22 +7,15 @@ public class CreateMonthsRequest {
 
     @NotBlank
     @Pattern(regexp = "^\\d{6}$", message = "Month format must be YYYYMM")
-    private String startMonth;
+    private String month;
 
     @NotBlank
-    @Pattern(regexp = "^\\d{6}$", message = "Month format must be YYYYMM")
-    private String endMonth;
+    @Pattern(regexp = "^\\d{4}-\\d{2}-\\d{2}$", message = "autoCloseDate format must be YYYY-MM-DD")
+    private String autoCloseDate;
 
-    @Min(value = 1, message = "auto_close_day must be between 1 and 31")
-    @Max(value = 31, message = "auto_close_day must be between 1 and 31")
-    private Integer autoCloseDay = 10;
+    public String getMonth() { return month; }
+    public void setMonth(String month) { this.month = month; }
 
-    public String getStartMonth() { return startMonth; }
-    public void setStartMonth(String startMonth) { this.startMonth = startMonth; }
-
-    public String getEndMonth() { return endMonth; }
-    public void setEndMonth(String endMonth) { this.endMonth = endMonth; }
-
-    public Integer getAutoCloseDay() { return autoCloseDay; }
-    public void setAutoCloseDay(Integer autoCloseDay) { this.autoCloseDay = autoCloseDay; }
+    public String getAutoCloseDate() { return autoCloseDate; }
+    public void setAutoCloseDate(String autoCloseDate) { this.autoCloseDate = autoCloseDate; }
 }

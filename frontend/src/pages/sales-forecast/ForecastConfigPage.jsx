@@ -123,7 +123,7 @@ export default function ForecastConfigPage() {
               {pageConfigs.map((c) => (
                 <tr key={c.id}>
                   <td>{c.month}</td>
-                  <td>{c.autoCloseDay}</td>
+                  <td>{c.autoCloseDate ?? '-'}</td>
                   <td>
                     <span className={c.isClosed ? 'badge--closed' : 'badge--open'}>
                       {c.isClosed ? '已結束新增設定' : '開放中'}

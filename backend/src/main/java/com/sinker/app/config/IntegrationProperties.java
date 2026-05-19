@@ -10,6 +10,7 @@ public class IntegrationProperties {
 
     private Pdca pdca = new Pdca();
     private Erp erp = new Erp();
+    private ErpProduct erpProduct = new ErpProduct();
 
     public Pdca getPdca() {
         return pdca;
@@ -25,6 +26,14 @@ public class IntegrationProperties {
 
     public void setErp(Erp erp) {
         this.erp = erp;
+    }
+
+    public ErpProduct getErpProduct() {
+        return erpProduct;
+    }
+
+    public void setErpProduct(ErpProduct erpProduct) {
+        this.erpProduct = erpProduct;
     }
 
     public static class Pdca {
@@ -89,6 +98,45 @@ public class IntegrationProperties {
 
         public void setPurchaseOrderUrl(String purchaseOrderUrl) {
             this.purchaseOrderUrl = purchaseOrderUrl;
+        }
+
+        public String getUsername() {
+            return username;
+        }
+
+        public void setUsername(String username) {
+            this.username = username;
+        }
+
+        public String getPassword() {
+            return password;
+        }
+
+        public void setPassword(String password) {
+            this.password = password;
+        }
+    }
+
+    public static class ErpProduct {
+        private boolean enabled = false;
+        private String productListUrl = "";
+        private String username = "";
+        private String password = "";
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getProductListUrl() {
+            return productListUrl;
+        }
+
+        public void setProductListUrl(String productListUrl) {
+            this.productListUrl = productListUrl;
         }
 
         public String getUsername() {

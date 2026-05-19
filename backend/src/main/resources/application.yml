@@ -28,6 +28,11 @@ app:
       purchase-order-url: ${ERP_PURCHASE_ORDER_URL:}
       username: ${ERP_USERNAME:}
       password: ${ERP_PASSWORD:}
+    erp-product:
+      enabled: ${ERP_PRODUCT_ENABLED:false}
+      product-list-url: ${ERP_PRODUCT_LIST_URL:}
+      username: ${ERP_USERNAME:}
+      password: ${ERP_PASSWORD:}
 
 management:
   endpoints:

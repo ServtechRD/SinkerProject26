@@ -1,5 +1,7 @@
 package com.sinker.app.controller;
 
+import com.sinker.app.dto.erp.ErpProductSyncParam;
+import com.sinker.app.service.ErpProductSyncService;
 import com.sinker.app.service.ErpPurchaseOrderService;
 import com.sinker.app.service.PdcaRecomputeService;
 import org.slf4j.Logger;
@@ -8,6 +10,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -26,11 +29,14 @@ public class IntegrationController {
 
     private final PdcaRecomputeService pdcaRecomputeService;
     private final ErpPurchaseOrderService erpPurchaseOrderService;
+    private final ErpProductSyncService erpProductSyncService;
 
     public IntegrationController(PdcaRecomputeService pdcaRecomputeService,
-                               ErpPurchaseOrderService erpPurchaseOrderService) {
+                                 ErpPurchaseOrderService erpPurchaseOrderService,
+                                 ErpProductSyncService erpProductSyncService) {
         this.pdcaRecomputeService = pdcaRecomputeService;
         this.erpPurchaseOrderService = erpPurchaseOrderService;
+        this.erpProductSyncService = erpProductSyncService;
     }
 
     @PostMapping("/pdca/recompute")
@@ -51,5 +57,18 @@ public class IntegrationController {
         log.info("POST /api/integrations/erp/purchase-order weekStart={}, factory={}", weekStart, factory);
         erpPurchaseOrderService.createPurchaseOrder(weekStart, factory);
         return ResponseEntity.ok(Map.of("message", "ERP purchase order request sent"));
+    }
+
+    @PostMapping("/erp/product-sync")
+    @PreAuthorize("hasRole('admin')")
+    public ResponseEntity<Map<String, Object>> erpProductSync(
+            @RequestBody(required = false) ErpProductSyncParam param) {
+        if (param == null) {
+            param = new ErpProductSyncParam();
+        }
+        log.info("POST /api/integrations/erp/product-sync isOnlyUpdate={}, prdNo='{}', pageSize={}",
+                param.getIsOnlyUpdate(), param.getPrdNo(), param.getPageSize());
+        Map<String, Object> result = erpProductSyncService.syncProducts(param);
+        return ResponseEntity.ok(result);
     }
 }

@@ -27,15 +27,6 @@ function formatNumber(value) {
   })
 }
 
-function escapeCsvCell(val) {
-  if (val == null) return ''
-  const s = String(val)
-  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
-    return '"' + s.replace(/"/g, '""') + '"'
-  }
-  return s
-}
-
 function getCurrentMonth() {
   const now = new Date()
   const year = now.getFullYear()
@@ -260,38 +251,6 @@ export default function InventoryIntegrationPage() {
     return sortConfig.direction === 'asc' ? cmp : -cmp
   })
 
-  const handleExportExcel = useCallback(() => {
-    if (!integrationData.length) {
-      toast.info('無資料可匯出')
-      return
-    }
-
-    const headers = ['庫位', '中類名稱', '貨品規格', '品號', '品名', '銷貨數量', '結存', '預估量', '生產小計', '修改後小計']
-    const dataRows = sortedData.map((row) => [
-      row.warehouseLocation ?? row.warehouse_location ?? '',
-      row.category ?? '',
-      row.spec ?? '',
-      row.productCode ?? row.product_code ?? '',
-      row.productName ?? row.product_name ?? '',
-      row.salesQuantity ?? row.sales_quantity ?? '',
-      row.inventoryBalance ?? row.inventory_balance ?? '',
-      row.forecastQuantity ?? row.forecast_quantity ?? '',
-      row.productionSubtotal ?? row.production_subtotal ?? '',
-      formatNumber(row.modifiedSubtotal ?? row.modified_subtotal),
-    ])
-
-    const BOM = '\uFEFF'
-    const csv = BOM + [headers.map(escapeCsvCell).join(','), ...dataRows.map((r) => r.map(escapeCsvCell).join(','))].join('\r\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-    const url = window.URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `庫存銷量預估量整合表單_${queryMode === QUERY_MODE_VERSION ? (selectedVersion || currentVersion || 'latest') : month}.csv`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    window.URL.revokeObjectURL(url)
-  }, [integrationData.length, sortedData, toast, queryMode, selectedVersion, currentVersion, month])
 
   useLayoutEffect(() => {
     const wh = warehouseThRef.current
@@ -492,14 +451,6 @@ export default function InventoryIntegrationPage() {
               </button>
             </>
           )}
-          <button
-            type="button"
-            className="btn btn--outline"
-            onClick={handleExportExcel}
-            disabled={!integrationData.length || versionEditMode}
-          >
-            Excel 匯出
-          </button>
         </div>
       )}
 

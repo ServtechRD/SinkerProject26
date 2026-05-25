@@ -40,13 +40,18 @@ public class PdcaResponse {
         private Double demandQuantity;
         @JsonAlias({"estimated_inventory"})
         private Double estimatedInventory;
+        @JsonAlias({"safety_stock"})
+        private Double safetyStock;
+        @JsonAlias({"standard_lead_time"})
+        private Integer standardLeadTime;
 
         public MaterialItem() {
         }
 
         public MaterialItem(String materialCode, String materialName, String unit,
                            String demandDate, Double expectedDelivery,
-                           Double demandQuantity, Double estimatedInventory) {
+                           Double demandQuantity, Double estimatedInventory,
+                           Double safetyStock, Integer standardLeadTime) {
             this.materialCode = materialCode;
             this.materialName = materialName;
             this.unit = unit;
@@ -54,6 +59,8 @@ public class PdcaResponse {
             this.expectedDelivery = expectedDelivery;
             this.demandQuantity = demandQuantity;
             this.estimatedInventory = estimatedInventory;
+            this.safetyStock = safetyStock;
+            this.standardLeadTime = standardLeadTime;
         }
 
         public String getMaterialCode() {
@@ -110,6 +117,22 @@ public class PdcaResponse {
 
         public void setEstimatedInventory(Double estimatedInventory) {
             this.estimatedInventory = estimatedInventory;
+        }
+
+        public Double getSafetyStock() {
+            return safetyStock;
+        }
+
+        public void setSafetyStock(Double safetyStock) {
+            this.safetyStock = safetyStock;
+        }
+
+        public Integer getStandardLeadTime() {
+            return standardLeadTime;
+        }
+
+        public void setStandardLeadTime(Integer standardLeadTime) {
+            this.standardLeadTime = standardLeadTime;
         }
     }
 }

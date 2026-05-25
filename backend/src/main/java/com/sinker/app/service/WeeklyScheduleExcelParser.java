@@ -12,7 +12,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.*;
 
 @Service
@@ -21,7 +20,7 @@ public class WeeklyScheduleExcelParser {
     private static final Logger log = LoggerFactory.getLogger(WeeklyScheduleExcelParser.class);
 
     private static final String HEADER_DEMAND_DATE = "生產日";
-    private static final String HEADER_WAREHOUSE_LOCATION = "區分";
+    private static final String HEADER_DIVISION = "區分";
     private static final String HEADER_PRODUCT_CODE = "料號";
     private static final String HEADER_PRODUCT_NAME = "名稱";
     private static final String HEADER_QUANTITY = "數量";
@@ -29,7 +28,7 @@ public class WeeklyScheduleExcelParser {
 
     private static final Set<String> REQUIRED_HEADERS = Set.of(
             HEADER_DEMAND_DATE,
-            HEADER_WAREHOUSE_LOCATION,
+            HEADER_DIVISION,
             HEADER_PRODUCT_CODE,
             HEADER_PRODUCT_NAME,
             HEADER_QUANTITY,
@@ -38,27 +37,30 @@ public class WeeklyScheduleExcelParser {
 
     public static class WeeklyScheduleRow {
         private final LocalDate demandDate;
+        private final String division;
         private final String productCode;
         private final String productName;
-        private final String warehouseLocation;
         private final BigDecimal quantity;
+        private final String remark;
         private final int rowNumber;
 
-        public WeeklyScheduleRow(LocalDate demandDate, String productCode, String productName,
-                                 String warehouseLocation, BigDecimal quantity, int rowNumber) {
+        public WeeklyScheduleRow(LocalDate demandDate, String division, String productCode, String productName,
+                                 BigDecimal quantity, String remark, int rowNumber) {
             this.demandDate = demandDate;
+            this.division = division;
             this.productCode = productCode;
             this.productName = productName;
-            this.warehouseLocation = warehouseLocation;
             this.quantity = quantity;
+            this.remark = remark;
             this.rowNumber = rowNumber;
         }
 
         public LocalDate getDemandDate() { return demandDate; }
+        public String getDivision() { return division; }
         public String getProductCode() { return productCode; }
         public String getProductName() { return productName; }
-        public String getWarehouseLocation() { return warehouseLocation; }
         public BigDecimal getQuantity() { return quantity; }
+        public String getRemark() { return remark; }
         public int getRowNumber() { return rowNumber; }
     }
 
@@ -106,7 +108,6 @@ public class WeeklyScheduleExcelParser {
             throw new ExcelParseException("Excel file has no data rows (only header or empty)");
         }
 
-        // Parse header row to get column indices
         Row headerRow = sheet.getRow(0);
         if (headerRow == null) {
             throw new ExcelParseException("Excel file is missing header row");
@@ -115,7 +116,6 @@ public class WeeklyScheduleExcelParser {
         Map<String, Integer> columnIndices = parseHeaderRow(headerRow);
         validateRequiredColumns(columnIndices);
 
-        // Parse data rows
         List<WeeklyScheduleRow> rows = new ArrayList<>();
         List<String> errors = new ArrayList<>();
 
@@ -174,16 +174,17 @@ public class WeeklyScheduleExcelParser {
 
     private WeeklyScheduleRow parseDataRow(Row row, Map<String, Integer> columnIndices, int rowNumber) {
         LocalDate demandDate = parseDateCell(row, columnIndices.get(HEADER_DEMAND_DATE), "生產日");
+        String division = parseOptionalStringCell(row, columnIndices.get(HEADER_DIVISION));
         String productCode = parseStringCell(row, columnIndices.get(HEADER_PRODUCT_CODE), "料號");
         String productName = parseStringCell(row, columnIndices.get(HEADER_PRODUCT_NAME), "名稱");
-        String warehouseLocation = parseStringCell(row, columnIndices.get(HEADER_WAREHOUSE_LOCATION), "區分");
         BigDecimal quantity = parseNumericCell(row, columnIndices.get(HEADER_QUANTITY), "數量");
+        String remark = parseOptionalStringCell(row, columnIndices.get(HEADER_REMARK));
 
         if (quantity.compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException("數量 must be >= 0");
         }
 
-        return new WeeklyScheduleRow(demandDate, productCode, productName, warehouseLocation, quantity, rowNumber);
+        return new WeeklyScheduleRow(demandDate, division, productCode, productName, quantity, remark, rowNumber);
     }
 
     private boolean isEmptyRow(Row row) {
@@ -230,6 +231,15 @@ public class WeeklyScheduleExcelParser {
             throw new IllegalArgumentException(columnName + " is required");
         }
         return value;
+    }
+
+    private String parseOptionalStringCell(Row row, int columnIndex) {
+        Cell cell = row.getCell(columnIndex);
+        if (cell == null) {
+            return null;
+        }
+        String value = getCellStringValue(cell).trim();
+        return value.isEmpty() ? null : value;
     }
 
     private BigDecimal parseNumericCell(Row row, int columnIndex, String columnName) {

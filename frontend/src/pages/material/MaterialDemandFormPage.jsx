@@ -339,6 +339,8 @@ export default function MaterialDemandFormPage() {
       '上次進貨日',
       '需求日',
       '現有庫存',
+      '安全庫存量',
+      '標準交期(天)',
       '預計進廠日',
       '預交量',
       '需求量',
@@ -354,6 +356,8 @@ export default function MaterialDemandFormPage() {
         r.lastPurchaseDate ?? '',
         r.demandDate ?? '',
         r.currentStock ?? 0,
+        r.safetyStock ?? 0,
+        r.standardLeadTime ?? '',
         r.expectedArrivalDate ?? '',
         r.expectedDelivery ?? 0,
         r.demandQuantity ?? 0,
@@ -535,6 +539,8 @@ export default function MaterialDemandFormPage() {
                     <th>上次進貨日</th>
                     <th>需求日</th>
                     <th className="numeric-col">現有庫存</th>
+                    <th className="numeric-col">安全庫存量</th>
+                    <th className="numeric-col">標準交期(天)</th>
                     <th>預計進廠日</th>
                     <th className="numeric-col">預交量</th>
                     <th className="numeric-col">需求量</th>
@@ -551,6 +557,8 @@ export default function MaterialDemandFormPage() {
                       <td>{row.lastPurchaseDate ?? '-'}</td>
                       <td>{row.demandDate ?? '-'}</td>
                       <td className="numeric-col">{formatDemandNumeric(row.currentStock)}</td>
+                      <td className="numeric-col">{formatDemandNumeric(row.safetyStock)}</td>
+                      <td className="numeric-col">{row.standardLeadTime ?? '-'}</td>
                       <td>{row.expectedArrivalDate ?? '-'}</td>
                       <td className="numeric-col">{formatDemandNumeric(row.expectedDelivery)}</td>
                       <td className="numeric-col">{formatDemandNumeric(row.demandQuantity)}</td>

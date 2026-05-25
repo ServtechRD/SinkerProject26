@@ -139,6 +139,10 @@ public class PdcaIntegrationService {
                     demand.setExpectedDelivery(BigDecimal.valueOf(item.getExpectedDelivery()));
                     demand.setDemandQuantity(BigDecimal.valueOf(item.getDemandQuantity()));
                     demand.setEstimatedInventory(BigDecimal.valueOf(item.getEstimatedInventory()));
+                    if (item.getSafetyStock() != null) {
+                        demand.setSafetyStock(BigDecimal.valueOf(item.getSafetyStock()));
+                    }
+                    demand.setStandardLeadTime(item.getStandardLeadTime());
                     demand.setLastPurchaseDate(null); // Set by purchase module later
                     demand.setCreatedAt(now);
                     demand.setUpdatedAt(now);

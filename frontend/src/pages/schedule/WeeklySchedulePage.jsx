@@ -246,16 +246,15 @@ export default function WeeklySchedulePage() {
       return
     }
     const BOM = '\uFEFF'
-    const headers = ['生產日', '區分', '料號', '名稱', '數量', '備註']
+    const headers = ['需求日期', '品號', '品名', '庫位','箱數']
     const csvRows = [headers.join(',')]
     rows.forEach((row) => {
       const demandDate = row.demandDate ?? ''
-      const warehouseLocation = row.warehouseLocation ?? ''
       const productCode = row.productCode ?? ''
       const productName = row.productName ?? ''
+      const warehouseLocation = row.warehouseLocation ?? row.warehouse_location ?? ''
       const qty = row.quantity != null ? row.quantity : ''
-      const remark = row.remark ?? ''
-      csvRows.push([demandDate, warehouseLocation, productCode, productName, qty, remark].join(','))
+      csvRows.push([demandDate, productCode, productName, warehouseLocation, qty].join(','))
     })
     const blob = new Blob([BOM + csvRows.join('\r\n')], { type: 'text/csv;charset=utf-8' })
     const url = window.URL.createObjectURL(blob)
@@ -415,21 +414,22 @@ export default function WeeklySchedulePage() {
                 <table className="schedule-table">
                   <thead>
                     <tr>
-                      <th>生產日</th>
-                      <th>區分</th>
-                      <th>料號</th>
-                      <th>名稱</th>
-                      <th>數量</th>
-                      <th>備註</th>
+                      <th>需求日期</th>
+                      <th>品號</th>
+                      <th>品名</th>
+                      <th className="schedule-col-warehouse">庫位</th>
+                      <th>箱數</th>
                     </tr>
                   </thead>
                   <tbody>
                     {pageRows.map((row) => (
                       <tr key={row.id}>
                         <td>{row.demandDate ?? '-'}</td>
-                        <td>{row.warehouseLocation ?? '-'}</td>
                         <td>{row.productCode ?? '-'}</td>
                         <td>{row.productName ?? '-'}</td>
+                        <td className="schedule-col-warehouse">
+                          {row.warehouse_location ?? row.warehouseLocation ?? '-'}
+                        </td>
                         <td
                           className={`${canEdit ? 'editable-quantity-cell' : ''}${changedRowIds.includes(row.id) ? ' schedule-value--changed' : ''}`}
                         >
@@ -446,7 +446,6 @@ export default function WeeklySchedulePage() {
                             row.quantity ?? '-'
                           )}
                         </td>
-                        <td>{row.remark ?? '-'}</td>
                       </tr>
                     ))}
                   </tbody>

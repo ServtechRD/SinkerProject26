@@ -17,6 +17,8 @@ public class MaterialDemandDTO {
     private LocalDate lastPurchaseDate;
     private LocalDate demandDate;
     private BigDecimal currentStock;
+    private BigDecimal safetyStock;
+    private Integer standardLeadTime;
     private LocalDate expectedArrivalDate;
     private BigDecimal expectedDelivery;
     private BigDecimal demandQuantity;
@@ -38,6 +40,8 @@ public class MaterialDemandDTO {
         dto.setLastPurchaseDate(entity.getLastPurchaseDate());
         dto.setDemandDate(entity.getDemandDate());
         dto.setCurrentStock(entity.getCurrentStock());
+        dto.setSafetyStock(entity.getSafetyStock());
+        dto.setStandardLeadTime(entity.getStandardLeadTime());
         dto.setExpectedArrivalDate(entity.getExpectedArrivalDate());
         dto.setExpectedDelivery(entity.getExpectedDelivery());
         dto.setDemandQuantity(entity.getDemandQuantity());
@@ -126,6 +130,22 @@ public class MaterialDemandDTO {
 
     public void setCurrentStock(BigDecimal currentStock) {
         this.currentStock = currentStock;
+    }
+
+    public BigDecimal getSafetyStock() {
+        return safetyStock;
+    }
+
+    public void setSafetyStock(BigDecimal safetyStock) {
+        this.safetyStock = safetyStock;
+    }
+
+    public Integer getStandardLeadTime() {
+        return standardLeadTime;
+    }
+
+    public void setStandardLeadTime(Integer standardLeadTime) {
+        this.standardLeadTime = standardLeadTime;
     }
 
     public LocalDate getExpectedArrivalDate() {

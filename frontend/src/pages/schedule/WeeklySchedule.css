@@ -195,6 +195,12 @@
   border-bottom: 2px solid #e2e8f0;
 }
 
+.schedule-table th.schedule-col-warehouse,
+.schedule-table td.schedule-col-warehouse {
+  min-width: 72px;
+  white-space: nowrap;
+}
+
 .schedule-table td {
   padding: 12px;
   border-bottom: 1px solid #e2e8f0;

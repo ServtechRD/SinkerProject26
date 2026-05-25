@@ -28,11 +28,17 @@ public class WeeklySchedule {
     @Column(name = "product_name", nullable = false, length = 200)
     private String productName;
 
-    @Column(name = "warehouse_location", nullable = false, length = 50)
+    @Column(length = 50)
+    private String division;
+
+    @Column(name = "warehouse_location", length = 50)
     private String warehouseLocation;
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal quantity;
+
+    @Column(columnDefinition = "TEXT")
+    private String remark;
 
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
@@ -88,6 +94,14 @@ public class WeeklySchedule {
         this.productName = productName;
     }
 
+    public String getDivision() {
+        return division;
+    }
+
+    public void setDivision(String division) {
+        this.division = division;
+    }
+
     public String getWarehouseLocation() {
         return warehouseLocation;
     }
@@ -102,6 +116,14 @@ public class WeeklySchedule {
 
     public void setQuantity(BigDecimal quantity) {
         this.quantity = quantity;
+    }
+
+    public String getRemark() {
+        return remark;
+    }
+
+    public void setRemark(String remark) {
+        this.remark = remark;
     }
 
     public LocalDateTime getCreatedAt() {

@@ -29,14 +29,17 @@ class WeeklyScheduleExcelParserTest {
     @Test
     void parse_validWorkbook_returnsParsedRows() throws Exception {
         MultipartFile file = buildWorkbook(List.of(
-                List.of(LocalDate.of(2026, 1, 15), "P001", "N1", "A01", 10),
-                List.of(LocalDate.of(2026, 1, 16), "P002", "N2", "A02", 20)
+                List.of(LocalDate.of(2026, 1, 15), "D01", "P001", "N1", 10, "note1"),
+                List.of(LocalDate.of(2026, 1, 16), "D02", "P002", "N2", 20, "")
         ));
 
         List<WeeklyScheduleExcelParser.WeeklyScheduleRow> rows = parser.parse(file);
 
         assertEquals(2, rows.size());
         assertEquals("P001", rows.get(0).getProductCode());
+        assertEquals("D01", rows.get(0).getDivision());
+        assertEquals("note1", rows.get(0).getRemark());
+        assertNull(rows.get(1).getRemark());
         assertEquals(0, new BigDecimal("10.0").compareTo(rows.get(0).getQuantity()));
         assertEquals(2, rows.get(0).getRowNumber());
     }
@@ -48,13 +51,13 @@ class WeeklyScheduleExcelParserTest {
         ExcelParseException ex = assertThrows(ExcelParseException.class, () -> parser.parse(file));
 
         assertTrue(ex.getMessage().contains("missing required columns"));
-        assertTrue(ex.getMessage().contains("箱數小計"));
+        assertTrue(ex.getMessage().contains("數量"));
     }
 
     @Test
     void parse_negativeQuantity_throws() throws Exception {
         MultipartFile file = buildWorkbook(List.of(
-                List.of(LocalDate.of(2026, 1, 15), "P001", "N1", "A01", -1)
+                List.of(LocalDate.of(2026, 1, 15), "D01", "P001", "N1", -1, "")
         ));
 
         ExcelParseException ex = assertThrows(ExcelParseException.class, () -> parser.parse(file));
@@ -89,11 +92,12 @@ class WeeklyScheduleExcelParserTest {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Sheet1");
             Row h = sheet.createRow(0);
-            h.createCell(0).setCellValue("需求日期");
-            h.createCell(1).setCellValue("品號");
-            h.createCell(2).setCellValue("品名");
-            h.createCell(3).setCellValue("庫位");
-            h.createCell(4).setCellValue("箱數小計");
+            h.createCell(0).setCellValue("生產日");
+            h.createCell(1).setCellValue("區分");
+            h.createCell(2).setCellValue("料號");
+            h.createCell(3).setCellValue("名稱");
+            h.createCell(4).setCellValue("數量");
+            h.createCell(5).setCellValue("備註");
 
             int r = 1;
             for (List<Object> data : rows) {
@@ -103,6 +107,7 @@ class WeeklyScheduleExcelParserTest {
                 row.createCell(2).setCellValue((String) data.get(2));
                 row.createCell(3).setCellValue((String) data.get(3));
                 row.createCell(4).setCellValue(((Number) data.get(4)).doubleValue());
+                row.createCell(5).setCellValue((String) data.get(5));
             }
 
             workbook.write(bos);
@@ -115,15 +120,16 @@ class WeeklyScheduleExcelParserTest {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Sheet1");
             Row h = sheet.createRow(0);
-            h.createCell(0).setCellValue("需求日期");
-            h.createCell(1).setCellValue("品號");
-            h.createCell(2).setCellValue("品名");
-            h.createCell(3).setCellValue("庫位");
+            h.createCell(0).setCellValue("生產日");
+            h.createCell(1).setCellValue("區分");
+            h.createCell(2).setCellValue("料號");
+            h.createCell(3).setCellValue("名稱");
+            h.createCell(5).setCellValue("備註");
             Row row = sheet.createRow(1);
             row.createCell(0).setCellValue(LocalDate.of(2026, 1, 15).toString());
-            row.createCell(1).setCellValue("P001");
-            row.createCell(2).setCellValue("N1");
-            row.createCell(3).setCellValue("A01");
+            row.createCell(1).setCellValue("D01");
+            row.createCell(2).setCellValue("P001");
+            row.createCell(3).setCellValue("N1");
             workbook.write(bos);
             return new MockMultipartFile("file", "test.xlsx",
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", bos.toByteArray());
@@ -134,17 +140,18 @@ class WeeklyScheduleExcelParserTest {
         try (Workbook workbook = new XSSFWorkbook(); ByteArrayOutputStream bos = new ByteArrayOutputStream()) {
             Sheet sheet = workbook.createSheet("Sheet1");
             Row h = sheet.createRow(0);
-            h.createCell(0).setCellValue("需求日期");
-            h.createCell(1).setCellValue("品號");
-            h.createCell(2).setCellValue("品名");
-            h.createCell(3).setCellValue("庫位");
-            h.createCell(4).setCellValue("箱數小計");
+            h.createCell(0).setCellValue("生產日");
+            h.createCell(1).setCellValue("區分");
+            h.createCell(2).setCellValue("料號");
+            h.createCell(3).setCellValue("名稱");
+            h.createCell(4).setCellValue("數量");
+            h.createCell(5).setCellValue("備註");
 
             Row r1 = sheet.createRow(1);
             r1.createCell(0).setCellValue(LocalDate.of(2026, 1, 15).toString());
-            r1.createCell(1).setCellValue("P001");
-            r1.createCell(2).setCellValue("N1");
-            r1.createCell(3).setCellValue("A01");
+            r1.createCell(1).setCellValue("D01");
+            r1.createCell(2).setCellValue("P001");
+            r1.createCell(3).setCellValue("N1");
             r1.createCell(4).setCellValue(10);
 
             sheet.createRow(2);

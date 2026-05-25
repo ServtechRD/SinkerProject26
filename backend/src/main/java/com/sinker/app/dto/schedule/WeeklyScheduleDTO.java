@@ -25,10 +25,14 @@ public class WeeklyScheduleDTO {
     @JsonProperty("productName")
     private String productName;
 
+    private String division;
+
     @JsonProperty("warehouseLocation")
     private String warehouseLocation;
 
     private BigDecimal quantity;
+
+    private String remark;
 
     @JsonProperty("createdAt")
     private LocalDateTime createdAt;
@@ -46,8 +50,10 @@ public class WeeklyScheduleDTO {
         dto.setDemandDate(entity.getDemandDate());
         dto.setProductCode(entity.getProductCode());
         dto.setProductName(entity.getProductName());
+        dto.setDivision(entity.getDivision());
         dto.setWarehouseLocation(entity.getWarehouseLocation());
         dto.setQuantity(entity.getQuantity());
+        dto.setRemark(entity.getRemark());
         dto.setCreatedAt(entity.getCreatedAt());
         dto.setUpdatedAt(entity.getUpdatedAt());
         return dto;
@@ -101,6 +107,14 @@ public class WeeklyScheduleDTO {
         this.productName = productName;
     }
 
+    public String getDivision() {
+        return division;
+    }
+
+    public void setDivision(String division) {
+        this.division = division;
+    }
+
     public String getWarehouseLocation() {
         return warehouseLocation;
     }
@@ -115,6 +129,14 @@ public class WeeklyScheduleDTO {
 
     public void setQuantity(BigDecimal quantity) {
         this.quantity = quantity;
+    }
+
+    public String getRemark() {
+        return remark;
+    }
+
+    public void setRemark(String remark) {
+        this.remark = remark;
     }
 
     public LocalDateTime getCreatedAt() {

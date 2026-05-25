@@ -57,7 +57,9 @@ public final class PdcaLocalStub {
                         materialDemandDate.format(FORMATTER),
                         Math.round(expectedDelivery * 100.0) / 100.0,
                         Math.round(demandQty * 100.0) / 100.0,
-                        Math.round(estimatedInventory * 100.0) / 100.0
+                        Math.round(estimatedInventory * 100.0) / 100.0,
+                        null,
+                        null
                 ));
             }
         }
@@ -81,7 +83,9 @@ public final class PdcaLocalStub {
                     base.plusDays(i).format(FORMATTER),
                     Math.round(expectedDelivery * 100.0) / 100.0,
                     Math.round(demandQty * 100.0) / 100.0,
-                    Math.round(estimatedInventory * 100.0) / 100.0
+                    Math.round(estimatedInventory * 100.0) / 100.0,
+                    null,
+                    null
             ));
         }
         return new PdcaResponse(materials);

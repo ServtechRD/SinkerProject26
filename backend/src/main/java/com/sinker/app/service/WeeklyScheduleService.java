@@ -1,5 +1,6 @@
 package com.sinker.app.service;
 
+import com.sinker.app.dto.reference.ProductDTO;
 import com.sinker.app.dto.schedule.UploadScheduleResponse;
 import com.sinker.app.dto.schedule.UpdateScheduleRequest;
 import com.sinker.app.dto.schedule.WeeklyScheduleDTO;
@@ -30,13 +31,16 @@ public class WeeklyScheduleService {
 
     private final WeeklyScheduleRepository repository;
     private final WeeklyScheduleExcelParser excelParser;
+    private final ErpProductService erpProductService;
     private final PdcaIntegrationService pdcaIntegrationService;
 
     public WeeklyScheduleService(WeeklyScheduleRepository repository,
                                  WeeklyScheduleExcelParser excelParser,
+                                 ErpProductService erpProductService,
                                  @Lazy PdcaIntegrationService pdcaIntegrationService) {
         this.repository = repository;
         this.excelParser = excelParser;
+        this.erpProductService = erpProductService;
         this.pdcaIntegrationService = pdcaIntegrationService;
     }
 
@@ -70,7 +74,7 @@ public class WeeklyScheduleService {
                     existing.getDemandDate(),
                     existing.getProductCode(),
                     existing.getProductName(),
-                    existing.getWarehouseLocation()
+                    existing.getDivision()
             ), existing);
         }
 
@@ -78,18 +82,21 @@ public class WeeklyScheduleService {
         repository.deleteByWeekStartAndFactory(weekStart, factory);
         log.info("Deleted existing data for weekStart={}, factory={}", weekStart, factory);
 
-        // 5. Insert all rows
+        // 5. Insert all rows（庫位由品號對應產品主檔帶入，供上傳結果顯示）
         LocalDateTime now = LocalDateTime.now();
+        Map<String, ProductDTO> productCache = new HashMap<>();
         List<WeeklySchedule> entities = rows.stream()
                 .map(row -> {
                     WeeklySchedule entity = new WeeklySchedule();
                     entity.setWeekStart(weekStart);
                     entity.setFactory(factory);
                     entity.setDemandDate(row.getDemandDate());
+                    entity.setDivision(row.getDivision());
                     entity.setProductCode(row.getProductCode());
                     entity.setProductName(row.getProductName());
-                    entity.setWarehouseLocation(row.getWarehouseLocation());
+                    entity.setWarehouseLocation(resolveWarehouseLocation(row.getProductCode(), productCache));
                     entity.setQuantity(row.getQuantity());
+                    entity.setRemark(row.getRemark());
                     entity.setCreatedAt(now);
                     entity.setUpdatedAt(now);
                     return entity;
@@ -104,7 +111,7 @@ public class WeeklyScheduleService {
                             entity.getDemandDate(),
                             entity.getProductCode(),
                             entity.getProductName(),
-                            entity.getWarehouseLocation()
+                            entity.getDivision()
                     ));
                     if (previous == null) return true;
                     return previous.getQuantity() == null
@@ -210,6 +217,16 @@ public class WeeklyScheduleService {
             throw new IllegalArgumentException(
                     "week_start must be a Monday. Provided date: " + weekStart + " (" + dayName + ")");
         }
+    }
+
+    private String resolveWarehouseLocation(String productCode, Map<String, ProductDTO> productCache) {
+        if (productCode == null || productCode.isBlank()) {
+            return null;
+        }
+        String code = productCode.trim();
+        ProductDTO product = productCache.computeIfAbsent(code,
+                k -> erpProductService.findProduct(k).orElse(null));
+        return product != null ? product.getWarehouseLocation() : null;
     }
 
     private String buildBusinessKey(LocalDate demandDate, String productCode, String productName, String warehouseLocation) {

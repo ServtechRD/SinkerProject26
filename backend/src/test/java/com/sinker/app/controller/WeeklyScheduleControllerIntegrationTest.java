@@ -113,19 +113,21 @@ class WeeklyScheduleControllerIntegrationTest {
         try (XSSFWorkbook wb = new XSSFWorkbook()) {
             Sheet sheet = wb.createSheet();
             Row header = sheet.createRow(0);
-            header.createCell(0).setCellValue("需求日期");
-            header.createCell(1).setCellValue("品號");
-            header.createCell(2).setCellValue("品名");
-            header.createCell(3).setCellValue("庫位");
-            header.createCell(4).setCellValue("箱數小計");
+            header.createCell(0).setCellValue("生產日");
+            header.createCell(1).setCellValue("區分");
+            header.createCell(2).setCellValue("料號");
+            header.createCell(3).setCellValue("名稱");
+            header.createCell(4).setCellValue("數量");
+            header.createCell(5).setCellValue("備註");
 
             for (int i = 1; i <= rowCount; i++) {
                 Row row = sheet.createRow(i);
-                row.createCell(0).setCellValue("2026-02-0" + (2 + i % 5)); // Dates in week
-                row.createCell(1).setCellValue("PROD" + String.format("%03d", i));
-                row.createCell(2).setCellValue("Product " + i);
-                row.createCell(3).setCellValue("WH-" + (char)('A' + i % 5));
+                row.createCell(0).setCellValue("2026-02-0" + (2 + i % 5));
+                row.createCell(1).setCellValue("DIV-" + (char)('A' + i % 5));
+                row.createCell(2).setCellValue("PROD" + String.format("%03d", i));
+                row.createCell(3).setCellValue("Product " + i);
                 row.createCell(4).setCellValue(100.0 + i * 10);
+                row.createCell(5).setCellValue("remark " + i);
             }
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -140,8 +142,8 @@ class WeeklyScheduleControllerIntegrationTest {
         try (XSSFWorkbook wb = new XSSFWorkbook()) {
             Sheet sheet = wb.createSheet();
             Row header = sheet.createRow(0);
-            header.createCell(0).setCellValue("需求日期");
-            header.createCell(1).setCellValue("品號");
+            header.createCell(0).setCellValue("生產日");
+            header.createCell(1).setCellValue("區分");
             // Missing other columns
 
             ByteArrayOutputStream out = new ByteArrayOutputStream();
@@ -262,10 +264,10 @@ class WeeklyScheduleControllerIntegrationTest {
     @Test
     void testGetSchedules_Success() throws Exception {
         // Insert test data
-        jdbc.update("INSERT INTO production_weekly_schedule (week_start, factory, demand_date, product_code, product_name, warehouse_location, quantity) " +
-                "VALUES (?, ?, '2026-02-03', 'PROD001', 'Product 1', 'WH-A', 100.50)", WEEK_START_MONDAY, FACTORY);
-        jdbc.update("INSERT INTO production_weekly_schedule (week_start, factory, demand_date, product_code, product_name, warehouse_location, quantity) " +
-                "VALUES (?, ?, '2026-02-04', 'PROD002', 'Product 2', 'WH-B', 200.75)", WEEK_START_MONDAY, FACTORY);
+        jdbc.update("INSERT INTO production_weekly_schedule (week_start, factory, demand_date, product_code, product_name, division, warehouse_location, quantity) " +
+                "VALUES (?, ?, '2026-02-03', 'PROD001', 'Product 1', 'DIV-A', NULL, 100.50)", WEEK_START_MONDAY, FACTORY);
+        jdbc.update("INSERT INTO production_weekly_schedule (week_start, factory, demand_date, product_code, product_name, division, warehouse_location, quantity) " +
+                "VALUES (?, ?, '2026-02-04', 'PROD002', 'Product 2', 'DIV-B', NULL, 200.75)", WEEK_START_MONDAY, FACTORY);
 
         mockMvc.perform(get("/api/weekly-schedule")
                         .param("week_start", WEEK_START_MONDAY)
@@ -320,8 +322,8 @@ class WeeklyScheduleControllerIntegrationTest {
     @Test
     void testUpdateSchedule_Success() throws Exception {
         // Insert test data
-        jdbc.update("INSERT INTO production_weekly_schedule (week_start, factory, demand_date, product_code, product_name, warehouse_location, quantity) " +
-                "VALUES (?, ?, '2026-02-03', 'PROD001', 'Product 1', 'WH-A', 100.50)", WEEK_START_MONDAY, FACTORY);
+        jdbc.update("INSERT INTO production_weekly_schedule (week_start, factory, demand_date, product_code, product_name, division, warehouse_location, quantity) " +
+                "VALUES (?, ?, '2026-02-03', 'PROD001', 'Product 1', 'DIV-A', NULL, 100.50)", WEEK_START_MONDAY, FACTORY);
         Integer id = jdbc.queryForObject("SELECT id FROM production_weekly_schedule WHERE product_code = 'PROD001'", Integer.class);
 
         UpdateScheduleRequest request = new UpdateScheduleRequest();
@@ -341,8 +343,8 @@ class WeeklyScheduleControllerIntegrationTest {
     @Test
     void testUpdateSchedule_PartialUpdate() throws Exception {
         // Insert test data
-        jdbc.update("INSERT INTO production_weekly_schedule (week_start, factory, demand_date, product_code, product_name, warehouse_location, quantity) " +
-                "VALUES (?, ?, '2026-02-03', 'PROD001', 'Product 1', 'WH-A', 100.50)", WEEK_START_MONDAY, FACTORY);
+        jdbc.update("INSERT INTO production_weekly_schedule (week_start, factory, demand_date, product_code, product_name, division, warehouse_location, quantity) " +
+                "VALUES (?, ?, '2026-02-03', 'PROD001', 'Product 1', 'DIV-A', NULL, 100.50)", WEEK_START_MONDAY, FACTORY);
         Integer id = jdbc.queryForObject("SELECT id FROM production_weekly_schedule WHERE product_code = 'PROD001'", Integer.class);
 
         // Update only quantity
@@ -372,8 +374,8 @@ class WeeklyScheduleControllerIntegrationTest {
 
     @Test
     void testUpdateSchedule_NegativeQuantity() throws Exception {
-        jdbc.update("INSERT INTO production_weekly_schedule (week_start, factory, demand_date, product_code, product_name, warehouse_location, quantity) " +
-                "VALUES (?, ?, '2026-02-03', 'PROD001', 'Product 1', 'WH-A', 100.50)", WEEK_START_MONDAY, FACTORY);
+        jdbc.update("INSERT INTO production_weekly_schedule (week_start, factory, demand_date, product_code, product_name, division, warehouse_location, quantity) " +
+                "VALUES (?, ?, '2026-02-03', 'PROD001', 'Product 1', 'DIV-A', NULL, 100.50)", WEEK_START_MONDAY, FACTORY);
         Integer id = jdbc.queryForObject("SELECT id FROM production_weekly_schedule WHERE product_code = 'PROD001'", Integer.class);
 
         UpdateScheduleRequest request = new UpdateScheduleRequest();
@@ -389,8 +391,8 @@ class WeeklyScheduleControllerIntegrationTest {
 
     /*@Test
     void testUpdateSchedule_WithoutPermission() throws Exception {
-        jdbc.update("INSERT INTO production_weekly_schedule (week_start, factory, demand_date, product_code, product_name, warehouse_location, quantity) " +
-                "VALUES (?, ?, '2026-02-03', 'PROD001', 'Product 1', 'WH-A', 100.50)", WEEK_START_MONDAY, FACTORY);
+        jdbc.update("INSERT INTO production_weekly_schedule (week_start, factory, demand_date, product_code, product_name, division, warehouse_location, quantity) " +
+                "VALUES (?, ?, '2026-02-03', 'PROD001', 'Product 1', 'DIV-A', NULL, 100.50)", WEEK_START_MONDAY, FACTORY);
         Integer id = jdbc.queryForObject("SELECT id FROM production_weekly_schedule WHERE product_code = 'PROD001'", Integer.class);
 
         UpdateScheduleRequest request = new UpdateScheduleRequest();

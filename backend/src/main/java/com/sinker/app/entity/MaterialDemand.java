@@ -37,6 +37,12 @@ public class MaterialDemand {
     @Column(name = "current_stock", precision = 10, scale = 2)
     private BigDecimal currentStock;
 
+    @Column(name = "safety_stock", precision = 10, scale = 2)
+    private BigDecimal safetyStock;
+
+    @Column(name = "standard_lead_time")
+    private Integer standardLeadTime;
+
     @Column(name = "expected_arrival_date")
     private LocalDate expectedArrivalDate;
 
@@ -128,6 +134,22 @@ public class MaterialDemand {
 
     public void setCurrentStock(BigDecimal currentStock) {
         this.currentStock = currentStock;
+    }
+
+    public BigDecimal getSafetyStock() {
+        return safetyStock;
+    }
+
+    public void setSafetyStock(BigDecimal safetyStock) {
+        this.safetyStock = safetyStock;
+    }
+
+    public Integer getStandardLeadTime() {
+        return standardLeadTime;
+    }
+
+    public void setStandardLeadTime(Integer standardLeadTime) {
+        this.standardLeadTime = standardLeadTime;
     }
 
     public LocalDate getExpectedArrivalDate() {

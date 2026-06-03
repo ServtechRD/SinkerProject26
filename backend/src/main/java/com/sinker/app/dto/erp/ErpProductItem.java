@@ -29,6 +29,9 @@ public class ErpProductItem {
     @JsonProperty("Spc")
     private String spc;
 
+    @JsonProperty("Wh")
+    private String wh;
+
     @JsonProperty("Knd")
     private String knd;
 
@@ -106,6 +109,9 @@ public class ErpProductItem {
 
     public String getSpc() { return spc; }
     public void setSpc(String spc) { this.spc = spc; }
+
+    public String getWh() { return wh; }
+    public void setWh(String wh) { this.wh = wh; }
 
     public String getKnd() { return knd; }
     public void setKnd(String knd) { this.knd = knd; }

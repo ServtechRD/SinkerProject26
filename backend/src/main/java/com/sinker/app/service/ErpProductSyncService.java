@@ -115,6 +115,7 @@ public class ErpProductSyncService {
                 product.setName(item.getName() != null ? item.getName() : product.getName());
                 product.setCategoryName(item.getIdxName());
                 product.setSpec(item.getSpc());
+                product.setWarehouseLocation(item.getWh());
                 product.setUpdatedAt(now);
                 toSave.add(product);
             } else if (!isOnlyUpdate) {
@@ -123,6 +124,7 @@ public class ErpProductSyncService {
                 newProduct.setName(item.getName() != null ? item.getName() : "");
                 newProduct.setCategoryName(item.getIdxName());
                 newProduct.setSpec(item.getSpc());
+                newProduct.setWarehouseLocation(item.getWh());
                 newProduct.setCreatedAt(now);
                 newProduct.setUpdatedAt(now);
                 toSave.add(newProduct);

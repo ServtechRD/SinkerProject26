@@ -99,26 +99,28 @@ public class ErpProductSyncService {
                 .filter(StringUtils::hasText)
                 .collect(Collectors.toList());
 
+        // uk_product_code 為 utf8mb4_unicode_ci（大小寫不分），
+        // Java HashMap 大小寫有別，因此統一以大寫作為 map key 避免誤判為新品而重複 INSERT
         Map<String, Product> existingByCode = productRepository.findByCodeIn(codes).stream()
-                .collect(Collectors.toMap(Product::getCode, p -> p));
+                .collect(Collectors.toMap(p -> p.getCode().toUpperCase(), p -> p));
 
         LocalDateTime now = LocalDateTime.now();
-        // 以 productCode 為 key，避免同頁重複 PrdNo 造成 uk_product_code 衝突
         Map<String, Product> toSave = new LinkedHashMap<>();
 
         for (ErpProductItem item : items) {
             if (!StringUtils.hasText(item.getPrdNo())) {
                 continue;
             }
-            Product product = existingByCode.get(item.getPrdNo());
+            String key = item.getPrdNo().toUpperCase();
+            Product product = existingByCode.get(key);
             if (product != null) {
                 product.setName(item.getName() != null ? item.getName() : product.getName());
                 product.setCategoryName(item.getIdxName());
                 product.setSpec(item.getSpc());
                 product.setWarehouseLocation(item.getWh());
                 product.setUpdatedAt(now);
-                toSave.put(item.getPrdNo(), product);
-            } else if (!isOnlyUpdate && !toSave.containsKey(item.getPrdNo())) {
+                toSave.put(key, product);
+            } else if (!isOnlyUpdate && !toSave.containsKey(key)) {
                 Product newProduct = new Product();
                 newProduct.setCode(item.getPrdNo());
                 newProduct.setName(item.getName() != null ? item.getName() : "");
@@ -127,7 +129,7 @@ public class ErpProductSyncService {
                 newProduct.setWarehouseLocation(item.getWh());
                 newProduct.setCreatedAt(now);
                 newProduct.setUpdatedAt(now);
-                toSave.put(item.getPrdNo(), newProduct);
+                toSave.put(key, newProduct);
             }
         }
 

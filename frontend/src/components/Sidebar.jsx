@@ -15,6 +15,7 @@ const navItems = [
   { to: '/weekly-schedule', label: '生產週排程表單-匯入', permission: 'weekly_schedule.view' },
   { to: '/semi-product/import', label: '半成品提前採購設定表單-匯入', permission: 'semi_product.view' },
   { to: '/material-demand/form', label: '物料需求數量表單', permission: 'material_demand.view' },
+  { to: '/erp/product-sync', label: '同步商品主檔', permission: 'user.view' },
 ]
 
 function hasPermission(user, perm) {

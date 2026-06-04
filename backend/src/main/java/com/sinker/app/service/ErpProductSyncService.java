@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -104,7 +103,8 @@ public class ErpProductSyncService {
                 .collect(Collectors.toMap(Product::getCode, p -> p));
 
         LocalDateTime now = LocalDateTime.now();
-        List<Product> toSave = new ArrayList<>();
+        // 以 productCode 為 key，避免同頁重複 PrdNo 造成 uk_product_code 衝突
+        Map<String, Product> toSave = new LinkedHashMap<>();
 
         for (ErpProductItem item : items) {
             if (!StringUtils.hasText(item.getPrdNo())) {
@@ -117,8 +117,8 @@ public class ErpProductSyncService {
                 product.setSpec(item.getSpc());
                 product.setWarehouseLocation(item.getWh());
                 product.setUpdatedAt(now);
-                toSave.add(product);
-            } else if (!isOnlyUpdate) {
+                toSave.put(item.getPrdNo(), product);
+            } else if (!isOnlyUpdate && !toSave.containsKey(item.getPrdNo())) {
                 Product newProduct = new Product();
                 newProduct.setCode(item.getPrdNo());
                 newProduct.setName(item.getName() != null ? item.getName() : "");
@@ -127,11 +127,11 @@ public class ErpProductSyncService {
                 newProduct.setWarehouseLocation(item.getWh());
                 newProduct.setCreatedAt(now);
                 newProduct.setUpdatedAt(now);
-                toSave.add(newProduct);
+                toSave.put(item.getPrdNo(), newProduct);
             }
         }
 
-        productRepository.saveAll(toSave);
+        productRepository.saveAll(toSave.values());
         return toSave.size();
     }
 

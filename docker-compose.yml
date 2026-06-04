@@ -27,19 +27,19 @@ services:
       SPRING_DATASOURCE_USERNAME: app
       SPRING_DATASOURCE_PASSWORD: app
       SPRING_PROFILES_ACTIVE: docker
+      # 外部 API 共用 JWT 憑證
+      ERP_TOKEN_URL: "https://your-erp.example.com/api/auth/login"
+      ERP_ACCOUNT: "your_account"
+      ERP_SALASANA: "your_salasana"
       # ERP 商品主檔同步
       ERP_PRODUCT_ENABLED: "false"
       ERP_PRODUCT_LIST_URL: "https://your-erp.example.com/api/product-list"
-      ERP_USERNAME: "your_erp_username"
-      ERP_PASSWORD: "your_erp_password"
       # ERP 採購單
       ERP_PURCHASE_ORDER_ENABLED: "false"
       ERP_PURCHASE_ORDER_URL: "https://your-erp.example.com/api/purchase-order"
       # PDCA 重算
       PDCA_RECOMPUTE_ENABLED: "false"
       PDCA_RECOMPUTE_URL: "https://your-pdca.example.com/api/recompute"
-      PDCA_USERNAME: "your_pdca_username"
-      PDCA_PASSWORD: "your_pdca_password"
     depends_on:
       db:
         condition: service_healthy

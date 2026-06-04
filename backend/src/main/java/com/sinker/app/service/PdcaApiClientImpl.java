@@ -1,5 +1,6 @@
 package com.sinker.app.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sinker.app.dto.pdca.PdcaRequest;
 import com.sinker.app.dto.pdca.PdcaResponse;
@@ -9,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.util.Collections;
+import java.util.List;
 
 /**
  * 呼叫外部 PDCA recompute 與 {@link PdcaRecomputeService} 相同之 HTTP 端點，
@@ -42,10 +44,10 @@ public class PdcaApiClientImpl implements PdcaApiClient {
                 weekStart, factory, request.getSchedule().size());
 
         String body = pdcaExternalHttpClient.postRecompute(weekStart, factory);
-        PdcaResponse response = objectMapper.readValue(body, PdcaResponse.class);
-        if (response.getMaterials() == null) {
-            response.setMaterials(Collections.emptyList());
-        }
+        // PDCA API 直接回傳 MaterialItem 陣列，非包裝物件
+        List<PdcaResponse.MaterialItem> items = objectMapper.readValue(
+                body, new TypeReference<List<PdcaResponse.MaterialItem>>() {});
+        PdcaResponse response = new PdcaResponse(items != null ? items : Collections.emptyList());
         log.info("PDCA HTTP recompute parsed {} materials", response.getMaterials().size());
         return response;
     }

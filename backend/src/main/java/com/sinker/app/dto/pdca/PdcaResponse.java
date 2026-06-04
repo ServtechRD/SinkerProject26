@@ -27,112 +27,79 @@ public class PdcaResponse {
 
     @JsonIgnoreProperties(ignoreUnknown = true)
     public static class MaterialItem {
-        @JsonAlias({"material_code"})
+        @JsonAlias({"PrdNo", "material_code"})
         private String materialCode;
-        @JsonAlias({"material_name"})
+
+        @JsonAlias({"PrdNm", "material_name"})
         private String materialName;
+
+        @JsonAlias({"Ut", "unit"})
         private String unit;
-        @JsonAlias({"demand_date"})
+
+        @JsonAlias({"PnDd", "demand_date"})
         private String demandDate;
-        @JsonAlias({"expected_delivery"})
+
+        @JsonAlias({"AddQty", "expected_delivery"})
         private Double expectedDelivery;
-        @JsonAlias({"demand_quantity"})
+
+        @JsonAlias({"SubQty", "demand_quantity"})
         private Double demandQuantity;
-        @JsonAlias({"estimated_inventory"})
+
+        @JsonAlias({"EndQty", "estimated_inventory"})
         private Double estimatedInventory;
+
+        @JsonAlias({"StkQty", "current_stock"})
+        private Double currentStock;
+
+        @JsonAlias({"LastInDate", "last_purchase_date"})
+        private String lastInDate;
+
+        @JsonAlias({"ExpInDate", "expected_arrival_date"})
+        private String expInDate;
+
         @JsonAlias({"safety_stock"})
         private Double safetyStock;
+
         @JsonAlias({"standard_lead_time"})
         private Integer standardLeadTime;
 
         public MaterialItem() {
         }
 
-        public MaterialItem(String materialCode, String materialName, String unit,
-                           String demandDate, Double expectedDelivery,
-                           Double demandQuantity, Double estimatedInventory,
-                           Double safetyStock, Integer standardLeadTime) {
-            this.materialCode = materialCode;
-            this.materialName = materialName;
-            this.unit = unit;
-            this.demandDate = demandDate;
-            this.expectedDelivery = expectedDelivery;
-            this.demandQuantity = demandQuantity;
-            this.estimatedInventory = estimatedInventory;
-            this.safetyStock = safetyStock;
-            this.standardLeadTime = standardLeadTime;
-        }
+        public String getMaterialCode() { return materialCode; }
+        public void setMaterialCode(String materialCode) { this.materialCode = materialCode; }
 
-        public String getMaterialCode() {
-            return materialCode;
-        }
+        public String getMaterialName() { return materialName; }
+        public void setMaterialName(String materialName) { this.materialName = materialName; }
 
-        public void setMaterialCode(String materialCode) {
-            this.materialCode = materialCode;
-        }
+        public String getUnit() { return unit; }
+        public void setUnit(String unit) { this.unit = unit; }
 
-        public String getMaterialName() {
-            return materialName;
-        }
+        public String getDemandDate() { return demandDate; }
+        public void setDemandDate(String demandDate) { this.demandDate = demandDate; }
 
-        public void setMaterialName(String materialName) {
-            this.materialName = materialName;
-        }
+        public Double getExpectedDelivery() { return expectedDelivery; }
+        public void setExpectedDelivery(Double expectedDelivery) { this.expectedDelivery = expectedDelivery; }
 
-        public String getUnit() {
-            return unit;
-        }
+        public Double getDemandQuantity() { return demandQuantity; }
+        public void setDemandQuantity(Double demandQuantity) { this.demandQuantity = demandQuantity; }
 
-        public void setUnit(String unit) {
-            this.unit = unit;
-        }
+        public Double getEstimatedInventory() { return estimatedInventory; }
+        public void setEstimatedInventory(Double estimatedInventory) { this.estimatedInventory = estimatedInventory; }
 
-        public String getDemandDate() {
-            return demandDate;
-        }
+        public Double getCurrentStock() { return currentStock; }
+        public void setCurrentStock(Double currentStock) { this.currentStock = currentStock; }
 
-        public void setDemandDate(String demandDate) {
-            this.demandDate = demandDate;
-        }
+        public String getLastInDate() { return lastInDate; }
+        public void setLastInDate(String lastInDate) { this.lastInDate = lastInDate; }
 
-        public Double getExpectedDelivery() {
-            return expectedDelivery;
-        }
+        public String getExpInDate() { return expInDate; }
+        public void setExpInDate(String expInDate) { this.expInDate = expInDate; }
 
-        public void setExpectedDelivery(Double expectedDelivery) {
-            this.expectedDelivery = expectedDelivery;
-        }
+        public Double getSafetyStock() { return safetyStock; }
+        public void setSafetyStock(Double safetyStock) { this.safetyStock = safetyStock; }
 
-        public Double getDemandQuantity() {
-            return demandQuantity;
-        }
-
-        public void setDemandQuantity(Double demandQuantity) {
-            this.demandQuantity = demandQuantity;
-        }
-
-        public Double getEstimatedInventory() {
-            return estimatedInventory;
-        }
-
-        public void setEstimatedInventory(Double estimatedInventory) {
-            this.estimatedInventory = estimatedInventory;
-        }
-
-        public Double getSafetyStock() {
-            return safetyStock;
-        }
-
-        public void setSafetyStock(Double safetyStock) {
-            this.safetyStock = safetyStock;
-        }
-
-        public Integer getStandardLeadTime() {
-            return standardLeadTime;
-        }
-
-        public void setStandardLeadTime(Integer standardLeadTime) {
-            this.standardLeadTime = standardLeadTime;
-        }
+        public Integer getStandardLeadTime() { return standardLeadTime; }
+        public void setStandardLeadTime(Integer standardLeadTime) { this.standardLeadTime = standardLeadTime; }
     }
 }

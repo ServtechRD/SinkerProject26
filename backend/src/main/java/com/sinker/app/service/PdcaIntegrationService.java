@@ -136,18 +136,33 @@ public class PdcaIntegrationService {
                     demand.setMaterialName(item.getMaterialName());
                     demand.setUnit(item.getUnit());
                     demand.setDemandDate(LocalDate.parse(item.getDemandDate(), DATE_FORMATTER));
-                    demand.setExpectedDelivery(BigDecimal.valueOf(item.getExpectedDelivery()));
-                    demand.setDemandQuantity(BigDecimal.valueOf(item.getDemandQuantity()));
-                    demand.setEstimatedInventory(BigDecimal.valueOf(item.getEstimatedInventory()));
+                    demand.setExpectedDelivery(toBigDecimal(item.getExpectedDelivery()));
+                    demand.setDemandQuantity(toBigDecimal(item.getDemandQuantity()));
+                    demand.setEstimatedInventory(toBigDecimal(item.getEstimatedInventory()));
+                    demand.setCurrentStock(toBigDecimal(item.getCurrentStock()));
                     if (item.getSafetyStock() != null) {
                         demand.setSafetyStock(BigDecimal.valueOf(item.getSafetyStock()));
                     }
                     demand.setStandardLeadTime(item.getStandardLeadTime());
-                    demand.setLastPurchaseDate(null); // Set by purchase module later
+                    demand.setLastPurchaseDate(parseDate(item.getLastInDate()));
+                    demand.setExpectedArrivalDate(parseDate(item.getExpInDate()));
                     demand.setCreatedAt(now);
                     demand.setUpdatedAt(now);
                     return demand;
                 })
                 .collect(Collectors.toList());
+    }
+
+    private static BigDecimal toBigDecimal(Double value) {
+        return value != null ? BigDecimal.valueOf(value) : BigDecimal.ZERO;
+    }
+
+    private LocalDate parseDate(String date) {
+        if (date == null || date.isBlank()) return null;
+        try {
+            return LocalDate.parse(date, DATE_FORMATTER);
+        } catch (Exception e) {
+            return null;
+        }
     }
 }

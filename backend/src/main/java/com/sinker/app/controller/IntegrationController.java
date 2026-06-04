@@ -60,7 +60,7 @@ public class IntegrationController {
     }
 
     @PostMapping("/erp/product-sync")
-    @PreAuthorize("hasRole('admin')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Map<String, Object>> erpProductSync(
             @RequestBody(required = false) ErpProductSyncParam param) {
         if (param == null) {

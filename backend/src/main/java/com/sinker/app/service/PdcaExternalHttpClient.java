@@ -8,6 +8,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDate;
@@ -21,11 +22,14 @@ public class PdcaExternalHttpClient {
 
     private final IntegrationProperties integrationProperties;
     private final RestTemplate integrationRestTemplate;
+    private final ErpTokenService erpTokenService;
 
     public PdcaExternalHttpClient(IntegrationProperties integrationProperties,
-                                  RestTemplate integrationRestTemplate) {
+                                  RestTemplate integrationRestTemplate,
+                                  ErpTokenService erpTokenService) {
         this.integrationProperties = integrationProperties;
         this.integrationRestTemplate = integrationRestTemplate;
+        this.erpTokenService = erpTokenService;
     }
 
     public boolean isConfigured() {
@@ -35,6 +39,7 @@ public class PdcaExternalHttpClient {
 
     /**
      * 呼叫外部 PDCA recompute，回傳 response body（若無 body 則回傳 "{}"）。
+     * 收到 401 時自動清除 token 快取並重試一次。
      *
      * @throws IllegalStateException 未啟用或未設定 URL
      * @throws RestClientException   HTTP 失敗
@@ -48,24 +53,27 @@ public class PdcaExternalHttpClient {
             throw new IllegalArgumentException("factory is required");
         }
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        if (StringUtils.hasText(cfg.getUsername())) {
-            headers.setBasicAuth(cfg.getUsername(), cfg.getPassword() != null ? cfg.getPassword() : "");
-        }
-
         Map<String, Object> body = Map.of(
                 "week_start", weekStart.toString(),
                 "factory", factory
         );
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
+        try {
+            return doPost(cfg.getRecomputeUrl(), body);
+        } catch (HttpClientErrorException.Unauthorized e) {
+            erpTokenService.invalidate();
+            return doPost(cfg.getRecomputeUrl(), body);
+        }
+    }
+
+    private String doPost(String url, Map<String, Object> body) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(erpTokenService.getToken());
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
         ResponseEntity<String> response = integrationRestTemplate.exchange(
-                cfg.getRecomputeUrl(),
-                HttpMethod.POST,
-                entity,
-                String.class
-        );
+                url, HttpMethod.POST, entity, String.class);
 
         String respBody = response.getBody();
         return respBody != null ? respBody : "{}";

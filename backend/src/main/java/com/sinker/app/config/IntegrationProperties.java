@@ -8,9 +8,18 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "app.integrations")
 public class IntegrationProperties {
 
+    private Auth auth = new Auth();
     private Pdca pdca = new Pdca();
     private Erp erp = new Erp();
     private ErpProduct erpProduct = new ErpProduct();
+
+    public Auth getAuth() {
+        return auth;
+    }
+
+    public void setAuth(Auth auth) {
+        this.auth = auth;
+    }
 
     public Pdca getPdca() {
         return pdca;
@@ -36,13 +45,42 @@ public class IntegrationProperties {
         this.erpProduct = erpProduct;
     }
 
+    /** 三個外部系統共用的 JWT 取得設定 */
+    public static class Auth {
+        private String tokenUrl = "";
+        private String account = "";
+        private String salasana = "";
+
+        public String getTokenUrl() {
+            return tokenUrl;
+        }
+
+        public void setTokenUrl(String tokenUrl) {
+            this.tokenUrl = tokenUrl;
+        }
+
+        public String getAccount() {
+            return account;
+        }
+
+        public void setAccount(String account) {
+            this.account = account;
+        }
+
+        public String getSalasana() {
+            return salasana;
+        }
+
+        public void setSalasana(String salasana) {
+            this.salasana = salasana;
+        }
+    }
+
     public static class Pdca {
         /** 是否呼叫外部 PDCA recompute API */
         private boolean enabled = false;
         /** 完整 URL（含 path），例如 https://pdca.example.com/api/recompute */
         private String recomputeUrl = "";
-        private String username = "";
-        private String password = "";
 
         public boolean isEnabled() {
             return enabled;
@@ -59,30 +97,12 @@ public class IntegrationProperties {
         public void setRecomputeUrl(String recomputeUrl) {
             this.recomputeUrl = recomputeUrl;
         }
-
-        public String getUsername() {
-            return username;
-        }
-
-        public void setUsername(String username) {
-            this.username = username;
-        }
-
-        public String getPassword() {
-            return password;
-        }
-
-        public void setPassword(String password) {
-            this.password = password;
-        }
     }
 
     public static class Erp {
         /** 是否呼叫外部 ERP 採購單建立 API */
         private boolean enabled = false;
         private String purchaseOrderUrl = "";
-        private String username = "";
-        private String password = "";
 
         public boolean isEnabled() {
             return enabled;
@@ -99,29 +119,11 @@ public class IntegrationProperties {
         public void setPurchaseOrderUrl(String purchaseOrderUrl) {
             this.purchaseOrderUrl = purchaseOrderUrl;
         }
-
-        public String getUsername() {
-            return username;
-        }
-
-        public void setUsername(String username) {
-            this.username = username;
-        }
-
-        public String getPassword() {
-            return password;
-        }
-
-        public void setPassword(String password) {
-            this.password = password;
-        }
     }
 
     public static class ErpProduct {
         private boolean enabled = false;
         private String productListUrl = "";
-        private String username = "";
-        private String password = "";
 
         public boolean isEnabled() {
             return enabled;
@@ -137,22 +139,6 @@ public class IntegrationProperties {
 
         public void setProductListUrl(String productListUrl) {
             this.productListUrl = productListUrl;
-        }
-
-        public String getUsername() {
-            return username;
-        }
-
-        public void setUsername(String username) {
-            this.username = username;
-        }
-
-        public String getPassword() {
-            return password;
-        }
-
-        public void setPassword(String password) {
-            this.password = password;
         }
     }
 }

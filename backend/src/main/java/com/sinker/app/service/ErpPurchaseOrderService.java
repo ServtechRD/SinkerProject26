@@ -11,6 +11,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
@@ -27,16 +28,20 @@ public class ErpPurchaseOrderService {
 
     private final IntegrationProperties integrationProperties;
     private final RestTemplate integrationRestTemplate;
+    private final ErpTokenService erpTokenService;
 
     public ErpPurchaseOrderService(IntegrationProperties integrationProperties,
-                                   RestTemplate integrationRestTemplate) {
+                                   RestTemplate integrationRestTemplate,
+                                   ErpTokenService erpTokenService) {
         this.integrationProperties = integrationProperties;
         this.integrationRestTemplate = integrationRestTemplate;
+        this.erpTokenService = erpTokenService;
     }
 
     /**
      * 建立採購單。未啟用或未設定 URL 時略過（僅 log），供開發環境使用。
      * 啟用且呼叫失敗時拋出 {@link ExternalApiException}。
+     * 收到 401 時自動清除 token 快取並重試一次。
      */
     public void createPurchaseOrder(LocalDate weekStart, String factory) {
         IntegrationProperties.Erp cfg = integrationProperties.getErp();
@@ -48,31 +53,39 @@ public class ErpPurchaseOrderService {
             throw new IllegalArgumentException("factory is required");
         }
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        if (StringUtils.hasText(cfg.getUsername())) {
-            headers.setBasicAuth(cfg.getUsername(), cfg.getPassword() != null ? cfg.getPassword() : "");
-        }
-
         Map<String, Object> body = Map.of(
                 "week_start", weekStart.toString(),
                 "factory", factory
         );
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
         try {
+            doPost(cfg.getPurchaseOrderUrl(), body, weekStart, factory);
+        } catch (HttpClientErrorException.Unauthorized e) {
+            erpTokenService.invalidate();
+            doPost(cfg.getPurchaseOrderUrl(), body, weekStart, factory);
+        } catch (RestClientException e) {
+            log.error("ERP purchase order HTTP error: weekStart={}, factory={}", weekStart, factory, e);
+            throw new ExternalApiException("ERP purchase order failed: " + e.getMessage(), e);
+        }
+    }
+
+    private void doPost(String url, Map<String, Object> body, LocalDate weekStart, String factory) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.setBearerAuth(erpTokenService.getToken());
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+        try {
             ResponseEntity<String> response = integrationRestTemplate.exchange(
-                    cfg.getPurchaseOrderUrl(),
-                    HttpMethod.POST,
-                    entity,
-                    String.class
-            );
+                    url, HttpMethod.POST, entity, String.class);
             if (response.getStatusCode().is2xxSuccessful()) {
                 log.info("ERP purchase order OK: weekStart={}, factory={}, status={}",
                         weekStart, factory, response.getStatusCode());
             } else {
                 throw new ExternalApiException("ERP purchase order returned " + response.getStatusCode());
             }
+        } catch (HttpClientErrorException.Unauthorized e) {
+            throw e;
         } catch (RestClientException e) {
             log.error("ERP purchase order HTTP error: weekStart={}, factory={}", weekStart, factory, e);
             throw new ExternalApiException("ERP purchase order failed: " + e.getMessage(), e);

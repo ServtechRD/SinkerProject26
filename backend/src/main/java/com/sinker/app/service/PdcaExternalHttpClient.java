@@ -15,7 +15,7 @@ import java.time.LocalDate;
 import java.util.Map;
 
 /**
- * 呼叫設定檔中的 PDCA recompute URL（POST JSON：week_start、factory），與 {@link PdcaRecomputeService} 共用。
+ * 呼叫設定檔中的 PDCA recompute URL（POST JSON：PnDd、Wh），與 {@link PdcaRecomputeService} 共用。
  */
 @Component
 public class PdcaExternalHttpClient {
@@ -32,6 +32,12 @@ public class PdcaExternalHttpClient {
         this.erpTokenService = erpTokenService;
     }
 
+    private static final Map<String, String> FACTORY_CODE_MAP = Map.of(
+            "一廠", "05",
+            "二廠", "02",
+            "三廠", "03"
+    );
+
     public boolean isConfigured() {
         IntegrationProperties.Pdca cfg = integrationProperties.getPdca();
         return cfg.isEnabled() && StringUtils.hasText(cfg.getRecomputeUrl());
@@ -41,8 +47,9 @@ public class PdcaExternalHttpClient {
      * 呼叫外部 PDCA recompute，回傳 response body（若無 body 則回傳 "{}"）。
      * 收到 401 時自動清除 token 快取並重試一次。
      *
-     * @throws IllegalStateException 未啟用或未設定 URL
-     * @throws RestClientException   HTTP 失敗
+     * @throws IllegalStateException    未啟用或未設定 URL
+     * @throws IllegalArgumentException factory 無對應代號
+     * @throws RestClientException      HTTP 失敗
      */
     public String postRecompute(LocalDate weekStart, String factory) {
         IntegrationProperties.Pdca cfg = integrationProperties.getPdca();
@@ -53,9 +60,14 @@ public class PdcaExternalHttpClient {
             throw new IllegalArgumentException("factory is required");
         }
 
+        String wh = FACTORY_CODE_MAP.get(factory);
+        if (wh == null) {
+            throw new IllegalArgumentException("未知廠別: " + factory);
+        }
+
         Map<String, Object> body = Map.of(
-                "week_start", weekStart.toString(),
-                "factory", factory
+                "PnDd", weekStart.toString(),
+                "Wh", wh
         );
 
         try {

@@ -2,6 +2,7 @@ package com.sinker.app.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sinker.app.dto.pdca.PdcaRawItem;
 import com.sinker.app.dto.pdca.PdcaRequest;
 import com.sinker.app.dto.pdca.PdcaResponse;
 import org.slf4j.Logger;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 呼叫外部 PDCA recompute 與 {@link PdcaRecomputeService} 相同之 HTTP 端點，
@@ -44,12 +46,30 @@ public class PdcaApiClientImpl implements PdcaApiClient {
                 weekStart, factory, request.getSchedule().size());
 
         String body = pdcaExternalHttpClient.postRecompute(weekStart, factory);
-        log.info("PDCA raw response body: {}", body);
-        // PDCA API 直接回傳 MaterialItem 陣列，非包裝物件
-        List<PdcaResponse.MaterialItem> items = objectMapper.readValue(
-                body, new TypeReference<List<PdcaResponse.MaterialItem>>() {});
-        PdcaResponse response = new PdcaResponse(items != null ? items : Collections.emptyList());
-        log.info("PDCA HTTP recompute parsed {} materials", response.getMaterials().size());
-        return response;
+        // PDCA API 回傳巢狀結構：外層為原料清單，內層 PnQtys 為每日數量，展開為 MaterialItem
+        List<PdcaRawItem> rawItems = objectMapper.readValue(body, new TypeReference<List<PdcaRawItem>>() {});
+        List<PdcaResponse.MaterialItem> materials = rawItems == null ? Collections.emptyList() :
+                rawItems.stream()
+                        .filter(raw -> raw.getPnQtys() != null)
+                        .flatMap(raw -> raw.getPnQtys().stream()
+                                .map(qty -> new PdcaResponse.MaterialItem(
+                                        raw.getPrdNo(),
+                                        raw.getPrdNm(),
+                                        raw.getUt(),
+                                        qty.getPnDd(),
+                                        toDouble(qty.getAddQty()),
+                                        toDouble(qty.getSubQty()),
+                                        toDouble(qty.getEndQty()),
+                                        null,
+                                        null
+                                ))
+                        )
+                        .collect(Collectors.toList());
+        log.info("PDCA HTTP recompute parsed {} material×date rows", materials.size());
+        return new PdcaResponse(materials);
+    }
+
+    private static double toDouble(Double value) {
+        return value != null ? value : 0.0;
     }
 }

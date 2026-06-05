@@ -1,38 +1,39 @@
 package com.sinker.app.dto.pdca;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class PdcaRawItem {
 
-    private String PrdNo;
-    private String PrdNm;
-    private String Ut;
-    private String LastInDate;
-    private Double StkQty;
-    private String ExpInDate;
-    private List<PdcaRawPnQty> PnQtys;
+    @JsonProperty("PrdNo")
+    private String prdNo;
 
-    public String getPrdNo() { return PrdNo; }
-    public void setPrdNo(String PrdNo) { this.PrdNo = PrdNo; }
+    @JsonProperty("PrdNm")
+    private String prdNm;
 
-    public String getPrdNm() { return PrdNm; }
-    public void setPrdNm(String PrdNm) { this.PrdNm = PrdNm; }
+    @JsonProperty("Ut")
+    private String ut;
 
-    public String getUt() { return Ut; }
-    public void setUt(String Ut) { this.Ut = Ut; }
+    @JsonProperty("LastInDate")
+    private String lastInDate;
 
-    public String getLastInDate() { return LastInDate; }
-    public void setLastInDate(String LastInDate) { this.LastInDate = LastInDate; }
+    @JsonProperty("StkQty")
+    private Double stkQty;
 
-    public Double getStkQty() { return StkQty; }
-    public void setStkQty(Double StkQty) { this.StkQty = StkQty; }
+    @JsonProperty("ExpInDate")
+    private String expInDate;
 
-    public String getExpInDate() { return ExpInDate; }
-    public void setExpInDate(String ExpInDate) { this.ExpInDate = ExpInDate; }
+    @JsonProperty("PnQtys")
+    private List<PdcaRawPnQty> pnQtys;
 
-    public List<PdcaRawPnQty> getPnQtys() { return PnQtys; }
-    public void setPnQtys(List<PdcaRawPnQty> PnQtys) { this.PnQtys = PnQtys; }
+    public String getPrdNo() { return prdNo; }
+    public String getPrdNm() { return prdNm; }
+    public String getUt() { return ut; }
+    public String getLastInDate() { return lastInDate; }
+    public Double getStkQty() { return stkQty; }
+    public String getExpInDate() { return expInDate; }
+    public List<PdcaRawPnQty> getPnQtys() { return pnQtys; }
 }

@@ -1,24 +1,25 @@
 package com.sinker.app.dto.pdca;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public class PdcaRawPnQty {
 
-    private String PnDd;
-    private Double AddQty;
-    private Double SubQty;
-    private Double EndQty;
+    @JsonProperty("PnDd")
+    private String pnDd;
 
-    public String getPnDd() { return PnDd; }
-    public void setPnDd(String PnDd) { this.PnDd = PnDd; }
+    @JsonProperty("AddQty")
+    private Double addQty;
 
-    public Double getAddQty() { return AddQty; }
-    public void setAddQty(Double AddQty) { this.AddQty = AddQty; }
+    @JsonProperty("SubQty")
+    private Double subQty;
 
-    public Double getSubQty() { return SubQty; }
-    public void setSubQty(Double SubQty) { this.SubQty = SubQty; }
+    @JsonProperty("EndQty")
+    private Double endQty;
 
-    public Double getEndQty() { return EndQty; }
-    public void setEndQty(Double EndQty) { this.EndQty = EndQty; }
+    public String getPnDd() { return pnDd; }
+    public Double getAddQty() { return addQty; }
+    public Double getSubQty() { return subQty; }
+    public Double getEndQty() { return endQty; }
 }

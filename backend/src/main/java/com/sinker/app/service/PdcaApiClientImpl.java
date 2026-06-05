@@ -2,6 +2,7 @@ package com.sinker.app.service;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sinker.app.dto.pdca.PdcaRawItem;
 import com.sinker.app.dto.pdca.PdcaRequest;
 import com.sinker.app.dto.pdca.PdcaResponse;
 import org.slf4j.Logger;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.util.Collections;
 import java.util.List;
+import java.util.stream.Collectors;
 
 /**
  * 呼叫外部 PDCA recompute，將回應 JSON 解析為 {@link PdcaResponse}
@@ -43,10 +45,29 @@ public class PdcaApiClientImpl implements PdcaApiClient {
         log.info("PDCA HTTP recompute: weekStart={}, factory={}", weekStart, factory);
 
         String body = pdcaExternalHttpClient.postRecompute(weekStart, factory);
-        List<PdcaResponse.MaterialItem> items = objectMapper.readValue(
-                body, new TypeReference<List<PdcaResponse.MaterialItem>>() {});
-        List<PdcaResponse.MaterialItem> materials = items != null ? items : Collections.emptyList();
-        log.info("PDCA HTTP recompute parsed {} rows", materials.size());
+        // PDCA API 回傳巢狀結構：外層為原料，內層 PnQtys 為每日數量，展開為每日一筆 MaterialItem
+        List<PdcaRawItem> rawItems = objectMapper.readValue(body, new TypeReference<List<PdcaRawItem>>() {});
+        List<PdcaResponse.MaterialItem> materials = rawItems == null ? Collections.emptyList() :
+                rawItems.stream()
+                        .filter(raw -> raw.getPnQtys() != null)
+                        .flatMap(raw -> raw.getPnQtys().stream()
+                                .map(qty -> {
+                                    PdcaResponse.MaterialItem item = new PdcaResponse.MaterialItem();
+                                    item.setMaterialCode(raw.getPrdNo());
+                                    item.setMaterialName(raw.getPrdNm());
+                                    item.setUnit(raw.getUt());
+                                    item.setCurrentStock(raw.getStkQty());
+                                    item.setLastInDate(raw.getLastInDate());
+                                    item.setExpInDate(raw.getExpInDate());
+                                    item.setDemandDate(qty.getPnDd());
+                                    item.setExpectedDelivery(qty.getAddQty());
+                                    item.setDemandQuantity(qty.getSubQty());
+                                    item.setEstimatedInventory(qty.getEndQty());
+                                    return item;
+                                })
+                        )
+                        .collect(Collectors.toList());
+        log.info("PDCA HTTP recompute parsed {} material×date rows", materials.size());
         return new PdcaResponse(materials);
     }
 }

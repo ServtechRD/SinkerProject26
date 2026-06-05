@@ -66,6 +66,21 @@ public class PdcaResponse {
         public MaterialItem() {
         }
 
+        public MaterialItem(String materialCode, String materialName, String unit,
+                            String demandDate, Double expectedDelivery,
+                            Double demandQuantity, Double estimatedInventory,
+                            Double safetyStock, Integer standardLeadTime) {
+            this.materialCode = materialCode;
+            this.materialName = materialName;
+            this.unit = unit;
+            this.demandDate = demandDate;
+            this.expectedDelivery = expectedDelivery;
+            this.demandQuantity = demandQuantity;
+            this.estimatedInventory = estimatedInventory;
+            this.safetyStock = safetyStock;
+            this.standardLeadTime = standardLeadTime;
+        }
+
         public String getMaterialCode() { return materialCode; }
         public void setMaterialCode(String materialCode) { this.materialCode = materialCode; }
 

@@ -72,8 +72,10 @@ public class MaterialPurchaseService {
 
         // Prepare ERP request
         ErpOrderRequest erpRequest = new ErpOrderRequest(
+                1,
                 purchase.getProductCode(),
-                purchase.getSemiProductCode(),
+                purchase.getProductName(),
+                purchase.getFactory(),
                 purchase.getQuantity(),
                 demandDate
         );

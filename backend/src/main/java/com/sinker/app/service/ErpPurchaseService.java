@@ -1,52 +1,71 @@
 package com.sinker.app.service;
 
+import com.sinker.app.dto.erp.ErpCreatePurchaseOrderRequest;
+import com.sinker.app.dto.erp.ErpCreatePurchaseOrderRequest.Detail;
 import com.sinker.app.dto.erp.ErpOrderRequest;
 import com.sinker.app.dto.erp.ErpOrderResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 
-/**
- * ERP Purchase Service Stub
- * This is a temporary stub implementation for ERP API integration.
- * Replace with actual ERP API client when ERP system details are available.
- */
 @Service
 public class ErpPurchaseService {
 
     private static final Logger log = LoggerFactory.getLogger(ErpPurchaseService.class);
-    private static final AtomicInteger orderSequence = new AtomicInteger(1);
+    private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
 
-    /**
-     * Stub method to create an ERP purchase order
-     * @param request ERP order request containing item details
-     * @return ERP order response with generated order number
-     * @throws RuntimeException if ERP service fails (simulated)
-     */
+    private final AtomicInteger dailySequence = new AtomicInteger(1);
+    private volatile String lastDate = "";
+
     public ErpOrderResponse createOrder(ErpOrderRequest request) {
-        log.info("ERP API call - createOrder: itm={}, prdNo={}, qty={}, demandDate={}",
-                request.getItm(), request.getPrdNo(), request.getQty(), request.getDemandDate());
+        String webNo = generateWebNo();
+        ErpCreatePurchaseOrderRequest body = buildRequest(webNo, request);
 
-        // Simulate network delay (200-500ms)
-        try {
-            Thread.sleep(300);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new RuntimeException("ERP service interrupted", e);
+        log.info("ERP createOrder: WebNo={}, PrdNo={}, Wh={}, Qty={}",
+                webNo, request.getPrdNo(), request.getWh(), request.getQty());
+
+        // TODO: 替換為實際 HTTP 呼叫（參考 ErpPurchaseOrderService）
+        return new ErpOrderResponse(webNo, "SUCCESS");
+    }
+
+    private synchronized String generateWebNo() {
+        String today = LocalDate.now().format(DATE_FMT);
+        if (!today.equals(lastDate)) {
+            lastDate = today;
+            dailySequence.set(1);
         }
+        return String.format("PO%s%04d", today, dailySequence.getAndIncrement());
+    }
 
-        // Generate mock order number: ERP-YYYY-NNNN
-        String year = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy"));
-        String orderNo = String.format("ERP-%s-%04d", year, orderSequence.getAndIncrement());
+    private ErpCreatePurchaseOrderRequest buildRequest(String webNo, ErpOrderRequest request) {
+        Detail detail = new Detail(
+                request.getItm(),
+                request.getPrdNo(),
+                request.getPrdName(),
+                request.getWh(),
+                "",
+                request.getQty(),
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                BigDecimal.ZERO,
+                ""
+        );
 
-        ErpOrderResponse response = new ErpOrderResponse(orderNo, "SUCCESS");
-
-        log.info("ERP API response - orderNo={}, status={}", response.getOrderNo(), response.getStatus());
-
-        return response;
+        return new ErpCreatePurchaseOrderRequest(
+                webNo,
+                "0000",
+                "",
+                LocalDate.now().toString(),
+                request.getDemandDate().toString(),
+                "",
+                1,
+                List.of(detail)
+        );
     }
 }

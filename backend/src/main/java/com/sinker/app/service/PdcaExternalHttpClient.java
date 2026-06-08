@@ -1,6 +1,8 @@
 package com.sinker.app.service;
 
 import com.sinker.app.config.IntegrationProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -19,6 +21,8 @@ import java.util.Map;
  */
 @Component
 public class PdcaExternalHttpClient {
+
+    private static final Logger log = LoggerFactory.getLogger(PdcaExternalHttpClient.class);
 
     private final IntegrationProperties integrationProperties;
     private final RestTemplate integrationRestTemplate;
@@ -70,9 +74,12 @@ public class PdcaExternalHttpClient {
                 "Wh", wh
         );
 
+        log.info("呼叫外部 PDCA API: url={}, body={}", cfg.getRecomputeUrl(), body);
+
         try {
             return doPost(cfg.getRecomputeUrl(), body);
         } catch (HttpClientErrorException.Unauthorized e) {
+            log.warn("PDCA API 回傳 401，清除 token 後重試: url={}, body={}", cfg.getRecomputeUrl(), body);
             erpTokenService.invalidate();
             return doPost(cfg.getRecomputeUrl(), body);
         }

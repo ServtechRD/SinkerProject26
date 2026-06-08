@@ -12,5 +12,7 @@ public interface MaterialDemandRepository extends JpaRepository<MaterialDemand, 
 
     List<MaterialDemand> findByWeekStartAndFactoryOrderByMaterialCodeAsc(LocalDate weekStart, String factory);
 
+    List<MaterialDemand> findByFactoryAndDemandDateBetweenOrderByMaterialCodeAsc(String factory, LocalDate startDate, LocalDate endDate);
+
     void deleteByWeekStartAndFactory(LocalDate weekStart, String factory);
 }

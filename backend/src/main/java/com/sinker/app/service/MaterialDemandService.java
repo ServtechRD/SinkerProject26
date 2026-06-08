@@ -38,29 +38,28 @@ public class MaterialDemandService {
     private final JdbcTemplate jdbcTemplate;
     private final PdcaRecomputeService pdcaRecomputeService;
     private final ErpPurchaseOrderService erpPurchaseOrderService;
-    private final PdcaIntegrationService pdcaIntegrationService;
 
     public MaterialDemandService(MaterialDemandRepository materialDemandRepository,
                                  MaterialDemandExcelParser excelParser,
                                  JdbcTemplate jdbcTemplate,
                                  PdcaRecomputeService pdcaRecomputeService,
-                                 ErpPurchaseOrderService erpPurchaseOrderService,
-                                 PdcaIntegrationService pdcaIntegrationService) {
+                                 ErpPurchaseOrderService erpPurchaseOrderService) {
         this.materialDemandRepository = materialDemandRepository;
         this.excelParser = excelParser;
         this.jdbcTemplate = jdbcTemplate;
         this.pdcaRecomputeService = pdcaRecomputeService;
         this.erpPurchaseOrderService = erpPurchaseOrderService;
-        this.pdcaIntegrationService = pdcaIntegrationService;
     }
 
-    /**
-     * 查詢：呼叫 PDCA（外部 URL 或 URL 未設定時固定假資料），並覆寫 DB 後回傳。
-     */
-    @Transactional
+    @Transactional(readOnly = true)
     public List<MaterialDemandDTO> queryMaterialDemand(LocalDate weekStart, String factory) {
-        log.info("Querying material demand via PDCA: weekStart={}, factory={}", weekStart, factory);
-        return pdcaIntegrationService.syncMaterialDemandFromPdca(weekStart, factory);
+        log.info("Querying material demand from DB: weekStart={}, factory={}", weekStart, factory);
+        LocalDate endDate = weekStart.plusDays(6);
+        return materialDemandRepository
+                .findByFactoryAndDemandDateBetweenOrderByMaterialCodeAsc(factory, weekStart, endDate)
+                .stream()
+                .map(MaterialDemandDTO::fromEntity)
+                .collect(Collectors.toList());
     }
 
     @Transactional

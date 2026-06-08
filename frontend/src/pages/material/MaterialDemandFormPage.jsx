@@ -81,6 +81,8 @@ export default function MaterialDemandFormPage() {
   const [queryClicked, setQueryClicked] = useState(false)
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(false)
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(20)
 
   const [editMode, setEditMode] = useState(false)
   const [purchaseQuantityById, setPurchaseQuantityById] = useState({})
@@ -148,6 +150,7 @@ export default function MaterialDemandFormPage() {
     getMaterialDemand(paramWeek, paramFactory)
       .then(async (result) => {
         setData(Array.isArray(result) ? result : [])
+        setPage(1)
         if (!result?.length) toast.info('查無資料')
         try {
           const meta = await getMaterialDemandLastEditSavedAt(paramWeek, paramFactory)
@@ -177,6 +180,7 @@ export default function MaterialDemandFormPage() {
     try {
       const result = await getMaterialDemand(weekStart, factory)
       setData(Array.isArray(result) ? result : [])
+      setPage(1)
       if (!result?.length) toast.info('查無資料')
       try {
         const meta = await getMaterialDemandLastEditSavedAt(weekStart, factory)
@@ -377,6 +381,9 @@ export default function MaterialDemandFormPage() {
     window.URL.revokeObjectURL(url)
   }
 
+  const totalPages = Math.ceil(data.length / pageSize)
+  const pageRows = data.slice((page - 1) * pageSize, page * pageSize)
+
   if (!canView) {
     return (
       <div className="material-demand-page">
@@ -529,57 +536,94 @@ export default function MaterialDemandFormPage() {
           ) : !data.length ? (
             <div className="material-demand-empty">查無資料</div>
           ) : (
-            <div className="material-demand-table-wrapper">
-              <table className="material-demand-table">
-                <thead>
-                  <tr>
-                    <th>品號</th>
-                    <th>品名</th>
-                    <th>單位</th>
-                    <th>上次進貨日</th>
-                    <th>需求日</th>
-                    <th className="numeric-col">現有庫存</th>
-                    <th className="numeric-col">安全庫存量</th>
-                    <th className="numeric-col">標準交期(天)</th>
-                    <th>預計進廠日</th>
-                    <th className="numeric-col">預交量</th>
-                    <th className="numeric-col">需求量</th>
-                    <th className="numeric-col">預計庫存量</th>
-                    <th className="numeric-col">採購量</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.map((row) => (
-                    <tr key={row.id}>
-                      <td>{row.materialCode}</td>
-                      <td>{row.materialName}</td>
-                      <td>{row.unit ?? '-'}</td>
-                      <td>{row.lastPurchaseDate ?? '-'}</td>
-                      <td>{row.demandDate ?? '-'}</td>
-                      <td className="numeric-col">{formatDemandNumeric(row.currentStock)}</td>
-                      <td className="numeric-col">{formatDemandNumeric(row.safetyStock)}</td>
-                      <td className="numeric-col">{row.standardLeadTime ?? '-'}</td>
-                      <td>{row.expectedArrivalDate ?? '-'}</td>
-                      <td className="numeric-col">{formatDemandNumeric(row.expectedDelivery)}</td>
-                      <td className="numeric-col">{formatDemandNumeric(row.demandQuantity)}</td>
-                      <td className="numeric-col">{formatDemandNumeric(computedEstimatedInventory(row))}</td>
-                      <td className="numeric-col">
-                        {editMode ? (
-                          <input
-                            type="text"
-                            className="material-demand-edit-input"
-                            value={purchaseQuantityById[row.id] ?? '0'}
-                            onChange={(e) => setPurchaseQuantity(row.id, e.target.value)}
-                          />
-                        ) : (
-                          formatDemandNumeric(row.purchaseQuantity)
-                        )}
-                      </td>
+            <>
+              <div className="material-demand-table-wrapper">
+                <table className="material-demand-table">
+                  <thead>
+                    <tr>
+                      <th>品號</th>
+                      <th>品名</th>
+                      <th>單位</th>
+                      <th>上次進貨日</th>
+                      <th>需求日</th>
+                      <th className="numeric-col">現有庫存</th>
+                      <th className="numeric-col">安全庫存量</th>
+                      <th className="numeric-col">標準交期(天)</th>
+                      <th>預計進廠日</th>
+                      <th className="numeric-col">預交量</th>
+                      <th className="numeric-col">需求量</th>
+                      <th className="numeric-col">預計庫存量</th>
+                      <th className="numeric-col">採購量</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {pageRows.map((row) => (
+                      <tr key={row.id}>
+                        <td>{row.materialCode}</td>
+                        <td>{row.materialName}</td>
+                        <td>{row.unit ?? '-'}</td>
+                        <td>{row.lastPurchaseDate ?? '-'}</td>
+                        <td>{row.demandDate ?? '-'}</td>
+                        <td className="numeric-col">{formatDemandNumeric(row.currentStock)}</td>
+                        <td className="numeric-col">{formatDemandNumeric(row.safetyStock)}</td>
+                        <td className="numeric-col">{row.standardLeadTime ?? '-'}</td>
+                        <td>{row.expectedArrivalDate ?? '-'}</td>
+                        <td className="numeric-col">{formatDemandNumeric(row.expectedDelivery)}</td>
+                        <td className="numeric-col">{formatDemandNumeric(row.demandQuantity)}</td>
+                        <td className="numeric-col">{formatDemandNumeric(computedEstimatedInventory(row))}</td>
+                        <td className="numeric-col">
+                          {editMode ? (
+                            <input
+                              type="text"
+                              className="material-demand-edit-input"
+                              value={purchaseQuantityById[row.id] ?? '0'}
+                              onChange={(e) => setPurchaseQuantity(row.id, e.target.value)}
+                            />
+                          ) : (
+                            formatDemandNumeric(row.purchaseQuantity)
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="material-demand-pagination">
+                <span className="material-demand-pagination-info">共 {data.length} 筆</span>
+                <div className="material-demand-pagination-buttons">
+                  <button
+                    type="button"
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    disabled={page === 1}
+                  >
+                    上一頁
+                  </button>
+                  <span className="material-demand-pagination-page">
+                    第 {page} / {totalPages} 頁
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={page === totalPages}
+                  >
+                    下一頁
+                  </button>
+                </div>
+                <div className="material-demand-pagination-size">
+                  每頁
+                  <select
+                    value={pageSize}
+                    onChange={(e) => { setPageSize(Number(e.target.value)); setPage(1) }}
+                    className="form-select--sm"
+                  >
+                    <option value={10}>10</option>
+                    <option value={20}>20</option>
+                    <option value={50}>50</option>
+                  </select>
+                  筆
+                </div>
+              </div>
+            </>
           )}
         </section>
       )}

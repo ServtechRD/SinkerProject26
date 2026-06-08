@@ -224,6 +224,58 @@
   to { transform: rotate(360deg); }
 }
 
+.form-select--sm {
+  padding: 3px 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 0.85rem;
+}
+
+.material-demand-pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  font-size: 0.875rem;
+}
+
+.material-demand-pagination-info {
+  color: #6b7280;
+}
+
+.material-demand-pagination-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.material-demand-pagination-buttons button {
+  padding: 4px 10px;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  background: #fff;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.material-demand-pagination-buttons button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.material-demand-pagination-page {
+  color: #374151;
+  min-width: 90px;
+  text-align: center;
+}
+
+.material-demand-pagination-size {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #6b7280;
+}
+
 @media (max-width: 768px) {
   .material-demand-filters {
     flex-direction: column;

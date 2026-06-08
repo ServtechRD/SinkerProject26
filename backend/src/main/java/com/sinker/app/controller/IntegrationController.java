@@ -7,8 +7,10 @@ import com.sinker.app.service.PdcaRecomputeService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.format.annotation.DateTimeFormat;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -66,9 +68,19 @@ public class IntegrationController {
         if (param == null) {
             param = new ErpProductSyncParam();
         }
+        if (erpProductSyncService.isRunning()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("message", "同步已在執行中，請稍後再試"));
+        }
         log.info("POST /api/integrations/erp/product-sync isOnlyUpdate={}, prdNo='{}', pageSize={}",
                 param.getIsOnlyUpdate(), param.getPrdNo(), param.getPageSize());
-        Map<String, Object> result = erpProductSyncService.syncProducts(param);
-        return ResponseEntity.ok(result);
+        erpProductSyncService.syncProductsAsync(param);
+        return ResponseEntity.accepted().body(Map.of("message", "同步已開始"));
+    }
+
+    @GetMapping("/erp/product-sync/status")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<Map<String, Object>> erpProductSyncStatus() {
+        return ResponseEntity.ok(erpProductSyncService.getSyncStatus());
     }
 }

@@ -8,6 +8,7 @@ import com.sinker.app.entity.Product;
 import com.sinker.app.repository.ProductRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -15,6 +16,7 @@ import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 @Service
@@ -26,12 +28,52 @@ public class ErpProductSyncService {
     private final ErpProductSyncClient client;
     private final ProductRepository productRepository;
 
+    private final AtomicBoolean running = new AtomicBoolean(false);
+    private volatile LocalDateTime lastStartedAt = null;
+    private volatile LocalDateTime lastFinishedAt = null;
+    private volatile Map<String, Object> lastResult = null;
+    private volatile String lastError = null;
+
     public ErpProductSyncService(ErpProductSyncClient client, ProductRepository productRepository) {
         this.client = client;
         this.productRepository = productRepository;
     }
 
-    public Map<String, Object> syncProducts(ErpProductSyncParam param) {
+    public Map<String, Object> getSyncStatus() {
+        Map<String, Object> status = new LinkedHashMap<>();
+        status.put("running", running.get());
+        status.put("lastStartedAt", lastStartedAt);
+        status.put("lastFinishedAt", lastFinishedAt);
+        status.put("lastResult", lastResult);
+        status.put("lastError", lastError);
+        return status;
+    }
+
+    public boolean isRunning() {
+        return running.get();
+    }
+
+    @Async
+    public void syncProductsAsync(ErpProductSyncParam param) {
+        if (!running.compareAndSet(false, true)) {
+            log.warn("ERP product sync already running, skipping duplicate trigger");
+            return;
+        }
+        lastStartedAt = LocalDateTime.now();
+        lastError = null;
+        try {
+            Map<String, Object> result = doSync(param);
+            lastResult = result;
+        } catch (Exception e) {
+            lastError = e.getMessage();
+            log.error("ERP product sync failed", e);
+        } finally {
+            lastFinishedAt = LocalDateTime.now();
+            running.set(false);
+        }
+    }
+
+    private Map<String, Object> doSync(ErpProductSyncParam param) {
         if (!client.isConfigured()) {
             throw new IllegalStateException("ERP product sync not configured");
         }

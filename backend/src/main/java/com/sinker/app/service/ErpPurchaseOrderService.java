@@ -31,6 +31,11 @@ public class ErpPurchaseOrderService {
 
     private static final Logger log = LoggerFactory.getLogger(ErpPurchaseOrderService.class);
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyyMMdd");
+    private static final java.util.Map<String, String> FACTORY_CODE_MAP = java.util.Map.of(
+            "一廠", "05",
+            "二廠", "02",
+            "三廠", "03"
+    );
 
     private final AtomicInteger dailySequence = new AtomicInteger(1);
     private volatile String lastDate = "";
@@ -92,7 +97,7 @@ public class ErpPurchaseOrderService {
                     i + 1,
                     d.getMaterialCode(),
                     d.getMaterialName(),
-                    d.getFactory(),
+                    FACTORY_CODE_MAP.getOrDefault(d.getFactory(), d.getFactory()),
                     d.getUnit(),
                     d.getPurchaseQuantity(),
                     BigDecimal.ZERO,

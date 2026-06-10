@@ -4,8 +4,10 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sinker.app.config.IntegrationProperties;
 import com.sinker.app.dto.erp.ErpCreatePurchaseOrderRequest;
+import com.sinker.app.entity.ErpPurchaseOrderRecord;
 import com.sinker.app.entity.MaterialDemand;
 import com.sinker.app.exception.ExternalApiException;
+import com.sinker.app.repository.ErpPurchaseOrderRecordRepository;
 import com.sinker.app.repository.MaterialDemandRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,9 +24,11 @@ import org.springframework.web.client.RestTemplate;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -46,23 +50,28 @@ public class ErpPurchaseOrderService {
     private final RestTemplate integrationRestTemplate;
     private final ErpTokenService erpTokenService;
     private final MaterialDemandRepository materialDemandRepository;
+    private final ErpPurchaseOrderRecordRepository erpPurchaseOrderRecordRepository;
     private final ObjectMapper objectMapper;
 
     public ErpPurchaseOrderService(IntegrationProperties integrationProperties,
                                    RestTemplate integrationRestTemplate,
                                    ErpTokenService erpTokenService,
                                    MaterialDemandRepository materialDemandRepository,
+                                   ErpPurchaseOrderRecordRepository erpPurchaseOrderRecordRepository,
                                    ObjectMapper objectMapper) {
         this.integrationProperties = integrationProperties;
         this.integrationRestTemplate = integrationRestTemplate;
         this.erpTokenService = erpTokenService;
         this.materialDemandRepository = materialDemandRepository;
+        this.erpPurchaseOrderRecordRepository = erpPurchaseOrderRecordRepository;
         this.objectMapper = objectMapper;
     }
 
     /**
-     * 建立採購單。未啟用或未設定 URL 時略過（僅 log），供開發環境使用。
-     * 啟用且呼叫失敗時拋出 {@link ExternalApiException}。
+     * 建立或修改採購單。
+     * - 若 erp_purchase_order 已有該週+廠區的採購單號 → PoNo 帶入單號，呼叫 ERP 修改
+     * - 若尚無紀錄 → PoNo 空字串，呼叫 ERP 新建，並將回傳的採購單號存入 erp_purchase_order
+     * 未啟用或未設定 URL 時略過（僅 log），供開發環境使用。
      * 收到 401 時自動清除 token 快取並重試一次。
      */
     public void createPurchaseOrder(LocalDate weekStart, String factory) {
@@ -87,6 +96,11 @@ public class ErpPurchaseOrderService {
                     weekStart, factory);
             return;
         }
+
+        Optional<ErpPurchaseOrderRecord> existing =
+                erpPurchaseOrderRecordRepository.findByWeekStartAndFactory(weekStart, factory);
+        String existingPoNo = existing.map(ErpPurchaseOrderRecord::getPoNo).orElse(null);
+        boolean isUpdate = existingPoNo != null;
 
         String webNo = generateWebNo();
 
@@ -118,29 +132,55 @@ public class ErpPurchaseOrderService {
                 "B105-2",
                 LocalDate.now().toString(),
                 estDd.toString(),
-                "",
+                isUpdate ? existingPoNo : "",
                 1,
                 details
         );
 
         try {
-            log.info("ERP createPurchaseOrder request: webNo={}, factory={}, detailCount={}, body={}",
-                    webNo, factory, details.size(), objectMapper.writeValueAsString(body));
+            log.info("ERP {} request: webNo={}, factory={}, poNo={}, detailCount={}, body={}",
+                    isUpdate ? "updatePurchaseOrder" : "createPurchaseOrder",
+                    webNo, factory, isUpdate ? existingPoNo : "(new)",
+                    details.size(), objectMapper.writeValueAsString(body));
         } catch (JsonProcessingException e) {
-            log.info("ERP createPurchaseOrder request: webNo={}, factory={}, detailCount={} (body serialization failed)",
-                    webNo, factory, details.size());
+            log.info("ERP {} request: webNo={}, factory={}, poNo={}, detailCount={} (body serialization failed)",
+                    isUpdate ? "updatePurchaseOrder" : "createPurchaseOrder",
+                    webNo, factory, isUpdate ? existingPoNo : "(new)", details.size());
         }
 
+        String returnedPoNo;
         try {
-            doPost(cfg.getPurchaseOrderUrl(), body, weekStart, factory, webNo);
+            returnedPoNo = doPost(cfg.getPurchaseOrderUrl(), body, weekStart, factory, webNo);
         } catch (HttpClientErrorException.Unauthorized e) {
             erpTokenService.invalidate();
-            doPost(cfg.getPurchaseOrderUrl(), body, weekStart, factory, webNo);
+            returnedPoNo = doPost(cfg.getPurchaseOrderUrl(), body, weekStart, factory, webNo);
         } catch (RestClientException e) {
             log.error("ERP purchase order HTTP error: weekStart={}, factory={}", weekStart, factory, e);
             String reason = e.getMessage() == null ? "unknown" : e.getMessage().strip().replaceAll("\\s+", " ");
             throw new ExternalApiException("ERP purchase order failed: " + reason, e);
         }
+
+        savePoNo(weekStart, factory, isUpdate ? existingPoNo : returnedPoNo, existing.orElse(null));
+    }
+
+    private void savePoNo(LocalDate weekStart, String factory, String poNo,
+                          ErpPurchaseOrderRecord existing) {
+        if (poNo == null || poNo.isBlank()) {
+            log.warn("ERP purchase order: response poNo is blank, skip saving: weekStart={}, factory={}",
+                    weekStart, factory);
+            return;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        ErpPurchaseOrderRecord record = existing != null ? existing : new ErpPurchaseOrderRecord();
+        if (existing == null) {
+            record.setWeekStart(weekStart);
+            record.setFactory(factory);
+            record.setCreatedAt(now);
+        }
+        record.setPoNo(poNo);
+        record.setUpdatedAt(now);
+        erpPurchaseOrderRecordRepository.save(record);
+        log.info("ERP purchase order record saved: weekStart={}, factory={}, poNo={}", weekStart, factory, poNo);
     }
 
     private synchronized String generateWebNo() {
@@ -152,8 +192,8 @@ public class ErpPurchaseOrderService {
         return String.format("PO%s%04d", today, dailySequence.getAndIncrement());
     }
 
-    private void doPost(String url, ErpCreatePurchaseOrderRequest body,
-                        LocalDate weekStart, String factory, String webNo) {
+    private String doPost(String url, ErpCreatePurchaseOrderRequest body,
+                          LocalDate weekStart, String factory, String webNo) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.setBearerAuth(erpTokenService.getToken());
@@ -165,6 +205,7 @@ public class ErpPurchaseOrderService {
             if (response.getStatusCode().is2xxSuccessful()) {
                 log.info("ERP purchase order OK: weekStart={}, factory={}, webNo={}, status={}, response={}",
                         weekStart, factory, webNo, response.getStatusCode(), response.getBody());
+                return response.getBody();
             } else {
                 throw new ExternalApiException("ERP purchase order returned " + response.getStatusCode());
             }

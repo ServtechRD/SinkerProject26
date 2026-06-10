@@ -60,7 +60,7 @@ public class ErpPurchaseService {
         return new ErpCreatePurchaseOrderRequest(
                 webNo,
                 "0000",
-                "",
+                "B105-2",
                 LocalDate.now().toString(),
                 request.getDemandDate().toString(),
                 "",

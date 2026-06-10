@@ -110,7 +110,7 @@ public class ErpPurchaseOrderService {
         ErpCreatePurchaseOrderRequest body = new ErpCreatePurchaseOrderRequest(
                 webNo,
                 "0000",
-                "A01",
+                "B105-2",
                 LocalDate.now().toString(),
                 estDd.toString(),
                 "",

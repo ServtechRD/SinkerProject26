@@ -16,11 +16,7 @@ public final class PdcaLocalStub {
     private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 
     private static final String[][] MOCK_MATERIALS = {
-            {"AA08C", "關華豆膠(LF20)/25kg/包", "KG"},
-            {"BA12D", "玉米澱粉/20kg/包", "KG"},
-            {"CC05A", "乳化劑E471/10kg/箱", "KG"},
-            {"DD15B", "葡萄糖漿/25kg/桶", "KG"},
-            {"EE08C", "食用色素黃5號/1kg/瓶", "KG"}
+            {"AA08C", "關華豆膠(LF20)/25kg/包", "KG"}
     };
 
     private PdcaLocalStub() {

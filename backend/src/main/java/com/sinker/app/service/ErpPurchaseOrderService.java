@@ -110,7 +110,7 @@ public class ErpPurchaseOrderService {
         ErpCreatePurchaseOrderRequest body = new ErpCreatePurchaseOrderRequest(
                 webNo,
                 "0000",
-                "",
+                "A01",
                 LocalDate.now().toString(),
                 estDd.toString(),
                 "",
@@ -127,7 +127,8 @@ public class ErpPurchaseOrderService {
             doPost(cfg.getPurchaseOrderUrl(), body, weekStart, factory, webNo);
         } catch (RestClientException e) {
             log.error("ERP purchase order HTTP error: weekStart={}, factory={}", weekStart, factory, e);
-            throw new ExternalApiException("ERP purchase order failed: " + e.getMessage(), e);
+            String reason = e.getMessage() == null ? "unknown" : e.getMessage().strip().replaceAll("\\s+", " ");
+            throw new ExternalApiException("ERP purchase order failed: " + reason, e);
         }
     }
 
@@ -160,7 +161,8 @@ public class ErpPurchaseOrderService {
             throw e;
         } catch (RestClientException e) {
             log.error("ERP purchase order HTTP error: weekStart={}, factory={}", weekStart, factory, e);
-            throw new ExternalApiException("ERP purchase order failed: " + e.getMessage(), e);
+            String reason = e.getMessage() == null ? "unknown" : e.getMessage().strip().replaceAll("\\s+", " ");
+            throw new ExternalApiException("ERP purchase order failed: " + reason, e);
         }
     }
 }

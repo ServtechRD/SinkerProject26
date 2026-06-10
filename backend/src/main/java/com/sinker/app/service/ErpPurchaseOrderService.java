@@ -98,7 +98,7 @@ public class ErpPurchaseOrderService {
                     d.getMaterialCode(),
                     d.getMaterialName(),
                     FACTORY_CODE_MAP.getOrDefault(d.getFactory(), d.getFactory()),
-                    "",
+                    "1",
                     d.getPurchaseQuantity(),
                     BigDecimal.ZERO,
                     BigDecimal.ZERO,

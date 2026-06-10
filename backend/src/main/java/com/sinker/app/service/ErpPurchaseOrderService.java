@@ -4,9 +4,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sinker.app.config.IntegrationProperties;
 import com.sinker.app.dto.erp.ErpCreatePurchaseOrderRequest;
+import com.sinker.app.entity.ErpPurchaseOrderDetail;
 import com.sinker.app.entity.ErpPurchaseOrderRecord;
 import com.sinker.app.entity.MaterialDemand;
 import com.sinker.app.exception.ExternalApiException;
+import com.sinker.app.repository.ErpPurchaseOrderDetailRepository;
 import com.sinker.app.repository.ErpPurchaseOrderRecordRepository;
 import com.sinker.app.repository.MaterialDemandRepository;
 import org.slf4j.Logger;
@@ -51,6 +53,7 @@ public class ErpPurchaseOrderService {
     private final ErpTokenService erpTokenService;
     private final MaterialDemandRepository materialDemandRepository;
     private final ErpPurchaseOrderRecordRepository erpPurchaseOrderRecordRepository;
+    private final ErpPurchaseOrderDetailRepository erpPurchaseOrderDetailRepository;
     private final ObjectMapper objectMapper;
 
     public ErpPurchaseOrderService(IntegrationProperties integrationProperties,
@@ -58,12 +61,14 @@ public class ErpPurchaseOrderService {
                                    ErpTokenService erpTokenService,
                                    MaterialDemandRepository materialDemandRepository,
                                    ErpPurchaseOrderRecordRepository erpPurchaseOrderRecordRepository,
+                                   ErpPurchaseOrderDetailRepository erpPurchaseOrderDetailRepository,
                                    ObjectMapper objectMapper) {
         this.integrationProperties = integrationProperties;
         this.integrationRestTemplate = integrationRestTemplate;
         this.erpTokenService = erpTokenService;
         this.materialDemandRepository = materialDemandRepository;
         this.erpPurchaseOrderRecordRepository = erpPurchaseOrderRecordRepository;
+        this.erpPurchaseOrderDetailRepository = erpPurchaseOrderDetailRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -168,7 +173,9 @@ public class ErpPurchaseOrderService {
             throw new ExternalApiException("ERP purchase order failed: " + reason, e);
         }
 
-        savePoNo(weekStart, factory, isUpdate ? existingPoNo : returnedPoNo, existing.orElse(null));
+        String finalPoNo = isUpdate ? existingPoNo : returnedPoNo;
+        savePoNo(weekStart, factory, finalPoNo, existing.orElse(null));
+        saveDetails(weekStart, factory, finalPoNo, details);
     }
 
     private void savePoNo(LocalDate weekStart, String factory, String poNo,
@@ -189,6 +196,28 @@ public class ErpPurchaseOrderService {
         record.setUpdatedAt(now);
         erpPurchaseOrderRecordRepository.save(record);
         log.info("ERP purchase order record saved: weekStart={}, factory={}, poNo={}", weekStart, factory, poNo);
+    }
+
+    private void saveDetails(LocalDate weekStart, String factory, String poNo,
+                             List<ErpCreatePurchaseOrderRequest.Detail> details) {
+        erpPurchaseOrderDetailRepository.deleteByWeekStartAndFactory(weekStart, factory);
+        LocalDateTime now = LocalDateTime.now();
+        List<ErpPurchaseOrderDetail> entities = details.stream().map(d -> {
+            ErpPurchaseOrderDetail e = new ErpPurchaseOrderDetail();
+            e.setWeekStart(weekStart);
+            e.setFactory(factory);
+            e.setPoNo(poNo != null ? poNo : "");
+            e.setItm(d.getItm());
+            e.setPrdNo(d.getPrdNo());
+            e.setPrdName(d.getPrdName());
+            e.setWh(d.getWh());
+            e.setQty(d.getQty());
+            e.setCreatedAt(now);
+            return e;
+        }).collect(Collectors.toList());
+        erpPurchaseOrderDetailRepository.saveAll(entities);
+        log.info("ERP purchase order details saved: count={}, weekStart={}, factory={}, poNo={}",
+                entities.size(), weekStart, factory, poNo);
     }
 
     private synchronized String generateWebNo() {

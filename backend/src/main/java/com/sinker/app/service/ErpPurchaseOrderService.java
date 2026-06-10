@@ -1,5 +1,7 @@
 package com.sinker.app.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sinker.app.config.IntegrationProperties;
 import com.sinker.app.dto.erp.ErpCreatePurchaseOrderRequest;
 import com.sinker.app.entity.MaterialDemand;
@@ -44,15 +46,18 @@ public class ErpPurchaseOrderService {
     private final RestTemplate integrationRestTemplate;
     private final ErpTokenService erpTokenService;
     private final MaterialDemandRepository materialDemandRepository;
+    private final ObjectMapper objectMapper;
 
     public ErpPurchaseOrderService(IntegrationProperties integrationProperties,
                                    RestTemplate integrationRestTemplate,
                                    ErpTokenService erpTokenService,
-                                   MaterialDemandRepository materialDemandRepository) {
+                                   MaterialDemandRepository materialDemandRepository,
+                                   ObjectMapper objectMapper) {
         this.integrationProperties = integrationProperties;
         this.integrationRestTemplate = integrationRestTemplate;
         this.erpTokenService = erpTokenService;
         this.materialDemandRepository = materialDemandRepository;
+        this.objectMapper = objectMapper;
     }
 
     /**
@@ -118,7 +123,13 @@ public class ErpPurchaseOrderService {
                 details
         );
 
-        log.info("ERP createPurchaseOrder: webNo={}, factory={}, detailCount={}", webNo, factory, details.size());
+        try {
+            log.info("ERP createPurchaseOrder request: webNo={}, factory={}, detailCount={}, body={}",
+                    webNo, factory, details.size(), objectMapper.writeValueAsString(body));
+        } catch (JsonProcessingException e) {
+            log.info("ERP createPurchaseOrder request: webNo={}, factory={}, detailCount={} (body serialization failed)",
+                    webNo, factory, details.size());
+        }
 
         try {
             doPost(cfg.getPurchaseOrderUrl(), body, weekStart, factory, webNo);
@@ -152,8 +163,8 @@ public class ErpPurchaseOrderService {
             ResponseEntity<String> response = integrationRestTemplate.exchange(
                     url, HttpMethod.POST, entity, String.class);
             if (response.getStatusCode().is2xxSuccessful()) {
-                log.info("ERP purchase order OK: weekStart={}, factory={}, webNo={}, status={}",
-                        weekStart, factory, webNo, response.getStatusCode());
+                log.info("ERP purchase order OK: weekStart={}, factory={}, webNo={}, status={}, response={}",
+                        weekStart, factory, webNo, response.getStatusCode(), response.getBody());
             } else {
                 throw new ExternalApiException("ERP purchase order returned " + response.getStatusCode());
             }

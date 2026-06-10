@@ -102,6 +102,14 @@ public class ErpPurchaseOrderService {
         String existingPoNo = existing.map(ErpPurchaseOrderRecord::getPoNo).orElse(null);
         boolean isUpdate = existingPoNo != null;
 
+        if (isUpdate) {
+            log.info("ERP purchase order: existing poNo found, will update: weekStart={}, factory={}, poNo={}",
+                    weekStart, factory, existingPoNo);
+        } else {
+            log.info("ERP purchase order: no existing poNo, will create new: weekStart={}, factory={}",
+                    weekStart, factory);
+        }
+
         String webNo = generateWebNo();
 
         LocalDate estDd = demands.stream()

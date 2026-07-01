@@ -7,7 +7,9 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import static org.mockito.ArgumentMatchers.anyInt;
+import java.time.LocalDate;
+
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -22,19 +24,19 @@ class AutoCloseSchedulerTest {
 
     @Test
     void testAutoCloseMonths_InvokesService() {
-        when(service.autoCloseMatchingMonths(anyInt())).thenReturn(2);
+        when(service.autoCloseMatchingMonths(any(LocalDate.class))).thenReturn(2);
 
         scheduler.autoCloseMonths();
 
-        verify(service).autoCloseMatchingMonths(anyInt());
+        verify(service).autoCloseMatchingMonths(any(LocalDate.class));
     }
 
     @Test
     void testAutoCloseMonths_ZeroResults() {
-        when(service.autoCloseMatchingMonths(anyInt())).thenReturn(0);
+        when(service.autoCloseMatchingMonths(any(LocalDate.class))).thenReturn(0);
 
         scheduler.autoCloseMonths();
 
-        verify(service).autoCloseMatchingMonths(anyInt());
+        verify(service).autoCloseMatchingMonths(any(LocalDate.class));
     }
 }

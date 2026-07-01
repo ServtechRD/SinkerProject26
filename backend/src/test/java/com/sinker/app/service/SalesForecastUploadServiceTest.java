@@ -87,7 +87,7 @@ class SalesForecastUploadServiceTest {
         for (int i = 1; i <= count; i++) {
             rows.add(new SalesForecastRow(
                     "飲料類", "600ml*24入", "P00" + i, "商品" + i, "A0" + i,
-                    new BigDecimal("100.50"), i + 1));
+                    new BigDecimal("100.50"), "", i + 1));
         }
         return rows;
     }
@@ -168,7 +168,7 @@ class SalesForecastUploadServiceTest {
                 .thenReturn(1);
         List<SalesForecastRow> rows = List.of(
                 new SalesForecastRow("飲料類", "spec", "P999", "商品", "A01",
-                        new BigDecimal("100.00"), 2)
+                        new BigDecimal("100.00"), "", 2)
         );
         when(excelParserService.parse(any())).thenReturn(rows);
         when(erpProductService.validateProduct("P999")).thenReturn(false);

@@ -56,7 +56,7 @@ class GiftSalesForecastUploadServiceTest {
         when(configRepository.findByMonth("202601")).thenReturn(Optional.of(cfg));
         when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq(1L), eq("家樂福"))).thenReturn(1);
         when(excelParserService.parseCsv(any())).thenReturn(List.of(
-                new SalesForecastRow("C", "S", "P1", "N", "A01", new BigDecimal("10"), 2)
+                new SalesForecastRow("C", "S", "P1", "N", "A01", new BigDecimal("10"), "", 2)
         ));
         when(erpProductService.validateProduct("P1")).thenReturn(true);
         ProductDTO p = new ProductDTO();
@@ -103,7 +103,7 @@ class GiftSalesForecastUploadServiceTest {
         when(configRepository.findByMonth("202601")).thenReturn(Optional.of(cfg));
         when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq(1L), eq("家樂福"))).thenReturn(1);
         when(excelParserService.parse(any())).thenReturn(List.of(
-                new SalesForecastRow("C", "S", "BAD", "N", "A01", new BigDecimal("10"), 2)
+                new SalesForecastRow("C", "S", "BAD", "N", "A01", new BigDecimal("10"), "", 2)
         ));
         when(erpProductService.validateProduct("BAD")).thenReturn(false);
 
@@ -119,7 +119,7 @@ class GiftSalesForecastUploadServiceTest {
         when(configRepository.findByMonth("202601")).thenReturn(Optional.of(cfg));
         when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), eq(1L), eq("家樂福"))).thenReturn(1);
         when(excelParserService.parse(any())).thenReturn(List.of(
-                new SalesForecastRow("uploaded-category", "uploaded-spec", "P1", "uploaded-name", "uploaded-wh", new BigDecimal("10"), 2)
+                new SalesForecastRow("uploaded-category", "uploaded-spec", "P1", "uploaded-name", "uploaded-wh", new BigDecimal("10"), "", 2)
         ));
         when(erpProductService.validateProduct("P1")).thenReturn(true);
         ProductDTO p = new ProductDTO();

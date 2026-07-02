@@ -24,6 +24,7 @@ import MaterialDemandFormPage from './pages/material/MaterialDemandFormPage'
 import MaterialPurchasePage from './pages/material/MaterialPurchasePage'
 import MaterialPurchaseFormPage from './pages/material/MaterialPurchaseFormPage'
 import ErpProductSyncPage from './pages/erp/ErpProductSyncPage'
+import ErpVendorSyncPage from './pages/erp/ErpVendorSyncPage'
 
 export default function AppRoutes() {
   return (
@@ -58,6 +59,7 @@ export default function AppRoutes() {
         <Route path="material-purchase" element={<MaterialPurchasePage />} />
         <Route path="material-purchase/form" element={<MaterialPurchaseFormPage />} />
         <Route path="erp/product-sync" element={<ErpProductSyncPage />} />
+        <Route path="erp/vendor-sync" element={<ErpVendorSyncPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -1,8 +1,10 @@
 package com.sinker.app.controller;
 
 import com.sinker.app.dto.erp.ErpProductSyncParam;
+import com.sinker.app.dto.erp.VendorSyncParam;
 import com.sinker.app.service.ErpProductSyncService;
 import com.sinker.app.service.ErpPurchaseOrderService;
+import com.sinker.app.service.ErpVendorSyncService;
 import com.sinker.app.service.PdcaRecomputeService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,13 +34,16 @@ public class IntegrationController {
     private final PdcaRecomputeService pdcaRecomputeService;
     private final ErpPurchaseOrderService erpPurchaseOrderService;
     private final ErpProductSyncService erpProductSyncService;
+    private final ErpVendorSyncService erpVendorSyncService;
 
     public IntegrationController(PdcaRecomputeService pdcaRecomputeService,
                                  ErpPurchaseOrderService erpPurchaseOrderService,
-                                 ErpProductSyncService erpProductSyncService) {
+                                 ErpProductSyncService erpProductSyncService,
+                                 ErpVendorSyncService erpVendorSyncService) {
         this.pdcaRecomputeService = pdcaRecomputeService;
         this.erpPurchaseOrderService = erpPurchaseOrderService;
         this.erpProductSyncService = erpProductSyncService;
+        this.erpVendorSyncService = erpVendorSyncService;
     }
 
     @PostMapping("/pdca/recompute")
@@ -82,5 +87,28 @@ public class IntegrationController {
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Map<String, Object>> erpProductSyncStatus() {
         return ResponseEntity.ok(erpProductSyncService.getSyncStatus());
+    }
+
+    @PostMapping("/erp/vendor-sync")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<Map<String, Object>> erpVendorSync(
+            @RequestBody(required = false) VendorSyncParam param) {
+        if (param == null) {
+            param = new VendorSyncParam();
+        }
+        if (erpVendorSyncService.isRunning()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body(Map.of("message", "同步已在執行中，請稍後再試"));
+        }
+        log.info("POST /api/integrations/erp/vendor-sync isOnlyUpdate={}, pageSize={}",
+                param.getIsOnlyUpdate(), param.getPageSize());
+        erpVendorSyncService.syncVendorsAsync(param);
+        return ResponseEntity.accepted().body(Map.of("message", "同步已開始"));
+    }
+
+    @GetMapping("/erp/vendor-sync/status")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<Map<String, Object>> erpVendorSyncStatus() {
+        return ResponseEntity.ok(erpVendorSyncService.getSyncStatus());
     }
 }

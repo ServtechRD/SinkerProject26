@@ -34,6 +34,9 @@ services:
       # ERP 商品主檔同步
       ERP_PRODUCT_ENABLED: "false"
       ERP_PRODUCT_LIST_URL: "https://your-erp.example.com/api/product-list"
+      # ERP 廠商主檔同步
+      ERP_VENDOR_ENABLED: "false"
+      ERP_VENDOR_LIST_URL: "https://your-erp.example.com/api/vendor-list"
       # ERP 採購單
       ERP_PURCHASE_ORDER_ENABLED: "false"
       ERP_PURCHASE_ORDER_URL: "https://your-erp.example.com/api/purchase-order"

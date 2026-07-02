@@ -31,6 +31,9 @@ app:
     erp-product:
       enabled: ${ERP_PRODUCT_ENABLED:false}
       product-list-url: ${ERP_PRODUCT_LIST_URL:}
+    erp-vendor:
+      enabled: ${ERP_VENDOR_ENABLED:false}
+      vendor-list-url: ${ERP_VENDOR_LIST_URL:}
 
 management:
   endpoints:

@@ -12,6 +12,7 @@ public class IntegrationProperties {
     private Pdca pdca = new Pdca();
     private Erp erp = new Erp();
     private ErpProduct erpProduct = new ErpProduct();
+    private ErpVendor erpVendor = new ErpVendor();
 
     public Auth getAuth() {
         return auth;
@@ -43,6 +44,14 @@ public class IntegrationProperties {
 
     public void setErpProduct(ErpProduct erpProduct) {
         this.erpProduct = erpProduct;
+    }
+
+    public ErpVendor getErpVendor() {
+        return erpVendor;
+    }
+
+    public void setErpVendor(ErpVendor erpVendor) {
+        this.erpVendor = erpVendor;
     }
 
     /** 三個外部系統共用的 JWT 取得設定 */
@@ -139,6 +148,27 @@ public class IntegrationProperties {
 
         public void setProductListUrl(String productListUrl) {
             this.productListUrl = productListUrl;
+        }
+    }
+
+    public static class ErpVendor {
+        private boolean enabled = false;
+        private String vendorListUrl = "";
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getVendorListUrl() {
+            return vendorListUrl;
+        }
+
+        public void setVendorListUrl(String vendorListUrl) {
+            this.vendorListUrl = vendorListUrl;
         }
     }
 }

@@ -86,48 +86,24 @@ public class ErpVendorSyncService {
         log.info("ERP vendor sync started: isOnlyUpdate={}, pageSize={}", isOnlyUpdate, pageSize);
 
         long totalStart = System.currentTimeMillis();
-        int nowPage = 1;
-        int totalFetched = 0;
-        int totalSaved = 0;
 
-        // 廠商 API 回傳純陣列、無 TotalPage，用回傳筆數 < pageSize 判斷是否為最後一頁
-        while (true) {
-            long pageStart = System.currentTimeMillis();
+        // 廠商 API 未實作分頁，NowPage/PageSize 會被忽略、每次都回傳全量資料，故僅呼叫一次
+        VendorListRequest request = new VendorListRequest();
+        request.setIsOnlyUpdate(isOnlyUpdate);
+        request.setNowPage(1);
+        request.setPageSize(pageSize);
 
-            VendorListRequest request = new VendorListRequest();
-            request.setIsOnlyUpdate(isOnlyUpdate);
-            request.setNowPage(nowPage);
-            request.setPageSize(pageSize);
-
-            List<VendorSyncItem> items = client.fetchPage(request);
-
-            if (items == null || items.isEmpty()) {
-                log.info("ERP vendor sync page {}: empty response, stopping", nowPage);
-                break;
-            }
-
-            totalFetched += items.size();
-            int saved = upsertPage(items, isOnlyUpdate);
-            totalSaved += saved;
-
-            long pageMs = System.currentTimeMillis() - pageStart;
-            log.info("ERP vendor sync page {}: fetched={}, saved={}, elapsed={}ms",
-                    nowPage, items.size(), saved, pageMs);
-
-            if (items.size() < pageSize) {
-                break;
-            }
-            nowPage++;
-        }
+        List<VendorSyncItem> items = client.fetchPage(request);
+        int totalFetched = (items != null) ? items.size() : 0;
+        int totalSaved = (items != null && !items.isEmpty()) ? upsertPage(items, isOnlyUpdate) : 0;
 
         long totalMs = System.currentTimeMillis() - totalStart;
-        log.info("ERP vendor sync completed: totalFetched={}, totalSaved={}, pages={}, totalElapsed={}ms",
-                totalFetched, totalSaved, nowPage, totalMs);
+        log.info("ERP vendor sync completed: totalFetched={}, totalSaved={}, totalElapsed={}ms",
+                totalFetched, totalSaved, totalMs);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("totalFetched", totalFetched);
         result.put("totalSaved", totalSaved);
-        result.put("totalPages", nowPage);
         result.put("elapsedMs", totalMs);
         return result;
     }

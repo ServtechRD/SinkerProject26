@@ -126,7 +126,6 @@ export default function ErpVendorSyncPage() {
               <>
                 <tr><th>拉取筆數</th><td>{lastResult.totalFetched}</td></tr>
                 <tr><th>寫入筆數</th><td>{lastResult.totalSaved}</td></tr>
-                <tr><th>頁數</th><td>{lastResult.totalPages}</td></tr>
                 <tr><th>耗時</th><td>{lastResult.elapsedMs} ms</td></tr>
               </>
             )}

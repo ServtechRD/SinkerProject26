@@ -47,26 +47,24 @@ class ErpVendorSyncServiceTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void doSync_stopsWhenPageReturnsFewerThanPageSize() {
+    void doSync_fetchesOnceRegardlessOfResultSize() {
         when(client.isConfigured()).thenReturn(true);
         VendorSyncParam param = new VendorSyncParam();
         param.setPageSize(2);
 
-        List<VendorSyncItem> page1 = List.of(
+        List<VendorSyncItem> items = List.of(
                 item("V001", "廠商1", "2020-01-01 00:00:00", "2020-01-02 00:00:00"),
-                item("V002", "廠商2", null, null));
-        List<VendorSyncItem> page2 = List.of(
+                item("V002", "廠商2", null, null),
                 item("V003", "廠商3", null, null));
 
-        when(client.fetchPage(any(VendorListRequest.class))).thenReturn(page1, page2);
+        when(client.fetchPage(any(VendorListRequest.class))).thenReturn(items);
         when(vendorRepository.findByCodeIn(any())).thenReturn(List.of());
 
         service.syncVendorsAsync(param);
 
         ArgumentCaptor<VendorListRequest> captor = ArgumentCaptor.forClass(VendorListRequest.class);
-        verify(client, times(2)).fetchPage(captor.capture());
-        assertEquals(1, captor.getAllValues().get(0).getNowPage());
-        assertEquals(2, captor.getAllValues().get(1).getNowPage());
+        verify(client, times(1)).fetchPage(captor.capture());
+        assertEquals(1, captor.getValue().getNowPage());
 
         Map<String, Object> status = service.getSyncStatus();
         Map<String, Object> result = (Map<String, Object>) status.get("lastResult");

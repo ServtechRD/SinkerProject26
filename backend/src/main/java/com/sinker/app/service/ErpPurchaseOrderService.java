@@ -11,6 +11,7 @@ import com.sinker.app.exception.ExternalApiException;
 import com.sinker.app.repository.ErpPurchaseOrderDetailRepository;
 import com.sinker.app.repository.ErpPurchaseOrderRecordRepository;
 import com.sinker.app.repository.MaterialDemandRepository;
+import com.sinker.app.repository.VendorRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpEntity;
@@ -44,6 +45,8 @@ public class ErpPurchaseOrderService {
             "二廠", "02",
             "三廠", "03"
     );
+    // ponytail: 沿用原本寫死的廠商代碼作為未指定 vendorCode 時的預設值，待前端串接下拉選單後可移除
+    private static final String DEFAULT_VENDOR_CODE = "B105-2";
 
     private final AtomicInteger dailySequence = new AtomicInteger(1);
     private volatile String lastDate = "";
@@ -54,6 +57,7 @@ public class ErpPurchaseOrderService {
     private final MaterialDemandRepository materialDemandRepository;
     private final ErpPurchaseOrderRecordRepository erpPurchaseOrderRecordRepository;
     private final ErpPurchaseOrderDetailRepository erpPurchaseOrderDetailRepository;
+    private final VendorRepository vendorRepository;
     private final ObjectMapper objectMapper;
 
     public ErpPurchaseOrderService(IntegrationProperties integrationProperties,
@@ -62,6 +66,7 @@ public class ErpPurchaseOrderService {
                                    MaterialDemandRepository materialDemandRepository,
                                    ErpPurchaseOrderRecordRepository erpPurchaseOrderRecordRepository,
                                    ErpPurchaseOrderDetailRepository erpPurchaseOrderDetailRepository,
+                                   VendorRepository vendorRepository,
                                    ObjectMapper objectMapper) {
         this.integrationProperties = integrationProperties;
         this.integrationRestTemplate = integrationRestTemplate;
@@ -69,6 +74,7 @@ public class ErpPurchaseOrderService {
         this.materialDemandRepository = materialDemandRepository;
         this.erpPurchaseOrderRecordRepository = erpPurchaseOrderRecordRepository;
         this.erpPurchaseOrderDetailRepository = erpPurchaseOrderDetailRepository;
+        this.vendorRepository = vendorRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -78,8 +84,11 @@ public class ErpPurchaseOrderService {
      * - 若尚無紀錄 → PoNo 空字串，呼叫 ERP 新建，並將回傳的採購單號存入 erp_purchase_order
      * 未啟用或未設定 URL 時略過（僅 log），供開發環境使用。
      * 收到 401 時自動清除 token 快取並重試一次。
+     *
+     * @param vendorCode 廠商代碼（對應 vendor.code），未指定時使用 {@link #DEFAULT_VENDOR_CODE}；
+     *                   有指定則須為 vendor 表中已存在的代碼
      */
-    public void createPurchaseOrder(LocalDate weekStart, String factory) {
+    public void createPurchaseOrder(LocalDate weekStart, String factory, String vendorCode) {
         IntegrationProperties.Erp cfg = integrationProperties.getErp();
         if (!cfg.isEnabled() || !StringUtils.hasText(cfg.getPurchaseOrderUrl())) {
             log.info("ERP purchase order skipped (disabled or empty URL): weekStart={}, factory={}", weekStart, factory);
@@ -87,6 +96,14 @@ public class ErpPurchaseOrderService {
         }
         if (factory == null || factory.isBlank()) {
             throw new IllegalArgumentException("factory is required");
+        }
+
+        String resolvedVendorCode = DEFAULT_VENDOR_CODE;
+        if (StringUtils.hasText(vendorCode)) {
+            if (!vendorRepository.existsByCode(vendorCode)) {
+                throw new IllegalArgumentException("vendor not found: " + vendorCode);
+            }
+            resolvedVendorCode = vendorCode;
         }
 
         List<MaterialDemand> demands = materialDemandRepository
@@ -142,7 +159,7 @@ public class ErpPurchaseOrderService {
         ErpCreatePurchaseOrderRequest body = new ErpCreatePurchaseOrderRequest(
                 webNo,
                 "0000",
-                "B105-2",
+                resolvedVendorCode,
                 LocalDate.now().toString(),
                 estDd.toString(),
                 isUpdate ? existingPoNo : "",
@@ -151,14 +168,14 @@ public class ErpPurchaseOrderService {
         );
 
         try {
-            log.info("ERP {} request: webNo={}, factory={}, poNo={}, detailCount={}, body={}",
+            log.info("ERP {} request: webNo={}, factory={}, vendorCode={}, poNo={}, detailCount={}, body={}",
                     isUpdate ? "updatePurchaseOrder" : "createPurchaseOrder",
-                    webNo, factory, isUpdate ? existingPoNo : "(new)",
+                    webNo, factory, resolvedVendorCode, isUpdate ? existingPoNo : "(new)",
                     details.size(), objectMapper.writeValueAsString(body));
         } catch (JsonProcessingException e) {
-            log.info("ERP {} request: webNo={}, factory={}, poNo={}, detailCount={} (body serialization failed)",
+            log.info("ERP {} request: webNo={}, factory={}, vendorCode={}, poNo={}, detailCount={} (body serialization failed)",
                     isUpdate ? "updatePurchaseOrder" : "createPurchaseOrder",
-                    webNo, factory, isUpdate ? existingPoNo : "(new)", details.size());
+                    webNo, factory, resolvedVendorCode, isUpdate ? existingPoNo : "(new)", details.size());
         }
 
         String returnedPoNo;

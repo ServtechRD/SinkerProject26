@@ -296,8 +296,8 @@ class MaterialDemandServiceTest {
         LocalDate weekStart = LocalDate.of(2026, 2, 17);
         when(jdbcTemplate.query(contains("SELECT status"), any(org.springframework.jdbc.core.RowMapper.class), any(), any()))
                 .thenReturn(List.of(MaterialDemandService.REVIEW_STATUS_APPROVED));
-        materialDemandService.confirmSendErp(weekStart, "F1");
-        verify(erpPurchaseOrderService).createPurchaseOrder(weekStart, "F1");
+        materialDemandService.confirmSendErp(weekStart, "F1", "V001");
+        verify(erpPurchaseOrderService).createPurchaseOrder(weekStart, "F1", "V001");
         verify(jdbcTemplate).update(contains("DELETE FROM material_demand_pending_confirm"), eq(weekStart), eq("F1"));
     }
 
@@ -306,8 +306,8 @@ class MaterialDemandServiceTest {
         LocalDate weekStart = LocalDate.of(2026, 2, 17);
         when(jdbcTemplate.query(contains("SELECT status"), any(org.springframework.jdbc.core.RowMapper.class), any(), any()))
                 .thenReturn(List.of(MaterialDemandService.REVIEW_STATUS_PENDING));
-        assertThrows(IllegalArgumentException.class, () -> materialDemandService.confirmSendErp(weekStart, "F1"));
-        verify(erpPurchaseOrderService, never()).createPurchaseOrder(any(), any());
+        assertThrows(IllegalArgumentException.class, () -> materialDemandService.confirmSendErp(weekStart, "F1", "V001"));
+        verify(erpPurchaseOrderService, never()).createPurchaseOrder(any(), any(), any());
     }
 
     @Test

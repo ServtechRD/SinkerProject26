@@ -12,5 +12,7 @@ public interface VendorRepository extends JpaRepository<Vendor, Integer> {
 
     List<Vendor> findByCodeIn(Collection<String> codes);
 
+    boolean existsByCode(String code);
+
     List<Vendor> findByCodeContainingIgnoreCaseOrNameContainingIgnoreCase(String code, String name);
 }

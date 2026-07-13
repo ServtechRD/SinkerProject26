@@ -153,14 +153,16 @@ public class MaterialDemandService {
 
     /**
      * 僅審核完成（status=1）可送出；先呼叫 ERP 採購單建立 API，再刪除待確認列。
+     *
+     * @param vendorCode 廠商代碼，未指定時由 {@link ErpPurchaseOrderService} 使用預設值
      */
     @Transactional
-    public void confirmSendErp(LocalDate weekStart, String factory) {
+    public void confirmSendErp(LocalDate weekStart, String factory, String vendorCode) {
         Integer st = getPendingStatus(weekStart, factory);
         if (st == null || st != REVIEW_STATUS_APPROVED) {
             throw new IllegalArgumentException("僅審核完成後可送出至天心ERP");
         }
-        erpPurchaseOrderService.createPurchaseOrder(weekStart, factory);
+        erpPurchaseOrderService.createPurchaseOrder(weekStart, factory, vendorCode);
         jdbcTemplate.update("DELETE FROM material_demand_pending_confirm WHERE week_start = ? AND factory = ?", weekStart, factory);
         log.info("Confirm send ERP: weekStart={}, factory={}", weekStart, factory);
     }

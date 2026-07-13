@@ -60,9 +60,10 @@ public class IntegrationController {
     @PreAuthorize("hasAuthority('confirm_data_send_erp')")
     public ResponseEntity<Map<String, Object>> erpPurchaseOrder(
             @RequestParam("week_start") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart,
-            @RequestParam String factory) {
-        log.info("POST /api/integrations/erp/purchase-order weekStart={}, factory={}", weekStart, factory);
-        erpPurchaseOrderService.createPurchaseOrder(weekStart, factory);
+            @RequestParam String factory,
+            @RequestParam(required = false) String vendorCode) {
+        log.info("POST /api/integrations/erp/purchase-order weekStart={}, factory={}, vendorCode={}", weekStart, factory, vendorCode);
+        erpPurchaseOrderService.createPurchaseOrder(weekStart, factory, vendorCode);
         return ResponseEntity.ok(Map.of("message", "ERP purchase order request sent"));
     }
 

@@ -125,9 +125,10 @@ public class MaterialDemandController {
     @PreAuthorize("hasAuthority('confirm_data_send_erp')")
     public ResponseEntity<Map<String, Object>> confirmSendErp(
             @RequestParam("week_start") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate weekStart,
-            @RequestParam String factory) {
-        log.info("POST /api/material-demand/confirm-send-erp - weekStart={}, factory={}", weekStart, factory);
-        materialDemandService.confirmSendErp(weekStart, factory);
+            @RequestParam String factory,
+            @RequestParam(required = false) String vendorCode) {
+        log.info("POST /api/material-demand/confirm-send-erp - weekStart={}, factory={}, vendorCode={}", weekStart, factory, vendorCode);
+        materialDemandService.confirmSendErp(weekStart, factory, vendorCode);
         return ResponseEntity.ok(Map.of("message", "Confirm send ERP successful"));
     }
 

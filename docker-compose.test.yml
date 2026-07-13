@@ -48,7 +48,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: ["./gradlew", "test", "--no-daemon"]
+    command: ["sh", "./gradlew", "test", "--no-daemon"]
 
   frontend:
     build: ./frontend

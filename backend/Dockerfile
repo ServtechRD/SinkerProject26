@@ -4,10 +4,10 @@ WORKDIR /app
 
 COPY build.gradle settings.gradle gradlew ./
 COPY gradle gradle
-RUN ./gradlew dependencies --no-daemon || true
+RUN sh ./gradlew dependencies --no-daemon || true
 
 COPY . .
-RUN ./gradlew build -x test -x check --no-daemon
+RUN sh ./gradlew build -x test -x check --no-daemon
 
 # ---------- run stage ----------
 FROM eclipse-temurin:17-jre

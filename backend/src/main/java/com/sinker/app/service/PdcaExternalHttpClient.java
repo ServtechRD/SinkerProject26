@@ -1,6 +1,7 @@
 package com.sinker.app.service;
 
 import com.sinker.app.config.IntegrationProperties;
+import com.sinker.app.dto.pdca.PdcaRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpEntity;
@@ -9,12 +10,15 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 呼叫設定檔中的 PDCA recompute URL（POST JSON：PnDd、Wh），與 {@link PdcaRecomputeService} 共用。
@@ -56,6 +60,13 @@ public class PdcaExternalHttpClient {
      * @throws RestClientException      HTTP 失敗
      */
     public String postRecompute(LocalDate weekStart, String factory) {
+        return postRecompute(weekStart, factory, null);
+    }
+
+    /**
+     * 同上，額外帶上週排程明細（品號 PrdNo、數量 Qty），供 PDCA 依實際上傳/編輯內容重算。
+     */
+    public String postRecompute(LocalDate weekStart, String factory, List<PdcaRequest.ScheduleItem> schedule) {
         IntegrationProperties.Pdca cfg = integrationProperties.getPdca();
         if (!cfg.isEnabled() || !StringUtils.hasText(cfg.getRecomputeUrl())) {
             throw new IllegalStateException("PDCA HTTP not configured");
@@ -69,10 +80,17 @@ public class PdcaExternalHttpClient {
             throw new IllegalArgumentException("未知廠別: " + factory);
         }
 
-        Map<String, Object> body = Map.of(
-                "PnDd", weekStart.toString(),
-                "Wh", wh
-        );
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("PnDd", weekStart.toString());
+        body.put("Wh", wh);
+        if (!CollectionUtils.isEmpty(schedule)) {
+            body.put("Details", schedule.stream()
+                    .map(item -> Map.of(
+                            "PrdNo", item.getProductCode(),
+                            "Qty", item.getQuantity()
+                    ))
+                    .collect(Collectors.toList()));
+        }
 
         log.info("呼叫外部 PDCA API: url={}, body={}", cfg.getRecomputeUrl(), body);
 

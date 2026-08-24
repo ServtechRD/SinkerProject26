@@ -44,7 +44,7 @@ public class PdcaApiClientImpl implements PdcaApiClient {
 
         log.info("PDCA HTTP recompute: weekStart={}, factory={}", weekStart, factory);
 
-        String body = pdcaExternalHttpClient.postRecompute(weekStart, factory);
+        String body = pdcaExternalHttpClient.postRecompute(weekStart, factory, request.getSchedule());
         // PDCA API 回傳巢狀結構：外層為原料，內層 PnQtys 為每日數量，展開為每日一筆 MaterialItem
         List<PdcaRawItem> rawItems = objectMapper.readValue(body, new TypeReference<List<PdcaRawItem>>() {});
         List<PdcaResponse.MaterialItem> materials = rawItems == null ? Collections.emptyList() :

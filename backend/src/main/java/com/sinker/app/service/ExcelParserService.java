@@ -260,8 +260,8 @@ public class ExcelParserService {
             throw new ExcelParseException("Row " + rowNumber + ": 箱數小計 (quantity) must be a valid number");
         }
 
-        if (quantity.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new ExcelParseException("Row " + rowNumber + ": 箱數小計 (quantity) must be positive");
+        if (quantity.compareTo(BigDecimal.ZERO) < 0) {
+            throw new ExcelParseException("Row " + rowNumber + ": 箱數小計 (quantity) must not be negative");
         }
 
         return quantity;

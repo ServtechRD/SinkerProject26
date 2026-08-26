@@ -182,13 +182,14 @@ class ExcelParserServiceTest {
     }
 
     @Test
-    void testParseExcel_ZeroQuantity_Rejected() throws IOException {
+    void testParseExcel_ZeroQuantity_Allowed() throws IOException {
         Object[][] data = withHeader(
                 new Object[]{"飲料類", "600ml*24入", "P001", "可口可樂", "A01", 0.0}
         );
-        MockMultipartFile file = createExcel(data);
-        ExcelParseException ex = assertThrows(ExcelParseException.class, () -> service.parse(file));
-        assertTrue(ex.getMessage().contains("positive"), "Zero quantity should be rejected");
+        List<SalesForecastRow> rows = service.parse(createExcel(data));
+        assertEquals(1, rows.size());
+        assertEquals(0, BigDecimal.ZERO.compareTo(rows.get(0).getQuantity()),
+                "Zero quantity should be allowed");
     }
 
     @Test

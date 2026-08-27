@@ -11,7 +11,7 @@ export function ToastProvider({ children }) {
     setToasts((prev) => [...prev, { id, message, type }])
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id))
-    }, 5000)
+    }, 7000)
   }, [])
 
   const success = useCallback((msg) => addToast(msg, 'success'), [addToast])

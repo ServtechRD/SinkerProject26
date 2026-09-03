@@ -54,9 +54,8 @@ public class MaterialDemandService {
     @Transactional(readOnly = true)
     public List<MaterialDemandDTO> queryMaterialDemand(LocalDate weekStart, String factory) {
         log.info("Querying material demand from DB: weekStart={}, factory={}", weekStart, factory);
-        LocalDate endDate = weekStart.plusDays(6);
         return materialDemandRepository
-                .findByFactoryAndDemandDateBetweenOrderByMaterialCodeAsc(factory, weekStart, endDate)
+                .findByWeekStartAndFactoryOrderByMaterialCodeAsc(weekStart, factory)
                 .stream()
                 .map(MaterialDemandDTO::fromEntity)
                 .collect(Collectors.toList());

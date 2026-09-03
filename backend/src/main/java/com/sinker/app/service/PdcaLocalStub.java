@@ -36,8 +36,7 @@ public final class PdcaLocalStub {
         List<PdcaResponse.MaterialItem> materials = new ArrayList<>();
 
         for (PdcaRequest.ScheduleItem scheduleItem : request.getSchedule()) {
-            LocalDate demandDate = LocalDate.parse(scheduleItem.getDemandDate());
-            LocalDate materialDemandDate = demandDate.minusDays(7);
+            LocalDate materialDemandDate = LocalDate.parse(scheduleItem.getDemandDate());
 
             for (int i = 0; i < 3; i++) {
                 String[] materialData = MOCK_MATERIALS[i % MOCK_MATERIALS.length];

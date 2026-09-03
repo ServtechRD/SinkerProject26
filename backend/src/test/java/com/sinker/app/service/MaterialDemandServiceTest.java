@@ -47,9 +47,6 @@ class MaterialDemandServiceTest {
     @Mock
     private ErpPurchaseOrderService erpPurchaseOrderService;
 
-    @Mock
-    private PdcaIntegrationService pdcaIntegrationService;
-
     @InjectMocks
     private MaterialDemandService materialDemandService;
 
@@ -59,34 +56,34 @@ class MaterialDemandServiceTest {
         LocalDate weekStart = LocalDate.of(2026, 2, 17);
         String factory = "F1";
 
-        MaterialDemandDTO dto1 = new MaterialDemandDTO();
-        dto1.setId(1);
-        dto1.setWeekStart(weekStart);
-        dto1.setFactory(factory);
-        dto1.setMaterialCode("M001");
-        dto1.setMaterialName("原料A");
-        dto1.setUnit("kg");
-        dto1.setLastPurchaseDate(LocalDate.of(2026, 2, 10));
-        dto1.setDemandDate(LocalDate.of(2026, 2, 20));
-        dto1.setExpectedDelivery(new BigDecimal("100.50"));
-        dto1.setDemandQuantity(new BigDecimal("500.00"));
-        dto1.setEstimatedInventory(new BigDecimal("50.25"));
+        MaterialDemand entity1 = new MaterialDemand();
+        entity1.setId(1);
+        entity1.setWeekStart(weekStart);
+        entity1.setFactory(factory);
+        entity1.setMaterialCode("M001");
+        entity1.setMaterialName("原料A");
+        entity1.setUnit("kg");
+        entity1.setLastPurchaseDate(LocalDate.of(2026, 2, 10));
+        entity1.setDemandDate(LocalDate.of(2026, 2, 20));
+        entity1.setExpectedDelivery(new BigDecimal("100.50"));
+        entity1.setDemandQuantity(new BigDecimal("500.00"));
+        entity1.setEstimatedInventory(new BigDecimal("50.25"));
 
-        MaterialDemandDTO dto2 = new MaterialDemandDTO();
-        dto2.setId(2);
-        dto2.setWeekStart(weekStart);
-        dto2.setFactory(factory);
-        dto2.setMaterialCode("M002");
-        dto2.setMaterialName("原料B");
-        dto2.setUnit("pcs");
-        dto2.setLastPurchaseDate(null);
-        dto2.setDemandDate(LocalDate.of(2026, 2, 22));
-        dto2.setExpectedDelivery(new BigDecimal("0.00"));
-        dto2.setDemandQuantity(new BigDecimal("1000.00"));
-        dto2.setEstimatedInventory(new BigDecimal("0.00"));
+        MaterialDemand entity2 = new MaterialDemand();
+        entity2.setId(2);
+        entity2.setWeekStart(weekStart);
+        entity2.setFactory(factory);
+        entity2.setMaterialCode("M002");
+        entity2.setMaterialName("原料B");
+        entity2.setUnit("pcs");
+        entity2.setLastPurchaseDate(null);
+        entity2.setDemandDate(LocalDate.of(2026, 2, 22));
+        entity2.setExpectedDelivery(new BigDecimal("0.00"));
+        entity2.setDemandQuantity(new BigDecimal("1000.00"));
+        entity2.setEstimatedInventory(new BigDecimal("0.00"));
 
-        when(pdcaIntegrationService.syncMaterialDemandFromPdca(weekStart, factory))
-                .thenReturn(Arrays.asList(dto1, dto2));
+        when(materialDemandRepository.findByWeekStartAndFactoryOrderByMaterialCodeAsc(weekStart, factory))
+                .thenReturn(Arrays.asList(entity1, entity2));
 
         // Act
         List<MaterialDemandDTO> results = materialDemandService.queryMaterialDemand(weekStart, factory);
@@ -113,7 +110,8 @@ class MaterialDemandServiceTest {
         assertEquals("M002", out2.getMaterialCode());
         assertNull(out2.getLastPurchaseDate());
 
-        verify(pdcaIntegrationService, times(1)).syncMaterialDemandFromPdca(weekStart, factory);
+        verify(materialDemandRepository, times(1))
+                .findByWeekStartAndFactoryOrderByMaterialCodeAsc(weekStart, factory);
     }
 
     @Test
@@ -122,7 +120,7 @@ class MaterialDemandServiceTest {
         LocalDate weekStart = LocalDate.of(2026, 12, 31);
         String factory = "F999";
 
-        when(pdcaIntegrationService.syncMaterialDemandFromPdca(weekStart, factory))
+        when(materialDemandRepository.findByWeekStartAndFactoryOrderByMaterialCodeAsc(weekStart, factory))
                 .thenReturn(Arrays.asList());
 
         // Act
@@ -132,7 +130,8 @@ class MaterialDemandServiceTest {
         assertNotNull(results);
         assertEquals(0, results.size());
 
-        verify(pdcaIntegrationService, times(1)).syncMaterialDemandFromPdca(weekStart, factory);
+        verify(materialDemandRepository, times(1))
+                .findByWeekStartAndFactoryOrderByMaterialCodeAsc(weekStart, factory);
     }
 
     @Test

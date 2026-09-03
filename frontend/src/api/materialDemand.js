@@ -10,10 +10,10 @@ export function updateMaterialDemand(id, data) {
   return api.put(`/api/material-demand/${id}`, data).then((r) => r.data)
 }
 
-export function confirmSendErp(weekStart, factory) {
+export function confirmSendErp(weekStart, factory, vendorCode) {
   return api
     .post('/api/material-demand/confirm-send-erp', null, {
-      params: { week_start: weekStart, factory },
+      params: { week_start: weekStart, factory, vendorCode },
     })
     .then((r) => r.data)
 }

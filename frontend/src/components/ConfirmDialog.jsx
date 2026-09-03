@@ -1,6 +1,6 @@
 import './ConfirmDialog.css'
 
-export default function ConfirmDialog({ open, title, message, onConfirm, onCancel, loading, confirmText = '刪除', confirmButtonClass = 'btn--danger' }) {
+export default function ConfirmDialog({ open, title, message, children, onConfirm, onCancel, loading, confirmDisabled = false, confirmText = '刪除', confirmButtonClass = 'btn--danger' }) {
   if (!open) return null
 
   return (
@@ -17,12 +17,13 @@ export default function ConfirmDialog({ open, title, message, onConfirm, onCance
             {title}
           </h3>
         )}
-        <p className="dialog-message">{message}</p>
+        {message && <p className="dialog-message">{message}</p>}
+        {children}
         <div className="dialog-actions">
           <button className="btn btn--secondary" onClick={onCancel} disabled={loading}>
             取消
           </button>
-          <button className={`btn ${confirmButtonClass}`} onClick={onConfirm} disabled={loading}>
+          <button className={`btn ${confirmButtonClass}`} onClick={onConfirm} disabled={loading || confirmDisabled}>
             {loading ? '處理中...' : confirmText}
           </button>
         </div>

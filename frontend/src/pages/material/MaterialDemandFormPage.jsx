@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../components/Toast'
 import { getWeeklyScheduleFactories } from '../../api/weeklySchedule'
+import { getVendorList } from '../../api/vendors'
 import {
   getMaterialDemand,
   getMaterialDemandLastEditSavedAt,
@@ -89,6 +90,8 @@ export default function MaterialDemandFormPage() {
   const [saving, setSaving] = useState(false)
   const [confirmingErp, setConfirmingErp] = useState(false)
   const [erpConfirmOpen, setErpConfirmOpen] = useState(false)
+  const [vendors, setVendors] = useState([])
+  const [vendorCode, setVendorCode] = useState('')
   /** 後端 lastEditSavedAt 原始值（待確認 ERP 時才有，即最後一次編輯儲存觸發時間） */
   const [lastEditSavedRaw, setLastEditSavedRaw] = useState(null)
   /** 0 待審核、1 審核完成、2 退回；無待確認列時為 null */
@@ -135,6 +138,13 @@ export default function MaterialDemandFormPage() {
   useEffect(() => {
     if (defaultWeek && !weekStart) setWeekStart(defaultWeek)
   }, [defaultWeek, weekStart])
+
+  useEffect(() => {
+    if (!canConfirmSendErp) return
+    getVendorList()
+      .then((list) => setVendors(Array.isArray(list) ? list : []))
+      .catch(() => setVendors([]))
+  }, [canConfirmSendErp])
 
   const hasAutoRun = useRef(false)
   useEffect(() => {
@@ -265,11 +275,12 @@ export default function MaterialDemandFormPage() {
   }
 
   const performConfirmSendErp = async () => {
-    if (!weekStart || !factory) return
+    if (!weekStart || !factory || !vendorCode) return
     setConfirmingErp(true)
     try {
-      await confirmSendErp(weekStart, factory)
+      await confirmSendErp(weekStart, factory, vendorCode)
       toast.success('已送ERP')
+      setVendorCode('')
       await runQuery()
     } catch (err) {
       toast.error(err.response?.data?.message || '送出失敗')
@@ -516,7 +527,10 @@ export default function MaterialDemandFormPage() {
                 <button
                   type="button"
                   className="btn btn--primary"
-                  onClick={() => setErpConfirmOpen(true)}
+                  onClick={() => {
+                    setVendorCode('')
+                    setErpConfirmOpen(true)
+                  }}
                   disabled={confirmingErp}
                 >
                   {confirmingErp ? '送出中...' : '本週資料確認無誤送出至天心ERP'}
@@ -655,15 +669,33 @@ export default function MaterialDemandFormPage() {
       <ConfirmDialog
         open={erpConfirmOpen}
         title="確認送出"
-        message="確定送出？"
+        message="請選擇廠商："
         onConfirm={handleErpConfirmDialogConfirm}
         onCancel={() => {
-          if (!confirmingErp) setErpConfirmOpen(false)
+          if (!confirmingErp) {
+            setErpConfirmOpen(false)
+            setVendorCode('')
+          }
         }}
         loading={confirmingErp}
+        confirmDisabled={!vendorCode}
         confirmText="確認"
         confirmButtonClass="btn--primary"
-      />
+      >
+        <select
+          className="form-select"
+          value={vendorCode}
+          onChange={(e) => setVendorCode(e.target.value)}
+          disabled={confirmingErp}
+        >
+          <option value="">請選擇廠商</option>
+          {vendors.map((v) => (
+            <option key={v.code} value={v.code}>
+              {v.name}
+            </option>
+          ))}
+        </select>
+      </ConfirmDialog>
     </div>
   )
 }

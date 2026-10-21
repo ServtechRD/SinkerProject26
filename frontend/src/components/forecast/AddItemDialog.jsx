@@ -99,7 +99,7 @@ export default function AddItemDialog({ open, month, channel, onClose, onSuccess
       const created = await createItem(payload)
       onSuccess(created)
     } catch (err) {
-      setErrors({ general: err.response?.data?.error || '新增失敗，請重試' })
+      setErrors({ general: err.response?.data?.message || err.response?.data?.error || '新增失敗，請重試' })
     } finally {
       setSubmitting(false)
     }

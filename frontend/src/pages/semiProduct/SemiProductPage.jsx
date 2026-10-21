@@ -97,6 +97,8 @@ export default function SemiProductPage() {
       if (err.response?.data?.details && Array.isArray(err.response.data.details)) {
         const errorMessages = err.response.data.details.join('; ')
         toast.error(errorMessages)
+      } else if (err.response?.data?.message) {
+        toast.error(err.response.data.message)
       } else if (err.response?.data?.error) {
         toast.error(err.response.data.error)
       } else {
@@ -152,7 +154,11 @@ export default function SemiProductPage() {
       setEditValue('')
       setEditError('')
     } catch (err) {
-      if (err.response?.data?.error) {
+      if (err.response?.data?.details && Array.isArray(err.response.data.details)) {
+        toast.error(err.response.data.details.join('; '))
+      } else if (err.response?.data?.message) {
+        toast.error(err.response.data.message)
+      } else if (err.response?.data?.error) {
         toast.error(err.response.data.error)
       } else {
         toast.error('更新失敗')

@@ -181,6 +181,8 @@ export default function WeeklySchedulePage() {
     } catch (err) {
       if (err.response?.data?.details && Array.isArray(err.response.data.details)) {
         toast.error(err.response.data.details.join('; '))
+      } else if (err.response?.data?.message) {
+        toast.error(err.response.data.message)
       } else if (err.response?.data?.error) {
         toast.error(err.response.data.error)
       } else {

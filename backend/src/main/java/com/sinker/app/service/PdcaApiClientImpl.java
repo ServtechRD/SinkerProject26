@@ -10,8 +10,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
-import java.util.Collections;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -44,10 +45,23 @@ public class PdcaApiClientImpl implements PdcaApiClient {
 
         log.info("PDCA HTTP recompute: weekStart={}, factory={}", weekStart, factory);
 
-        String body = pdcaExternalHttpClient.postRecompute(weekStart, factory, request.getSchedule());
+        // 外部 API 一次只收一個品號，依排程中不重複的品號逐一呼叫後合併
+        List<String> prdNos = request.getSchedule() == null ? List.of() :
+                request.getSchedule().stream()
+                        .map(PdcaRequest.ScheduleItem::getProductCode)
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .collect(Collectors.toList());
+        List<PdcaRawItem> rawItems = new ArrayList<>();
+        for (String prdNo : prdNos) {
+            String body = pdcaExternalHttpClient.postRecompute(weekStart, factory, prdNo);
+            List<PdcaRawItem> parsed = objectMapper.readValue(body, new TypeReference<List<PdcaRawItem>>() {});
+            if (parsed != null) {
+                rawItems.addAll(parsed);
+            }
+        }
         // PDCA API 回傳巢狀結構：外層為原料，內層 PnQtys 為每日數量，展開為每日一筆 MaterialItem
-        List<PdcaRawItem> rawItems = objectMapper.readValue(body, new TypeReference<List<PdcaRawItem>>() {});
-        List<PdcaResponse.MaterialItem> materials = rawItems == null ? Collections.emptyList() :
+        List<PdcaResponse.MaterialItem> materials =
                 rawItems.stream()
                         .filter(raw -> raw.getPnQtys() != null)
                         .flatMap(raw -> raw.getPnQtys().stream()

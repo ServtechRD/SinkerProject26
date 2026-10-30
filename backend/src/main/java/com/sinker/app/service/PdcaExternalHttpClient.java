@@ -21,7 +21,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * 呼叫設定檔中的 PDCA recompute URL（POST JSON：PnDd、Wh），與 {@link PdcaRecomputeService} 共用。
+ * 呼叫設定檔中的 PDCA recompute URL（POST JSON：PnDd、PrdNo、Name、Wh），與 {@link PdcaRecomputeService} 共用。
  */
 @Component
 public class PdcaExternalHttpClient {
@@ -60,13 +60,13 @@ public class PdcaExternalHttpClient {
      * @throws RestClientException      HTTP 失敗
      */
     public String postRecompute(LocalDate weekStart, String factory) {
-        return postRecompute(weekStart, factory, null);
+        return postRecompute(weekStart, factory, "");
     }
 
     /**
-     * 同上，額外帶上週排程明細（品號 PrdNo、數量 Qty），供 PDCA 依實際上傳/編輯內容重算。
+     * 同上，指定單一品號 PrdNo（外部 API 目前格式：PnDd、PrdNo、Name、Wh，一次一個品號）。
      */
-    public String postRecompute(LocalDate weekStart, String factory, List<PdcaRequest.ScheduleItem> schedule) {
+    public String postRecompute(LocalDate weekStart, String factory, String prdNo) {
         IntegrationProperties.Pdca cfg = integrationProperties.getPdca();
         if (!cfg.isEnabled() || !StringUtils.hasText(cfg.getRecomputeUrl())) {
             throw new IllegalStateException("PDCA HTTP not configured");
@@ -82,15 +82,18 @@ public class PdcaExternalHttpClient {
 
         Map<String, Object> body = new java.util.HashMap<>();
         body.put("PnDd", weekStart.toString());
+        body.put("PrdNo", prdNo != null ? prdNo : "");
+        body.put("Name", "");
         body.put("Wh", wh);
-        if (!CollectionUtils.isEmpty(schedule)) {
-            body.put("Details", schedule.stream()
-                    .map(item -> Map.of(
-                            "PrdNo", item.getProductCode(),
-                            "Qty", item.getQuantity()
-                    ))
-                    .collect(Collectors.toList()));
-        }
+        // 外部 API 目前不收 Qty，舊的 Details 明細格式先保留，待對方支援再恢復
+        // if (!CollectionUtils.isEmpty(schedule)) {
+        //     body.put("Details", schedule.stream()
+        //             .map(item -> Map.of(
+        //                     "PrdNo", item.getProductCode(),
+        //                     "Qty", item.getQuantity()
+        //             ))
+        //             .collect(Collectors.toList()));
+        // }
 
         log.info("呼叫外部 PDCA API: url={}, body={}", cfg.getRecomputeUrl(), body);
 

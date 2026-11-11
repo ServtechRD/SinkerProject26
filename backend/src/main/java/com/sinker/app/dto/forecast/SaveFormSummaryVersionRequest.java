@@ -37,9 +37,9 @@ public class SaveFormSummaryVersionRequest {
         private String productName;
         @JsonProperty("product_code")
         private String productCode;
-        /** 該列備註（與修改原因獨立） */
-        @JsonProperty("remark")
-        private String remark;
+        /** 各通路列備註（與修改原因獨立），依 channel 寫回對應通路列；month 忽略 */
+        @JsonProperty("remarks")
+        private List<ChannelRemarkDTO> remarks;
         @JsonProperty("channel_quantities")
         private List<java.math.BigDecimal> channelQuantities;
 
@@ -53,8 +53,8 @@ public class SaveFormSummaryVersionRequest {
         public void setProductName(String productName) { this.productName = productName; }
         public String getProductCode() { return productCode; }
         public void setProductCode(String productCode) { this.productCode = productCode; }
-        public String getRemark() { return remark; }
-        public void setRemark(String remark) { this.remark = remark; }
+        public List<ChannelRemarkDTO> getRemarks() { return remarks; }
+        public void setRemarks(List<ChannelRemarkDTO> remarks) { this.remarks = remarks; }
         public List<java.math.BigDecimal> getChannelQuantities() { return channelQuantities; }
         public void setChannelQuantities(List<java.math.BigDecimal> channelQuantities) { this.channelQuantities = channelQuantities; }
     }

@@ -128,9 +128,11 @@ public class FormSummaryService {
             qtyByChannel[i] = new LinkedHashMap<>();
         }
         Map<String, FormSummaryRowDTO> keyToRow = new TreeMap<>();
+        Map<String, Map<String, String>> remarksByKey = new LinkedHashMap<>();
         for (SalesForecast r : currentRows) {
             String pk = productKey(r);
             keyToRow.putIfAbsent(pk, rowFrom(r));
+            collectRemark(remarksByKey, pk, r.getChannel(), r.getRemark());
             int chIdx = CHANNEL_ORDER.indexOf(r.getChannel());
             if (chIdx >= 0) qtyByChannel[chIdx].put(pk, r.getQuantity());
         }
@@ -167,6 +169,7 @@ public class FormSummaryService {
                     String pk = productKeyGift(g);
                     giftQtyByChannel[chIdx].put(pk, g.getQuantity());
                     keyToRow.putIfAbsent(pk, rowFromGift(g));
+                    collectRemark(remarksByKey, pk, channel, g.getRemark());
                 }
             }
         }
@@ -197,6 +200,7 @@ public class FormSummaryService {
                 cells.add(cell);
             }
             row.setChannelCells(cells);
+            row.setRemarks(toRemarkList(remarksByKey.get(pk), month));
             rows.add(row);
         }
         rows.sort((a, b) -> {
@@ -245,7 +249,7 @@ public class FormSummaryService {
         formVersionRepository.save(v1);
 
         Map<String, FormSummaryRowDTO> keyToRow = new TreeMap<>();
-        Map<String, String> remarkChannelByProductKey = new LinkedHashMap<>();
+        Map<String, Map<String, String>> remarksByKey = new LinkedHashMap<>();
         Map<String, BigDecimal>[] qtyByChannel = new Map[CHANNEL_ORDER.size()];
         for (int i = 0; i < CHANNEL_ORDER.size(); i++) {
             qtyByChannel[i] = new LinkedHashMap<>();
@@ -259,9 +263,7 @@ public class FormSummaryService {
                 for (SalesForecast r : salesRows) {
                     String pk = productKey(r);
                     keyToRow.putIfAbsent(pk, rowFrom(r));
-                    if (!remarkChannelByProductKey.containsKey(pk) && StringUtils.hasText(r.getRemark())) {
-                        remarkChannelByProductKey.put(pk, channel);
-                    }
+                    collectRemark(remarksByKey, pk, channel, r.getRemark());
                     qtyByChannel[chIdx].put(pk, r.getQuantity());
                 }
             }
@@ -269,9 +271,7 @@ public class FormSummaryService {
             for (GiftSalesForecast g : giftRows) {
                 String pk = productKeyGift(g);
                 keyToRow.putIfAbsent(pk, rowFromGift(g));
-                if (!remarkChannelByProductKey.containsKey(pk) && StringUtils.hasText(g.getRemark())) {
-                    remarkChannelByProductKey.put(pk, channel);
-                }
+                collectRemark(remarksByKey, pk, channel, g.getRemark());
                 BigDecimal existing = qtyByChannel[chIdx].getOrDefault(pk, BigDecimal.ZERO);
                 qtyByChannel[chIdx].put(pk, existing.add(g.getQuantity()));
             }
@@ -296,12 +296,7 @@ public class FormSummaryService {
                 sf.setProductName(row.getProductName());
                 sf.setProductCode(row.getProductCode() != null ? row.getProductCode() : "");
                 sf.setQuantity(qty);
-                String remarkSourceChannel = remarkChannelByProductKey.get(pk);
-                if (StringUtils.hasText(row.getRemark()) && channel.equals(remarkSourceChannel)) {
-                    sf.setRemark(row.getRemark());
-                } else {
-                    sf.setRemark("");
-                }
+                sf.setRemark(remarksByKey.getOrDefault(pk, Map.of()).getOrDefault(channel, ""));
                 sf.setIsModified(false);
                 sf.setCreatedAt(now);
                 sf.setUpdatedAt(now);
@@ -323,20 +318,6 @@ public class FormSummaryService {
         ensureFormVersion1Exists(month, config);
         List<SalesForecastFormVersion> existing = formVersionRepository.findByMonthOrderByVersionNoDesc(month);
         int nextNo = existing.isEmpty() ? 2 : existing.get(0).getVersionNo() + 1;
-        Integer baseVersionNo = existing.isEmpty() ? null : existing.get(0).getVersionNo();
-
-        Map<String, String> remarkChannelByProductKey = new LinkedHashMap<>();
-        if (baseVersionNo != null) {
-            List<SalesForecast> baseRows = forecastRepository.findByMonthAndFormVersionNoOrderByChannelCategorySpecProductCode(
-                    month, baseVersionNo
-            );
-            for (SalesForecast base : baseRows) {
-                String key = productKey(base);
-                if (!remarkChannelByProductKey.containsKey(key) && StringUtils.hasText(base.getRemark())) {
-                    remarkChannelByProductKey.put(key, base.getChannel());
-                }
-            }
-        }
 
         SalesForecastFormVersion newVer = new SalesForecastFormVersion();
         newVer.setMonth(month);
@@ -350,9 +331,22 @@ public class FormSummaryService {
         int inserted = 0;
         List<SaveFormSummaryVersionRequest.FormSummaryRowEditDTO> rows = request.getRows();
         if (rows == null) rows = List.of();
+        List<Map<String, String>> remarksByRow = new ArrayList<>();
+        for (SaveFormSummaryVersionRequest.FormSummaryRowEditDTO row : rows) {
+            Map<String, String> byChannel = new LinkedHashMap<>();
+            if (row.getRemarks() != null) {
+                for (ChannelRemarkDTO rm : row.getRemarks()) {
+                    if (rm != null && rm.getChannel() != null && StringUtils.hasText(rm.getText())) {
+                        byChannel.put(rm.getChannel(), rm.getText().trim());
+                    }
+                }
+            }
+            remarksByRow.add(byChannel);
+        }
         for (int chIdx = 0; chIdx < CHANNEL_ORDER.size(); chIdx++) {
             String channel = CHANNEL_ORDER.get(chIdx);
-            for (SaveFormSummaryVersionRequest.FormSummaryRowEditDTO row : rows) {
+            for (int rowIdx = 0; rowIdx < rows.size(); rowIdx++) {
+                SaveFormSummaryVersionRequest.FormSummaryRowEditDTO row = rows.get(rowIdx);
                 BigDecimal qty = BigDecimal.ZERO;
                 if (row.getChannelQuantities() != null && chIdx < row.getChannelQuantities().size()) {
                     BigDecimal v = row.getChannelQuantities().get(chIdx);
@@ -369,14 +363,7 @@ public class FormSummaryService {
                 sf.setProductName(row.getProductName());
                 sf.setProductCode(row.getProductCode() != null ? row.getProductCode() : "");
                 sf.setQuantity(qty);
-                String rowRemark = row.getRemark() != null ? row.getRemark() : "";
-                String productKey = productKey(row);
-                String remarkSourceChannel = remarkChannelByProductKey.get(productKey);
-                if (StringUtils.hasText(rowRemark) && channel.equals(remarkSourceChannel)) {
-                    sf.setRemark(rowRemark);
-                } else {
-                    sf.setRemark("");
-                }
+                sf.setRemark(remarksByRow.get(rowIdx).getOrDefault(channel, ""));
                 sf.setIsModified(true);
                 sf.setCreatedAt(now);
                 sf.setUpdatedAt(now);
@@ -404,6 +391,7 @@ public class FormSummaryService {
         Map<String, Map<String, BigDecimal>> channelPreviousQty = new LinkedHashMap<>();
         Map<String, String> channelRemark = new LinkedHashMap<>();
         Map<String, FormSummaryRowDTO> keyToRow = new TreeMap<>();
+        Map<String, Map<String, String>> remarksByKey = new LinkedHashMap<>();
 
         for (String channel : CHANNEL_ORDER) {
             List<String> versions = forecastRepository.findDistinctVersionsByMonthAndChannel(month, channel);
@@ -423,6 +411,7 @@ public class FormSummaryService {
                     String pk = productKey(r);
                     latestQty.put(pk, r.getQuantity());
                     keyToRow.putIfAbsent(pk, rowFrom(r));
+                    collectRemark(remarksByKey, pk, channel, r.getRemark());
                 }
                 remark = versionReasonRepository.findByMonthAndChannelAndVersion(month, channel, latestVer)
                         .map(SalesForecastVersionReason::getChangeReason)
@@ -450,6 +439,7 @@ public class FormSummaryService {
                 String pk = productKeyGift(g);
                 qtyMap.put(pk, g.getQuantity());
                 keyToRow.putIfAbsent(pk, rowFromGift(g));
+                collectRemark(remarksByKey, pk, channel, g.getRemark());
             }
             giftLatestQty.put(channel, qtyMap);
         }
@@ -472,6 +462,7 @@ public class FormSummaryService {
                 cells.add(cell);
             }
             row.setChannelCells(cells);
+            row.setRemarks(toRemarkList(remarksByKey.get(pk), month));
         }
 
         List<FormSummaryRowDTO> rows = new ArrayList<>(keyToRow.values());
@@ -506,12 +497,21 @@ public class FormSummaryService {
                 + (g.getProductCode() != null ? g.getProductCode() : "");
     }
 
-    private static String productKey(SaveFormSummaryVersionRequest.FormSummaryRowEditDTO row) {
-        return (row.getWarehouseLocation() != null ? row.getWarehouseLocation() : "") + "|"
-                + (row.getCategory() != null ? row.getCategory() : "") + "|"
-                + (row.getSpec() != null ? row.getSpec() : "") + "|"
-                + (row.getProductName() != null ? row.getProductName() : "") + "|"
-                + (row.getProductCode() != null ? row.getProductCode() : "");
+    /** 收集某品項某通路的備註；同通路銷售與禮品皆有備註時以「；」串接（相同內容不重複） */
+    private static void collectRemark(Map<String, Map<String, String>> remarksByKey, String pk, String channel, String text) {
+        if (channel == null || !StringUtils.hasText(text)) return;
+        remarksByKey.computeIfAbsent(pk, k -> new LinkedHashMap<>())
+                .merge(channel, text.trim(), (a, b) -> a.equals(b) ? a : a + "；" + b);
+    }
+
+    private static List<ChannelRemarkDTO> toRemarkList(Map<String, String> byChannel, String month) {
+        List<ChannelRemarkDTO> list = new ArrayList<>();
+        if (byChannel == null) return list;
+        for (String ch : CHANNEL_ORDER) {
+            String text = byChannel.get(ch);
+            if (text != null) list.add(new ChannelRemarkDTO(ch, month, text));
+        }
+        return list;
     }
 
     private static FormSummaryRowDTO rowFrom(SalesForecast r) {
@@ -521,7 +521,6 @@ public class FormSummaryService {
         dto.setSpec(r.getSpec());
         dto.setProductName(r.getProductName());
         dto.setProductCode(r.getProductCode());
-        dto.setRemark(r.getRemark());
         return dto;
     }
 
@@ -532,7 +531,6 @@ public class FormSummaryService {
         dto.setSpec(g.getSpec());
         dto.setProductName(g.getProductName());
         dto.setProductCode(g.getProductCode());
-        dto.setRemark(g.getRemark());
         return dto;
     }
 

@@ -113,6 +113,17 @@ function num(v) {
   return Number.isNaN(n) ? 0 : n
 }
 
+/** 備註來源標示，如 [全聯/12月]；month 為 YYYYMM */
+function remarkLabel(r) {
+  return `[${r.channel}/${Number(String(r.month ?? '').slice(4))}月]`
+}
+
+/** CSV 欄位跳脫：含逗號、引號或換行時以雙引號包住 */
+function csvCell(v) {
+  const s = String(v ?? '')
+  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+
 /** 通路格：目前值是否與前一版不同（用於紅字） */
 function channelValueChangedFromPrev(prevQty, currQty) {
   return Math.abs(num(currQty) - num(prevQty)) > 1e-9
@@ -157,6 +168,10 @@ export default function ForecastListPage() {
   const [saving, setSaving] = useState(false)
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false)
   const [remarkModal, setRemarkModal] = useState(null)
+  /** 開啟中的列備註彈窗（rows 中的索引），null 為關閉 */
+  const [rowRemarkModalIdx, setRowRemarkModalIdx] = useState(null)
+  // 資料重新載入（查詢、儲存）後索引可能指向別列，一律關閉彈窗
+  useEffect(() => { setRowRemarkModalIdx(null) }, [rows])
 
   const [sortKey, setSortKey] = useState(DEFAULT_SORT_KEY)
   const [sortAsc, setSortAsc] = useState(DEFAULT_SORT_ASC)
@@ -356,7 +371,7 @@ export default function ForecastListPage() {
     setEditChannelValues(next)
     const remarks = {}
     rows.forEach((row, rowIdx) => {
-      remarks[rowIdx] = row.remark ?? ''
+      remarks[rowIdx] = (row.remarks ?? []).map((r) => ({ ...r }))
     })
     setEditRowRemarks(remarks)
     setEditMode(true)
@@ -375,6 +390,17 @@ export default function ForecastListPage() {
       return { ...prev, [rowIdx]: arr }
     })
   }
+
+  const setEditRemarkText = (rowIdx, remarkIdx, text) => {
+    setEditRowRemarks((prev) => {
+      const arr = [...(prev[rowIdx] ?? [])]
+      arr[remarkIdx] = { ...arr[remarkIdx], text }
+      return { ...prev, [rowIdx]: arr }
+    })
+  }
+
+  const getRowRemarks = (row, rowIdxInRows) =>
+    (editMode ? editRowRemarks[rowIdxInRows] : null) ?? row.remarks ?? []
 
   const getEditValue = (rowIdx, chIdx) => {
     const arr = editChannelValues[rowIdx]
@@ -395,7 +421,7 @@ export default function ForecastListPage() {
           spec: row.spec,
           product_name: row.product_name ?? row.productName,
           product_code: row.product_code ?? row.productCode,
-          remark: editMode ? (editRowRemarks[rowIdxInRows] ?? row.remark ?? '') : (row.remark ?? ''),
+          remarks: getRowRemarks(row, rowIdxInRows).map((r) => ({ channel: r.channel, text: r.text ?? '' })),
           channel_quantities: (Array.isArray(quantities) ? quantities : []).map((q) => (q != null && q !== '') ? Number(q) : 0),
         }
       })
@@ -457,7 +483,10 @@ export default function ForecastListPage() {
       /** 第 1 版無前一版可比：差異仍為 0；更改後小計顯示本版列總（與畫面一致） */
       const exportAfterSum = afterTotal
       const exportDiff = isFormVersion1 && !editMode ? 0 : diff
-      const remark = editMode ? (editRowRemarks[rowIdxInRows] ?? row.remark ?? '-') : (row.remark ?? '-')
+      const remarkLines = getRowRemarks(row, rowIdxInRows)
+        .filter((r) => (r.text ?? '').trim())
+        .map((r) => `${remarkLabel(r)} ${r.text.trim()}`)
+      const remark = remarkLines.length ? remarkLines.join('\n') : '-'
       return [
         row.warehouse_location ?? row.warehouseLocation ?? '',
         row.category ?? '',
@@ -471,7 +500,7 @@ export default function ForecastListPage() {
         remark,
       ]
     })
-    const csv = BOM + [headers.join(','), ...dataRows.map((r) => r.join(','))].join('\r\n')
+    const csv = BOM + [headers, ...dataRows].map((r) => r.map(csvCell).join(',')).join('\r\n')
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -728,16 +757,16 @@ export default function ForecastListPage() {
                                     <td className={`align-right${highlightAfterDiff ? ' forecast-channel-value--changed' : ''}`}>{showAfterSum}</td>
                                     <td className={`align-right${highlightAfterDiff ? ' forecast-channel-value--changed' : ''}`}>{showDiff}</td>
                                     <td className="forecast-remark-cell">
-                                      {editMode ? (
-                                        <input
-                                          type="text"
-                                          className="form-select forecast-remark-input"
-                                          value={editRowRemarks[rowIdxInRows] ?? row.remark ?? ''}
-                                          onChange={(e) => setEditRowRemarks((prev) => ({ ...prev, [rowIdxInRows]: e.target.value }))}
-                                          placeholder="列備註"
-                                        />
+                                      {getRowRemarks(row, rowIdxInRows).length ? (
+                                        <button
+                                          type="button"
+                                          className="btn btn--small btn--link forecast-remark-btn"
+                                          onClick={() => setRowRemarkModalIdx(rowIdxInRows)}
+                                        >
+                                          備註
+                                        </button>
                                       ) : (
-                                        (row.remark ?? '-')
+                                        '-'
                                       )}
                                     </td>
                                   </tr>
@@ -799,6 +828,40 @@ export default function ForecastListPage() {
               </div>
             </div>
           )}
+
+          {rowRemarkModalIdx != null && rows[rowRemarkModalIdx] && (() => {
+            const modalRow = rows[rowRemarkModalIdx]
+            const modalRemarks = getRowRemarks(modalRow, rowRemarkModalIdx)
+            const closeModal = () => setRowRemarkModalIdx(null)
+            return (
+              <div className="forecast-remark-modal-overlay" onClick={closeModal} role="presentation">
+                <div className="forecast-remark-modal" role="dialog" aria-label="備註" onClick={(e) => e.stopPropagation()}>
+                  <div className="forecast-remark-modal-header">
+                    <h3>備註：{modalRow.product_name ?? modalRow.productName ?? ''}</h3>
+                    <button type="button" className="forecast-remark-modal-close" onClick={closeModal} aria-label="關閉">×</button>
+                  </div>
+                  <ul className="forecast-remark-modal-list">
+                    {modalRemarks.map((r, ri) => (
+                      <li key={r.channel} className="forecast-remark-line">
+                        <span className="forecast-remark-label">{remarkLabel(r)}</span>
+                        {editMode ? (
+                          <input
+                            type="text"
+                            className="form-select forecast-remark-input"
+                            value={r.text ?? ''}
+                            onChange={(e) => setEditRemarkText(rowRemarkModalIdx, ri, e.target.value)}
+                            aria-label={`${remarkLabel(r)} 備註`}
+                          />
+                        ) : (
+                          <span>{r.text}</span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            )
+          })()}
         </>
       )}
     </div>

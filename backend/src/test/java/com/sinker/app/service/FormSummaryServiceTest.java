@@ -1,5 +1,6 @@
 package com.sinker.app.service;
 
+import com.sinker.app.dto.forecast.ChannelRemarkDTO;
 import com.sinker.app.dto.forecast.FormVersionListItemDTO;
 import com.sinker.app.dto.forecast.FormSummaryResponse;
 import com.sinker.app.dto.forecast.SaveFormSummaryVersionRequest;
@@ -15,6 +16,7 @@ import com.sinker.app.repository.SalesForecastRepository;
 import com.sinker.app.repository.SalesForecastVersionReasonRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
@@ -197,7 +199,7 @@ class FormSummaryServiceTest {
         row.setSpec("S");
         row.setProductName("N");
         row.setProductCode("P001");
-        row.setRemark("row remark");
+        row.setRemarks(List.of(new ChannelRemarkDTO("7-11", MONTH, "row remark")));
         row.setChannelQuantities(new ArrayList<>(List.of(new BigDecimal("22"))));
         req.setRows(List.of(row));
 
@@ -243,6 +245,116 @@ class FormSummaryServiceTest {
 
         verify(formVersionRepository).save(argThat(v -> v.getVersionNo() == 1 && MONTH.equals(v.getMonth())));
         verify(forecastRepository, times(12)).save(any(SalesForecast.class));
+    }
+
+    // F126：同品項多通路備註皆保留，前一通路無備註時後一通路的備註也不能遺失
+    @Test
+    void createFormVersion1Snapshot_keepsRemarkPerChannel() {
+        SalesForecastConfig config = closedConfig();
+        when(formVersionRepository.countByMonth(MONTH)).thenReturn(0L);
+        when(forecastRepository.findDistinctVersionsByMonthAndChannel(anyString(), anyString())).thenReturn(List.of());
+        when(giftForecastRepository.findLatestByMonthAndChannel(anyString(), anyString())).thenReturn(List.of());
+        // P001：PX 與 7-11 各有備註；P002：PX 無備註、7-11 有備註
+        when(forecastRepository.findDistinctVersionsByMonthAndChannel(MONTH, CH)).thenReturn(List.of("vPX"));
+        when(forecastRepository.findByMonthAndChannelAndVersionOrderByCategoryAscSpecAscProductCodeAsc(MONTH, CH, "vPX"))
+                .thenReturn(List.of(
+                        sales(MONTH, CH, "vPX", null, "P001", BigDecimal.ONE, "PX 備註"),
+                        sales(MONTH, CH, "vPX", null, "P002", BigDecimal.ONE, "")));
+        when(forecastRepository.findDistinctVersionsByMonthAndChannel(MONTH, "7-11")).thenReturn(List.of("v711"));
+        when(forecastRepository.findByMonthAndChannelAndVersionOrderByCategoryAscSpecAscProductCodeAsc(MONTH, "7-11", "v711"))
+                .thenReturn(List.of(
+                        sales(MONTH, "7-11", "v711", null, "P001", BigDecimal.ONE, "711 備註"),
+                        sales(MONTH, "7-11", "v711", null, "P002", BigDecimal.ONE, "9/30前需生產完成")));
+        GiftSalesForecast g = gift("7-11", "P001", BigDecimal.ONE);
+        g.setRemark("禮品備註");
+        when(giftForecastRepository.findLatestByMonthAndChannel(MONTH, "7-11")).thenReturn(List.of(g));
+
+        service.createFormVersion1Snapshot(MONTH, config);
+
+        ArgumentCaptor<SalesForecast> captor = ArgumentCaptor.forClass(SalesForecast.class);
+        verify(forecastRepository, times(24)).save(captor.capture());
+        assertEquals("PX 備註", remarkOf(captor.getAllValues(), CH, "P001"));
+        assertEquals("711 備註；禮品備註", remarkOf(captor.getAllValues(), "7-11", "P001"));
+        assertEquals("", remarkOf(captor.getAllValues(), CH, "P002"));
+        assertEquals("9/30前需生產完成", remarkOf(captor.getAllValues(), "7-11", "P002"));
+    }
+
+    @Test
+    void getFormSummaryByVersion_returnsRemarksPerChannelInChannelOrder() {
+        when(configRepository.findByMonth(MONTH)).thenReturn(Optional.of(closedConfig()));
+        doNothing().when(service).ensureFormVersion1Exists(eq(MONTH), any(SalesForecastConfig.class));
+        when(formVersionRepository.findByMonthOrderByVersionNoDesc(MONTH)).thenReturn(List.of(formVer(2, null)));
+        // repository 依通路名稱排序回傳，7-11 會排在 PX 前面；輸出需依 CHANNEL_ORDER
+        when(forecastRepository.findByMonthAndFormVersionNoOrderByChannelCategorySpecProductCode(MONTH, 2))
+                .thenReturn(List.of(
+                        sales(MONTH, "7-11", "form_v2", 2, "P001", BigDecimal.ONE, "711 備註"),
+                        sales(MONTH, CH, "form_v2", 2, "P001", BigDecimal.ONE, "PX 備註"),
+                        sales(MONTH, "全家", "form_v2", 2, "P001", BigDecimal.ONE, "")));
+        when(forecastRepository.findByMonthAndFormVersionNoOrderByChannelCategorySpecProductCode(MONTH, 1))
+                .thenReturn(List.of());
+
+        FormSummaryResponse resp = service.getFormSummaryByVersion(MONTH, 2);
+
+        List<ChannelRemarkDTO> remarks = resp.getRows().get(0).getRemarks();
+        assertEquals(2, remarks.size());
+        assertEquals(CH, remarks.get(0).getChannel());
+        assertEquals("PX 備註", remarks.get(0).getText());
+        assertEquals(MONTH, remarks.get(0).getMonth());
+        assertEquals("7-11", remarks.get(1).getChannel());
+        assertEquals("711 備註", remarks.get(1).getText());
+    }
+
+    @Test
+    void getFormSummaryLegacy_includesGiftRemarkWithChannel() {
+        when(forecastRepository.findDistinctVersionsByMonthAndChannel(anyString(), anyString())).thenReturn(List.of());
+        when(giftForecastRepository.findLatestByMonthAndChannel(anyString(), anyString())).thenReturn(List.of());
+        GiftSalesForecast g = gift("全家", "P009", BigDecimal.ONE);
+        g.setRemark("禮盒改版");
+        when(giftForecastRepository.findLatestByMonthAndChannel(MONTH, "全家")).thenReturn(List.of(g));
+
+        FormSummaryResponse resp = service.getFormSummaryLegacy(MONTH);
+
+        List<ChannelRemarkDTO> remarks = resp.getRows().get(0).getRemarks();
+        assertEquals(1, remarks.size());
+        assertEquals("全家", remarks.get(0).getChannel());
+        assertEquals("禮盒改版", remarks.get(0).getText());
+    }
+
+    @Test
+    void saveFormSummaryVersion_writesEachChannelRemarkToItsOwnRow() {
+        when(configRepository.findByMonth(MONTH)).thenReturn(Optional.of(closedConfig()));
+        doNothing().when(service).ensureFormVersion1Exists(eq(MONTH), any(SalesForecastConfig.class));
+        when(formVersionRepository.findByMonthOrderByVersionNoDesc(MONTH)).thenReturn(List.of(formVer(1, null)));
+
+        SaveFormSummaryVersionRequest.FormSummaryRowEditDTO row = new SaveFormSummaryVersionRequest.FormSummaryRowEditDTO();
+        row.setProductCode("P001");
+        row.setRemarks(List.of(
+                new ChannelRemarkDTO(CH, MONTH, "PX 原備註"),
+                new ChannelRemarkDTO("7-11", null, "  711 修改後  "),
+                new ChannelRemarkDTO("全家", MONTH, "   ")));
+        SaveFormSummaryVersionRequest req = new SaveFormSummaryVersionRequest();
+        req.setRows(List.of(row));
+
+        service.saveFormSummaryVersion(MONTH, req);
+
+        ArgumentCaptor<SalesForecast> captor = ArgumentCaptor.forClass(SalesForecast.class);
+        verify(forecastRepository, times(12)).save(captor.capture());
+        assertEquals("PX 原備註", remarkOf(captor.getAllValues(), CH, "P001"));
+        assertEquals("711 修改後", remarkOf(captor.getAllValues(), "7-11", "P001"));
+        assertEquals("", remarkOf(captor.getAllValues(), "全家", "P001"));
+        assertEquals("", remarkOf(captor.getAllValues(), "家樂福", "P001"));
+    }
+
+    private static String remarkOf(List<SalesForecast> saved, String channel, String code) {
+        return saved.stream()
+                .filter(s -> channel.equals(s.getChannel()) && code.equals(s.getProductCode()))
+                .findFirst().orElseThrow().getRemark();
+    }
+
+    private SalesForecast sales(String month, String channel, String version, Integer formVersionNo, String code, BigDecimal qty, String remark) {
+        SalesForecast s = sales(month, channel, version, formVersionNo, code, qty);
+        s.setRemark(remark);
+        return s;
     }
 
     private SalesForecastConfig closedConfig() {

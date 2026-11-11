@@ -19,9 +19,9 @@ public class FormSummaryRowDTO {
     private String productName;
     @JsonProperty("product_code")
     private String productCode;
-    /** 該列備註（與版本修改原因獨立） */
-    @JsonProperty("remark")
-    private String remark;
+    /** 各通路列備註（與版本修改原因獨立），順序同 channel_order */
+    @JsonProperty("remarks")
+    private List<ChannelRemarkDTO> remarks;
     @JsonProperty("channel_cells")
     private List<ChannelCellDTO> channelCells;
 
@@ -40,8 +40,8 @@ public class FormSummaryRowDTO {
     public String getProductCode() { return productCode; }
     public void setProductCode(String productCode) { this.productCode = productCode; }
 
-    public String getRemark() { return remark; }
-    public void setRemark(String remark) { this.remark = remark; }
+    public List<ChannelRemarkDTO> getRemarks() { return remarks; }
+    public void setRemarks(List<ChannelRemarkDTO> remarks) { this.remarks = remarks; }
 
     public List<ChannelCellDTO> getChannelCells() { return channelCells; }
     public void setChannelCells(List<ChannelCellDTO> channelCells) { this.channelCells = channelCells; }

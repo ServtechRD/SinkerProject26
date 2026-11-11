@@ -151,18 +151,25 @@
 }
 
 .forecast-remark-cell {
-  max-width: 100px;
+  white-space: nowrap;
 }
 
-/* 編輯模式下備註欄與編輯區塊同寬 */
-.forecast-table--edit .forecast-remark-cell {
-  min-width: 320px;
-  max-width: none;
-  width: 30%;
+/* 彈窗內每則通路備註一行：[通路/M月] 內容 */
+.forecast-remark-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  line-height: 1.5;
 }
-.forecast-table--edit .forecast-remark-input {
+
+.forecast-remark-label {
+  flex-shrink: 0;
+  color: #555;
+}
+
+.forecast-remark-line .forecast-remark-input {
+  flex: 1;
   max-width: none;
-  width: 100%;
   box-sizing: border-box;
 }
 

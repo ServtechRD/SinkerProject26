@@ -15,12 +15,13 @@ vi.mock('../../../api/forecast', () => ({
   getForecastList: vi.fn(),
   getFormVersions: vi.fn(),
   getFormSummary: vi.fn(),
+  saveFormSummaryVersion: vi.fn(),
   updateForecastItem: vi.fn(),
   deleteForecastItem: vi.fn(),
 }))
 
 import { listConfigs } from '../../../api/forecastConfig'
-import { getForecastVersions, getForecastList, getFormVersions, getFormSummary } from '../../../api/forecast'
+import { getForecastVersions, getForecastList, getFormVersions, getFormSummary, saveFormSummaryVersion } from '../../../api/forecast'
 
 const mockConfigs = [
   {
@@ -309,6 +310,62 @@ describe('ForecastListPage', () => {
 
     await waitFor(() => {
       expect(screen.getByText('該月份尚無預估資料')).toBeInTheDocument()
+    })
+  })
+
+  describe('per-channel remarks (F126)', () => {
+    const closedConfigs = [{ id: 1, month: '202612', autoCloseDay: 10, isClosed: true, closedAt: '2026-12-10T10:00:00' }]
+    const rowWithRemarks = {
+      productCode: 'P001',
+      productName: '中元禮盒',
+      channel_cells: [{ current_qty: 100, previous_qty: 100, current_sales_qty: 100 }],
+      remarks: [
+        { channel: '全聯', month: '202612', text: '12月替換新品' },
+        { channel: '7-11', month: '202612', text: '9/30前需生產完成' },
+      ],
+    }
+
+    async function openSummary() {
+      listConfigs.mockResolvedValue(closedConfigs)
+      getFormVersions.mockResolvedValue([{ version_no: 1, created_at: '2026-12-15T10:00:00' }])
+      getFormSummary.mockResolvedValue({ rows: [rowWithRemarks], channel_order: ['PX + 大全聯'], version_no: 1 })
+      renderPage({ permissions: ['sales_forecast.view', 'sales_forecast.update_after_closed'], roleCode: 'production_planner' })
+      await waitFor(() => expect(screen.getByLabelText('月份')).toBeInTheDocument())
+      await userEvent.selectOptions(screen.getByLabelText('月份'), '202612')
+      await userEvent.click(screen.getByRole('button', { name: '查詢' }))
+      await waitFor(() => expect(screen.getByText('中元禮盒')).toBeInTheDocument())
+    }
+
+    it('shows remark button and opens modal listing each channel remark with [channel/month] label', async () => {
+      await openSummary()
+      expect(screen.queryByText('[全聯/12月]')).not.toBeInTheDocument()
+      await userEvent.click(screen.getByRole('button', { name: '備註' }))
+      expect(screen.getByRole('dialog', { name: '備註' })).toBeInTheDocument()
+      expect(screen.getByText('[全聯/12月]')).toBeInTheDocument()
+      expect(screen.getByText('[7-11/12月]')).toBeInTheDocument()
+      expect(screen.getByText(/12月替換新品/)).toBeInTheDocument()
+      expect(screen.getByText(/9\/30前需生產完成/)).toBeInTheDocument()
+    })
+
+    it('edits a single channel remark and sends per-channel remarks on save', async () => {
+      saveFormSummaryVersion.mockResolvedValue({ version_no: 2 })
+      await openSummary()
+
+      await userEvent.click(screen.getByRole('button', { name: '編輯' }))
+      await userEvent.click(screen.getByRole('button', { name: '備註' }))
+      const input711 = screen.getByLabelText('[7-11/12月] 備註')
+      await userEvent.clear(input711)
+      await userEvent.type(input711, '改為10/15前')
+      await userEvent.click(screen.getByRole('button', { name: '關閉' }))
+      await userEvent.click(screen.getByRole('button', { name: '儲存' }))
+      await userEvent.click(screen.getByRole('button', { name: '是' }))
+
+      await waitFor(() => expect(saveFormSummaryVersion).toHaveBeenCalled())
+      const payload = saveFormSummaryVersion.mock.calls[0][1]
+      expect(payload.rows[0].remarks).toEqual([
+        { channel: '全聯', text: '12月替換新品' },
+        { channel: '7-11', text: '改為10/15前' },
+      ])
     })
   })
 })

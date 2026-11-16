@@ -2,9 +2,11 @@ package com.sinker.app.controller;
 
 import com.sinker.app.dto.forecast.ConfigResponse;
 import com.sinker.app.dto.forecast.CreateMonthsRequest;
+import com.sinker.app.dto.forecast.ReopenRequest;
 import com.sinker.app.dto.forecast.UpdateConfigRequest;
 import com.sinker.app.exception.ResourceNotFoundException;
 import com.sinker.app.security.JwtUserPrincipal;
+import com.sinker.app.service.ReopenService;
 import com.sinker.app.service.SalesForecastConfigService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -27,9 +29,11 @@ public class SalesForecastConfigController {
     private static final Logger log = LoggerFactory.getLogger(SalesForecastConfigController.class);
 
     private final SalesForecastConfigService service;
+    private final ReopenService reopenService;
 
-    public SalesForecastConfigController(SalesForecastConfigService service) {
+    public SalesForecastConfigController(SalesForecastConfigService service, ReopenService reopenService) {
         this.service = service;
+        this.reopenService = reopenService;
     }
 
     @PostMapping
@@ -60,6 +64,17 @@ public class SalesForecastConfigController {
         log.info("PUT /api/sales-forecast/config/{} - Updating config", id);
         ConfigResponse response = service.updateConfig(id, request, principal.getUserId());
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{id}/reopen")
+    @PreAuthorize("hasAuthority('sales_forecast_config.reopen')")
+    public ResponseEntity<Void> reopen(
+            @PathVariable Integer id,
+            @Valid @RequestBody ReopenRequest request,
+            @AuthenticationPrincipal JwtUserPrincipal principal) {
+        log.info("POST /api/sales-forecast/config/{}/reopen - channels={}", id, request.getChannels());
+        reopenService.open(id, request, principal.getUserId());
+        return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)

@@ -14,7 +14,7 @@ CREATE TABLE sales_forecast_reopen_window (
     PRIMARY KEY (id),
     KEY idx_reopen_window_month_channel (month, channel, ended_at),
     KEY idx_reopen_window_expires (ended_at, expires_at)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE sales_forecast_form_log (
     id          INT          NOT NULL AUTO_INCREMENT,
@@ -26,7 +26,7 @@ CREATE TABLE sales_forecast_form_log (
     created_at  DATETIME     NOT NULL,
     PRIMARY KEY (id),
     KEY idx_form_log_month (month, created_at)
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 INSERT INTO permissions (code, name, module, description) VALUES
 ('sales_forecast_config.reopen', '開放補登', 'sales_forecast_config', '已結束新增的月份，對指定通路開放補登');

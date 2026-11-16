@@ -1,6 +1,7 @@
 package com.sinker.app.service;
 
 import com.sinker.app.dto.forecast.*;
+import com.sinker.app.entity.FormLogAction;
 import com.sinker.app.entity.GiftSalesForecast;
 import com.sinker.app.entity.SalesForecast;
 import com.sinker.app.entity.SalesForecastConfig;
@@ -35,7 +36,7 @@ import java.util.TreeMap;
 public class FormSummaryService {
 
     private static final Logger log = LoggerFactory.getLogger(FormSummaryService.class);
-    private static final List<String> CHANNEL_ORDER = List.of(
+    public static final List<String> CHANNEL_ORDER = List.of(
             "PX + 大全聯", "家樂福", "愛買", "7-11", "全家", "Ok+萊爾富",
             "好市多", "楓康", "美聯社", "康是美", "電商", "市面經銷");
 
@@ -44,17 +45,20 @@ public class FormSummaryService {
     private final SalesForecastConfigRepository configRepository;
     private final SalesForecastFormVersionRepository formVersionRepository;
     private final GiftSalesForecastRepository giftForecastRepository;
+    private final FormLogService formLogService;
 
     public FormSummaryService(SalesForecastRepository forecastRepository,
                               SalesForecastVersionReasonRepository versionReasonRepository,
                               SalesForecastConfigRepository configRepository,
                               SalesForecastFormVersionRepository formVersionRepository,
-                              GiftSalesForecastRepository giftForecastRepository) {
+                              GiftSalesForecastRepository giftForecastRepository,
+                              FormLogService formLogService) {
         this.forecastRepository = forecastRepository;
         this.versionReasonRepository = versionReasonRepository;
         this.configRepository = configRepository;
         this.formVersionRepository = formVersionRepository;
         this.giftForecastRepository = giftForecastRepository;
+        this.formLogService = formLogService;
     }
 
     /**
@@ -309,7 +313,7 @@ public class FormSummaryService {
     }
 
     @Transactional
-    public int saveFormSummaryVersion(String month, SaveFormSummaryVersionRequest request) {
+    public int saveFormSummaryVersion(String month, SaveFormSummaryVersionRequest request, Long userId) {
         validateMonth(month);
         SalesForecastConfig config = configRepository.findByMonth(month)
                 .orElseThrow(() -> new IllegalArgumentException("Month config not found: " + month));
@@ -373,6 +377,8 @@ public class FormSummaryService {
             }
         }
         log.info("Saved form summary version {} for month {}, {} rows", nextNo, month, inserted);
+        formLogService.record(month, null, FormLogAction.CORRECTION, userId,
+                "產生版本 " + versionLabel + "；原因：" + request.getChangeReason());
         return nextNo;
     }
 

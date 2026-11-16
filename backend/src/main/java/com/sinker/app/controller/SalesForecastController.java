@@ -144,7 +144,7 @@ public class SalesForecastController {
             throw new IllegalArgumentException("Missing required parameter: month");
         }
 
-        int versionNo = formSummaryService.saveFormSummaryVersion(month, request);
+        int versionNo = formSummaryService.saveFormSummaryVersion(month, request, principal.getUserId());
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("version_no", versionNo));
     }
 

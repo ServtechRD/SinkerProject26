@@ -51,6 +51,8 @@ class FormSummaryServiceTest {
     private SalesForecastFormVersionRepository formVersionRepository;
     @Mock
     private GiftSalesForecastRepository giftForecastRepository;
+    @Mock
+    private FormLogService formLogService;
 
     @Spy
     @InjectMocks
@@ -111,7 +113,7 @@ class FormSummaryServiceTest {
         SaveFormSummaryVersionRequest req = new SaveFormSummaryVersionRequest();
         IllegalArgumentException ex = assertThrows(
                 IllegalArgumentException.class,
-                () -> service.saveFormSummaryVersion(MONTH, req)
+                () -> service.saveFormSummaryVersion(MONTH, req, 1L)
         );
         assertTrue(ex.getMessage().contains("not closed"));
         verify(formVersionRepository, never()).save(any());
@@ -205,11 +207,13 @@ class FormSummaryServiceTest {
         row.setChannelQuantities(new ArrayList<>(List.of(new BigDecimal("22"))));
         req.setRows(List.of(row));
 
-        int versionNo = service.saveFormSummaryVersion(MONTH, req);
+        int versionNo = service.saveFormSummaryVersion(MONTH, req, 1L);
 
         assertEquals(3, versionNo);
         verify(formVersionRepository).save(argThat(v -> v.getVersionNo() == 3 && "new reason".equals(v.getChangeReason())));
         verify(forecastRepository, times(12)).save(any(SalesForecast.class));
+        verify(formLogService).record(eq(MONTH), isNull(),
+                eq(com.sinker.app.entity.FormLogAction.CORRECTION), eq(1L), contains("form_v" + versionNo));
     }
 
     @Test
@@ -337,7 +341,7 @@ class FormSummaryServiceTest {
         SaveFormSummaryVersionRequest req = new SaveFormSummaryVersionRequest();
         req.setRows(List.of(row));
 
-        service.saveFormSummaryVersion(MONTH, req);
+        service.saveFormSummaryVersion(MONTH, req, 1L);
 
         ArgumentCaptor<SalesForecast> captor = ArgumentCaptor.forClass(SalesForecast.class);
         verify(forecastRepository, times(12)).save(captor.capture());

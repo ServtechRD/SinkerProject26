@@ -2,14 +2,17 @@ package com.sinker.app.dto.forecast;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
 
 /**
- * 儲存新版本請求：修改原因（可為空）+ 各列各通路數量
+ * 儲存新版本請求：修改原因（必填）+ 各列各通路數量
  */
 public class SaveFormSummaryVersionRequest {
 
+    /** 修改原因，必填，儲存新版本時一併寫入異動紀錄 */
+    @NotBlank(message = "change_reason is required")
     @JsonProperty("change_reason")
     private String changeReason;
 

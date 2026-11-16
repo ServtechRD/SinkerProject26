@@ -10,12 +10,13 @@ public class CreateMonthsRequest {
     private String month;
 
     @NotBlank
-    @Pattern(regexp = "^\\d{4}-\\d{2}-\\d{2}$", message = "autoCloseDate format must be YYYY-MM-DD")
-    private String autoCloseDate;
+    @Pattern(regexp = "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}(:\\d{2})?$",
+            message = "autoCloseAt format must be YYYY-MM-DDTHH:mm")
+    private String autoCloseAt;
 
     public String getMonth() { return month; }
     public void setMonth(String month) { this.month = month; }
 
-    public String getAutoCloseDate() { return autoCloseDate; }
-    public void setAutoCloseDate(String autoCloseDate) { this.autoCloseDate = autoCloseDate; }
+    public String getAutoCloseAt() { return autoCloseAt; }
+    public void setAutoCloseAt(String autoCloseAt) { this.autoCloseAt = autoCloseAt; }
 }

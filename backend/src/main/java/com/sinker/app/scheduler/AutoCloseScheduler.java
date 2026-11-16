@@ -6,8 +6,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
-import java.time.LocalDate;
-
 @Component
 public class AutoCloseScheduler {
 
@@ -19,12 +17,16 @@ public class AutoCloseScheduler {
         this.service = service;
     }
 
-    @Scheduled(cron = "0 45 7 * * ?")
-    public void autoCloseMonths() {
-        LocalDate currentDate = LocalDate.now();
-        log.info("AutoCloseScheduler running - current date: {}", currentDate);
-
-        int closedCount = service.autoCloseMatchingMonths(currentDate);
-        log.info("AutoCloseScheduler completed - {} month(s) auto-closed", closedCount);
+    /** 每分鐘：自動截止到期的月份 */
+    @Scheduled(cron = "0 * * * * ?")
+    public void runEveryMinute() {
+        try {
+            int closed = service.autoCloseDue();
+            if (closed > 0) {
+                log.info("AutoCloseScheduler - {} month(s) auto-closed", closed);
+            }
+        } catch (Exception e) {
+            log.error("AutoCloseScheduler - 自動截止失敗", e);
+        }
     }
 }

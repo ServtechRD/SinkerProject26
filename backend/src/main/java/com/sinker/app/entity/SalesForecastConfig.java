@@ -1,7 +1,6 @@
 package com.sinker.app.entity;
 
 import jakarta.persistence.*;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -15,8 +14,8 @@ public class SalesForecastConfig {
     @Column(nullable = false, unique = true, length = 7)
     private String month;
 
-    @Column(name = "auto_close_date", nullable = false)
-    private LocalDate autoCloseDate;
+    @Column(name = "auto_close_at", nullable = false)
+    private LocalDateTime autoCloseAt;
 
     @Column(name = "is_closed", nullable = false)
     private Boolean isClosed = false;
@@ -36,8 +35,8 @@ public class SalesForecastConfig {
     public String getMonth() { return month; }
     public void setMonth(String month) { this.month = month; }
 
-    public LocalDate getAutoCloseDate() { return autoCloseDate; }
-    public void setAutoCloseDate(LocalDate autoCloseDate) { this.autoCloseDate = autoCloseDate; }
+    public LocalDateTime getAutoCloseAt() { return autoCloseAt; }
+    public void setAutoCloseAt(LocalDateTime autoCloseAt) { this.autoCloseAt = autoCloseAt; }
 
     public Boolean getIsClosed() { return isClosed; }
     public void setIsClosed(Boolean isClosed) { this.isClosed = isClosed; }

@@ -2,259 +2,178 @@ package com.sinker.app.service;
 
 import com.sinker.app.dto.forecast.ConfigResponse;
 import com.sinker.app.dto.forecast.UpdateConfigRequest;
+import com.sinker.app.entity.FormLogAction;
 import com.sinker.app.entity.SalesForecastConfig;
 import com.sinker.app.exception.ResourceNotFoundException;
 import com.sinker.app.repository.SalesForecastConfigRepository;
+import com.sinker.app.repository.SalesForecastReopenWindowRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDate;
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class SalesForecastConfigServiceTest {
 
-    @Mock
-    private SalesForecastConfigRepository repository;
+    // 2026-12-10 08:00 台灣時間
+    private static final Clock CLOCK = Clock.fixed(Instant.parse("2026-12-10T00:00:00Z"), ZoneId.of("Asia/Taipei"));
+    private static final LocalDateTime NOW = LocalDateTime.of(2026, 12, 10, 8, 0);
 
-    @Mock
-    private FormSummaryService formSummaryService;
+    @Mock private SalesForecastConfigRepository repository;
+    @Mock private FormSummaryService formSummaryService;
+    @Mock private FormLogService formLogService;
+    @Mock private SalesForecastReopenWindowRepository windowRepository;
 
     private SalesForecastConfigService service;
 
     @BeforeEach
     void setUp() {
-        service = new SalesForecastConfigService(repository, formSummaryService);
+        service = new SalesForecastConfigService(repository, formSummaryService, formLogService, windowRepository, CLOCK);
     }
 
-    private SalesForecastConfig createConfig(Integer id, String month,
-                                              LocalDate autoCloseDate, boolean isClosed) {
-        SalesForecastConfig config = new SalesForecastConfig();
-        config.setId(id);
-        config.setMonth(month);
-        config.setAutoCloseDate(autoCloseDate);
-        config.setIsClosed(isClosed);
-        config.setClosedAt(isClosed ? LocalDateTime.of(2025, 1, 15, 10, 0) : null);
-        config.setCreatedAt(LocalDateTime.of(2025, 1, 1, 0, 0));
-        config.setUpdatedAt(LocalDateTime.of(2025, 1, 1, 0, 0));
-        return config;
-    }
-
-    // --- Create Month ---
-
-    @Test
-    void testCreateMonth_Success() {
-        when(repository.existsByMonth("202501")).thenReturn(false);
-        when(repository.save(any(SalesForecastConfig.class))).thenAnswer(inv -> {
-            SalesForecastConfig c = inv.getArgument(0);
-            c.setId(1);
-            return c;
-        });
-
-        LocalDate autoCloseDate = LocalDate.of(2025, 2, 10);
-        ConfigResponse response = service.createMonth("202501", autoCloseDate);
-
-        assertEquals("202501", response.getMonth());
-        assertEquals(autoCloseDate, response.getAutoCloseDate());
-        assertFalse(response.getIsClosed());
+    private SalesForecastConfig config(Integer id, String month, LocalDateTime autoCloseAt, boolean closed) {
+        SalesForecastConfig c = new SalesForecastConfig();
+        c.setId(id);
+        c.setMonth(month);
+        c.setAutoCloseAt(autoCloseAt);
+        c.setIsClosed(closed);
+        c.setClosedAt(closed ? LocalDateTime.of(2026, 12, 9, 10, 0) : null);
+        return c;
     }
 
     @Test
-    void testCreateMonth_DuplicateMonth() {
-        when(repository.existsByMonth("202501")).thenReturn(true);
+    void createMonth_setsAutoCloseAt() {
+        when(repository.existsByMonth("202612")).thenReturn(false);
+        when(repository.save(any(SalesForecastConfig.class))).thenAnswer(inv -> inv.getArgument(0));
 
+        ConfigResponse r = service.createMonth("202612", LocalDateTime.of(2026, 12, 10, 18, 30));
+
+        assertEquals("202612", r.getMonth());
+        assertEquals(LocalDateTime.of(2026, 12, 10, 18, 30), r.getAutoCloseAt());
+        assertFalse(r.getIsClosed());
+    }
+
+    @Test
+    void createMonth_duplicate() {
+        when(repository.existsByMonth("202612")).thenReturn(true);
         assertThrows(SalesForecastConfigService.DuplicateMonthException.class,
-                () -> service.createMonth("202501", LocalDate.of(2025, 2, 10)));
-        verify(repository, never()).save(any());
+                () -> service.createMonth("202612", NOW));
     }
 
     @Test
-    void testCreateMonth_InvalidMonthFormat() {
-        assertThrows(IllegalArgumentException.class,
-                () -> service.createMonth("20251", LocalDate.of(2025, 2, 10)));
+    void createMonth_invalidFormat() {
+        assertThrows(IllegalArgumentException.class, () -> service.createMonth("20261", NOW));
     }
 
-    // --- Update Config ---
+    @Test
+    void listAll_includesActiveReopenCount() {
+        when(repository.findAllByOrderByMonthDesc()).thenReturn(List.of(config(1, "202612", NOW, true)));
+        when(windowRepository.countByMonthAndEndedAtIsNull("202612")).thenReturn(2L);
+
+        List<ConfigResponse> list = service.listAll();
+
+        assertEquals(1, list.size());
+        assertEquals(2L, list.get(0).getActiveReopenCount());
+    }
 
     @Test
-    void testUpdateConfig_ChangeClosedToTrue() {
-        SalesForecastConfig config = createConfig(1, "202501", LocalDate.of(2025, 1, 10), false);
-        when(repository.findById(1)).thenReturn(Optional.of(config));
+    void updateConfig_manualClose_logsAndSnapshots() {
+        SalesForecastConfig c = config(1, "202612", NOW, false);
+        when(repository.findById(1)).thenReturn(Optional.of(c));
         when(repository.save(any(SalesForecastConfig.class))).thenAnswer(inv -> inv.getArgument(0));
+        UpdateConfigRequest req = new UpdateConfigRequest();
+        req.setIsClosed(true);
 
-        UpdateConfigRequest request = new UpdateConfigRequest();
-        request.setIsClosed(true);
+        ConfigResponse r = service.updateConfig(1, req, 7L);
 
-        ConfigResponse response = service.updateConfig(1, request);
-
-        assertTrue(response.getIsClosed());
-        assertNotNull(response.getClosedAt());
+        assertTrue(r.getIsClosed());
+        assertNotNull(r.getClosedAt());
+        verify(formSummaryService).createFormVersion1Snapshot(eq("202612"), any());
+        verify(formLogService).record(eq("202612"), isNull(), eq(FormLogAction.MANUAL_CLOSE), eq(7L), anyString());
     }
 
     @Test
-    void testUpdateConfig_CannotReopenWhenClosed() {
-        SalesForecastConfig config = createConfig(1, "202501", LocalDate.of(2025, 1, 10), true);
-        when(repository.findById(1)).thenReturn(Optional.of(config));
+    void updateConfig_cannotReopen() {
+        when(repository.findById(1)).thenReturn(Optional.of(config(1, "202612", NOW, true)));
+        UpdateConfigRequest req = new UpdateConfigRequest();
+        req.setIsClosed(false);
+        assertThrows(IllegalArgumentException.class, () -> service.updateConfig(1, req, 7L));
+    }
 
-        UpdateConfigRequest request = new UpdateConfigRequest();
-        request.setIsClosed(false);
+    @Test
+    void updateConfig_closedUnchanged_doesNotLog() {
+        when(repository.findById(1)).thenReturn(Optional.of(config(1, "202612", NOW, true)));
+        when(repository.save(any(SalesForecastConfig.class))).thenAnswer(inv -> inv.getArgument(0));
+        UpdateConfigRequest req = new UpdateConfigRequest();
+        req.setIsClosed(true);
 
+        service.updateConfig(1, req, 7L);
+
+        verify(formLogService, never()).record(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void updateConfig_validAutoCloseAt() {
+        when(repository.findById(1)).thenReturn(Optional.of(config(1, "202612", NOW, false)));
+        when(repository.save(any(SalesForecastConfig.class))).thenAnswer(inv -> inv.getArgument(0));
+        UpdateConfigRequest req = new UpdateConfigRequest();
+        req.setAutoCloseAt("2026-12-11T18:00");
+
+        ConfigResponse r = service.updateConfig(1, req, 7L);
+
+        assertEquals(LocalDateTime.of(2026, 12, 11, 18, 0), r.getAutoCloseAt());
+    }
+
+    @Test
+    void updateConfig_invalidAutoCloseAt() {
+        when(repository.findById(1)).thenReturn(Optional.of(config(1, "202612", NOW, false)));
+        UpdateConfigRequest req = new UpdateConfigRequest();
+        req.setAutoCloseAt("2026/12/11");
         IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> service.updateConfig(1, request));
-        assertTrue(ex.getMessage().contains("無法重新開放"));
-        verify(repository, never()).save(any());
+                () -> service.updateConfig(1, req, 7L));
+        assertTrue(ex.getMessage().contains("autoCloseAt"));
     }
 
     @Test
-    void testUpdateConfig_ClosedUnchanged() {
-        LocalDateTime originalClosedAt = LocalDateTime.of(2025, 1, 15, 10, 0);
-        SalesForecastConfig config = createConfig(1, "202501", LocalDate.of(2025, 1, 10), true);
-        config.setClosedAt(originalClosedAt);
-        when(repository.findById(1)).thenReturn(Optional.of(config));
-        when(repository.save(any(SalesForecastConfig.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        UpdateConfigRequest request = new UpdateConfigRequest();
-        request.setAutoCloseDate("2025-01-20");
-
-        ConfigResponse response = service.updateConfig(1, request);
-
-        assertEquals(LocalDate.of(2025, 1, 20), response.getAutoCloseDate());
-        assertTrue(response.getIsClosed());
-        assertEquals(originalClosedAt, response.getClosedAt());
-    }
-
-    @Test
-    void testUpdateConfig_ValidAutoCloseDate() {
-        SalesForecastConfig config = createConfig(1, "202501", LocalDate.of(2025, 1, 10), false);
-        when(repository.findById(1)).thenReturn(Optional.of(config));
-        when(repository.save(any(SalesForecastConfig.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        UpdateConfigRequest request = new UpdateConfigRequest();
-        request.setAutoCloseDate("2025-02-15");
-
-        ConfigResponse response = service.updateConfig(1, request);
-
-        assertEquals(LocalDate.of(2025, 2, 15), response.getAutoCloseDate());
-    }
-
-    @Test
-    void testUpdateConfig_InvalidAutoCloseDateFormat() {
-        SalesForecastConfig config = createConfig(1, "202501", LocalDate.of(2025, 1, 10), false);
-        when(repository.findById(1)).thenReturn(Optional.of(config));
-
-        UpdateConfigRequest request = new UpdateConfigRequest();
-        request.setAutoCloseDate("2025/02/15");
-
-        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
-                () -> service.updateConfig(1, request));
-        assertEquals("autoCloseDate format must be YYYY-MM-DD", ex.getMessage());
-    }
-
-    @Test
-    void testUpdateConfig_NotFound() {
+    void updateConfig_notFound() {
         when(repository.findById(99)).thenReturn(Optional.empty());
-
-        UpdateConfigRequest request = new UpdateConfigRequest();
-        request.setAutoCloseDate("2025-01-15");
-
         assertThrows(ResourceNotFoundException.class,
-                () -> service.updateConfig(99, request));
+                () -> service.updateConfig(99, new UpdateConfigRequest(), 7L));
     }
 
     @Test
-    void testUpdateConfig_BothFields() {
-        SalesForecastConfig config = createConfig(1, "202501", LocalDate.of(2025, 1, 10), false);
-        when(repository.findById(1)).thenReturn(Optional.of(config));
+    void autoCloseDue_closesDueMonthsWithLog() {
+        SalesForecastConfig a = config(1, "202612", NOW.minusMinutes(1), false);
+        SalesForecastConfig b = config(2, "202701", NOW, false);
+        when(repository.findByIsClosedFalseAndAutoCloseAtLessThanEqual(NOW)).thenReturn(List.of(a, b));
         when(repository.save(any(SalesForecastConfig.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        UpdateConfigRequest request = new UpdateConfigRequest();
-        request.setAutoCloseDate("2025-01-25");
-        request.setIsClosed(true);
+        int count = service.autoCloseDue();
 
-        ConfigResponse response = service.updateConfig(1, request);
-
-        assertEquals(LocalDate.of(2025, 1, 25), response.getAutoCloseDate());
-        assertTrue(response.getIsClosed());
-        assertNotNull(response.getClosedAt());
-    }
-
-    // --- List All ---
-
-    @Test
-    void testListAllConfigs() {
-        SalesForecastConfig c1 = createConfig(1, "202503", LocalDate.of(2025, 3, 10), false);
-        SalesForecastConfig c2 = createConfig(2, "202502", LocalDate.of(2025, 2, 15), true);
-        SalesForecastConfig c3 = createConfig(3, "202501", LocalDate.of(2025, 1, 10), false);
-        when(repository.findAllByOrderByMonthDesc()).thenReturn(List.of(c1, c2, c3));
-
-        List<ConfigResponse> configs = service.listAll();
-
-        assertEquals(3, configs.size());
-        assertEquals("202503", configs.get(0).getMonth());
-        assertEquals("202502", configs.get(1).getMonth());
-        assertEquals("202501", configs.get(2).getMonth());
+        assertEquals(2, count);
+        assertTrue(a.getIsClosed());
+        assertTrue(b.getIsClosed());
+        verify(formSummaryService, times(2)).createFormVersion1Snapshot(anyString(), any());
+        verify(formLogService).record(eq("202612"), isNull(), eq(FormLogAction.AUTO_CLOSE), isNull(), anyString());
+        verify(formLogService).record(eq("202701"), isNull(), eq(FormLogAction.AUTO_CLOSE), isNull(), anyString());
     }
 
     @Test
-    void testListAllConfigs_Empty() {
-        when(repository.findAllByOrderByMonthDesc()).thenReturn(List.of());
-
-        List<ConfigResponse> configs = service.listAll();
-
-        assertTrue(configs.isEmpty());
-    }
-
-    // --- Auto Close ---
-
-    @Test
-    void testAutoCloseMatchingMonths_Matches() {
-        LocalDate closeDate = LocalDate.of(2025, 1, 15);
-        SalesForecastConfig config = createConfig(1, "202501", closeDate, false);
-        when(repository.findByIsClosedFalseAndAutoCloseDate(closeDate)).thenReturn(List.of(config));
-        when(repository.save(any(SalesForecastConfig.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        int count = service.autoCloseMatchingMonths(closeDate);
-
-        assertEquals(1, count);
-        assertTrue(config.getIsClosed());
-        assertNotNull(config.getClosedAt());
-    }
-
-    @Test
-    void testAutoCloseMatchingMonths_NoMatch() {
-        LocalDate closeDate = LocalDate.of(2025, 1, 10);
-        when(repository.findByIsClosedFalseAndAutoCloseDate(closeDate)).thenReturn(List.of());
-
-        int count = service.autoCloseMatchingMonths(closeDate);
-
-        assertEquals(0, count);
+    void autoCloseDue_none() {
+        when(repository.findByIsClosedFalseAndAutoCloseAtLessThanEqual(NOW)).thenReturn(List.of());
+        assertEquals(0, service.autoCloseDue());
         verify(repository, never()).save(any());
-    }
-
-    @Test
-    void testAutoCloseMatchingMonths_MultipleMonths() {
-        LocalDate closeDate = LocalDate.of(2025, 1, 10);
-        SalesForecastConfig c1 = createConfig(1, "202501", closeDate, false);
-        SalesForecastConfig c2 = createConfig(2, "202502", closeDate, false);
-        SalesForecastConfig c3 = createConfig(3, "202503", closeDate, false);
-        when(repository.findByIsClosedFalseAndAutoCloseDate(closeDate))
-                .thenReturn(List.of(c1, c2, c3));
-        when(repository.save(any(SalesForecastConfig.class))).thenAnswer(inv -> inv.getArgument(0));
-
-        int count = service.autoCloseMatchingMonths(closeDate);
-
-        assertEquals(3, count);
-        assertTrue(c1.getIsClosed());
-        assertTrue(c2.getIsClosed());
-        assertTrue(c3.getIsClosed());
     }
 }

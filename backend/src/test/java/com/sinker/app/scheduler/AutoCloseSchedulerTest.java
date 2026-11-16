@@ -7,11 +7,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDate;
-
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AutoCloseSchedulerTest {
@@ -23,20 +20,15 @@ class AutoCloseSchedulerTest {
     private AutoCloseScheduler scheduler;
 
     @Test
-    void testAutoCloseMonths_InvokesService() {
-        when(service.autoCloseMatchingMonths(any(LocalDate.class))).thenReturn(2);
-
-        scheduler.autoCloseMonths();
-
-        verify(service).autoCloseMatchingMonths(any(LocalDate.class));
+    void runEveryMinute_invokesAutoClose() {
+        when(service.autoCloseDue()).thenReturn(2);
+        scheduler.runEveryMinute();
+        verify(service).autoCloseDue();
     }
 
     @Test
-    void testAutoCloseMonths_ZeroResults() {
-        when(service.autoCloseMatchingMonths(any(LocalDate.class))).thenReturn(0);
-
-        scheduler.autoCloseMonths();
-
-        verify(service).autoCloseMatchingMonths(any(LocalDate.class));
+    void runEveryMinute_swallowsException() {
+        when(service.autoCloseDue()).thenThrow(new RuntimeException("db down"));
+        assertDoesNotThrow(() -> scheduler.runEveryMinute());
     }
 }

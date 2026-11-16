@@ -4,6 +4,7 @@ import com.sinker.app.dto.forecast.ConfigResponse;
 import com.sinker.app.dto.forecast.CreateMonthsRequest;
 import com.sinker.app.dto.forecast.UpdateConfigRequest;
 import com.sinker.app.exception.ResourceNotFoundException;
+import com.sinker.app.security.JwtUserPrincipal;
 import com.sinker.app.service.SalesForecastConfigService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -12,9 +13,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -35,10 +36,10 @@ public class SalesForecastConfigController {
     @PreAuthorize("hasAuthority('sales_forecast_config.edit')")
     public ResponseEntity<ConfigResponse> createMonth(
             @Valid @RequestBody CreateMonthsRequest request) {
-        log.info("POST /api/sales-forecast/config - Creating month {}, autoCloseDate={}",
-                request.getMonth(), request.getAutoCloseDate());
-        LocalDate autoCloseDate = LocalDate.parse(request.getAutoCloseDate());
-        ConfigResponse response = service.createMonth(request.getMonth(), autoCloseDate);
+        log.info("POST /api/sales-forecast/config - Creating month {}, autoCloseAt={}",
+                request.getMonth(), request.getAutoCloseAt());
+        LocalDateTime autoCloseAt = SalesForecastConfigService.parseDateTime(request.getAutoCloseAt());
+        ConfigResponse response = service.createMonth(request.getMonth(), autoCloseAt);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
@@ -54,9 +55,10 @@ public class SalesForecastConfigController {
     @PreAuthorize("hasAuthority('sales_forecast_config.edit')")
     public ResponseEntity<ConfigResponse> updateConfig(
             @PathVariable Integer id,
-            @RequestBody UpdateConfigRequest request) {
+            @RequestBody UpdateConfigRequest request,
+            @AuthenticationPrincipal JwtUserPrincipal principal) {
         log.info("PUT /api/sales-forecast/config/{} - Updating config", id);
-        ConfigResponse response = service.updateConfig(id, request);
+        ConfigResponse response = service.updateConfig(id, request, principal.getUserId());
         return ResponseEntity.ok(response);
     }
 

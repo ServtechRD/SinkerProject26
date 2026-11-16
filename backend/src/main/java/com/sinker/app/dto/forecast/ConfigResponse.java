@@ -2,24 +2,24 @@ package com.sinker.app.dto.forecast;
 
 import com.sinker.app.entity.SalesForecastConfig;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public class ConfigResponse {
 
     private Integer id;
     private String month;
-    private LocalDate autoCloseDate;
+    private LocalDateTime autoCloseAt;
     private Boolean isClosed;
     private LocalDateTime closedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private long activeReopenCount;
 
     public static ConfigResponse fromEntity(SalesForecastConfig entity) {
         ConfigResponse dto = new ConfigResponse();
         dto.setId(entity.getId());
         dto.setMonth(entity.getMonth());
-        dto.setAutoCloseDate(entity.getAutoCloseDate());
+        dto.setAutoCloseAt(entity.getAutoCloseAt());
         dto.setIsClosed(entity.getIsClosed());
         dto.setClosedAt(entity.getClosedAt());
         dto.setCreatedAt(entity.getCreatedAt());
@@ -33,8 +33,8 @@ public class ConfigResponse {
     public String getMonth() { return month; }
     public void setMonth(String month) { this.month = month; }
 
-    public LocalDate getAutoCloseDate() { return autoCloseDate; }
-    public void setAutoCloseDate(LocalDate autoCloseDate) { this.autoCloseDate = autoCloseDate; }
+    public LocalDateTime getAutoCloseAt() { return autoCloseAt; }
+    public void setAutoCloseAt(LocalDateTime autoCloseAt) { this.autoCloseAt = autoCloseAt; }
 
     public Boolean getIsClosed() { return isClosed; }
     public void setIsClosed(Boolean isClosed) { this.isClosed = isClosed; }
@@ -47,4 +47,7 @@ public class ConfigResponse {
 
     public LocalDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public long getActiveReopenCount() { return activeReopenCount; }
+    public void setActiveReopenCount(long activeReopenCount) { this.activeReopenCount = activeReopenCount; }
 }

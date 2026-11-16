@@ -11,6 +11,7 @@ import com.sinker.app.repository.SalesForecastConfigRepository;
 import com.sinker.app.repository.SalesForecastFormVersionRepository;
 import com.sinker.app.repository.SalesForecastRepository;
 import com.sinker.app.repository.SalesForecastVersionReasonRepository;
+import com.sinker.app.util.MonthRangeUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -373,6 +374,67 @@ public class FormSummaryService {
         }
         log.info("Saved form summary version {} for month {}, {} rows", nextNo, month, inserted);
         return nextNo;
+    }
+
+    /**
+     * 跨月彙整：逐月取單月彙總（已關帳取最新表單版本、未關帳取各通路最新上傳），依品號合併。
+     * 品項資訊取範圍內最後一個有該品號的月份；備註依月份、再依通路排序。
+     * 已關帳但尚無表單版本的月份會建立第 1 版快照，故非唯讀交易。
+     */
+    @Transactional
+    public FormSummaryRangeResponse getFormSummaryRange(String startMonth, String endMonth) {
+        MonthRangeUtil.validateMonthRange(startMonth, endMonth);
+        List<String> months = MonthRangeUtil.listMonthsInRange(startMonth, endMonth);
+
+        FormSummaryRangeResponse resp = new FormSummaryRangeResponse();
+        Map<String, FormSummaryRangeResponse.RowDTO> byCode = new LinkedHashMap<>();
+        for (String month : months) {
+            Optional<SalesForecastConfig> config = configRepository.findByMonth(month);
+            boolean closed = config.map(c -> Boolean.TRUE.equals(c.getIsClosed())).orElse(false);
+            resp.getMonths().add(new FormSummaryRangeResponse.MonthStatusDTO(month, closed));
+
+            FormSummaryResponse summary;
+            if (closed) {
+                List<SalesForecastFormVersion> versions = formVersionRepository.findByMonthOrderByVersionNoDesc(month);
+                summary = getFormSummaryByVersion(month, versions.isEmpty() ? 1 : versions.get(0).getVersionNo());
+            } else {
+                summary = getFormSummaryLegacy(month);
+            }
+
+            for (FormSummaryRowDTO r : summary.getRows()) {
+                if (!StringUtils.hasText(r.getProductCode())) continue;
+                FormSummaryRangeResponse.RowDTO row = byCode.computeIfAbsent(r.getProductCode(), code -> {
+                    FormSummaryRangeResponse.RowDTO created = new FormSummaryRangeResponse.RowDTO();
+                    created.setProductCode(code);
+                    for (String m : months) created.getMonthQuantities().put(m, BigDecimal.ZERO);
+                    return created;
+                });
+                row.setWarehouseLocation(r.getWarehouseLocation());
+                row.setCategory(r.getCategory());
+                row.setSpec(r.getSpec());
+                row.setProductName(r.getProductName());
+                BigDecimal monthQty = BigDecimal.ZERO;
+                if (r.getChannelCells() != null) {
+                    for (ChannelCellDTO c : r.getChannelCells()) {
+                        if (c.getCurrentQty() != null) monthQty = monthQty.add(c.getCurrentQty());
+                    }
+                }
+                row.getMonthQuantities().merge(month, monthQty, BigDecimal::add);
+                row.setTotal(row.getTotal().add(monthQty));
+                if (r.getRemarks() != null) row.getRemarks().addAll(r.getRemarks());
+            }
+        }
+
+        List<FormSummaryRangeResponse.RowDTO> rows = new ArrayList<>(byCode.values());
+        rows.sort((a, b) -> {
+            int c = nullSafeCompare(a.getCategory(), b.getCategory());
+            if (c != 0) return c;
+            c = nullSafeCompare(a.getSpec(), b.getSpec());
+            if (c != 0) return c;
+            return nullSafeCompare(a.getProductCode(), b.getProductCode());
+        });
+        resp.setRows(rows);
+        return resp;
     }
 
     private static void validateMonth(String month) {

@@ -1,6 +1,8 @@
 package com.sinker.app.service;
 
+import com.sinker.app.dto.forecast.ChannelCellDTO;
 import com.sinker.app.dto.forecast.ChannelRemarkDTO;
+import com.sinker.app.dto.forecast.FormSummaryRowDTO;
 import com.sinker.app.dto.forecast.FormVersionListItemDTO;
 import com.sinker.app.dto.forecast.FormSummaryResponse;
 import com.sinker.app.dto.forecast.SaveFormSummaryVersionRequest;
@@ -343,6 +345,94 @@ class FormSummaryServiceTest {
         assertEquals("711 修改後", remarkOf(captor.getAllValues(), "7-11", "P001"));
         assertEquals("", remarkOf(captor.getAllValues(), "全家", "P001"));
         assertEquals("", remarkOf(captor.getAllValues(), "家樂福", "P001"));
+    }
+
+    // F127：跨月彙整，已關帳取最新表單版本、未關帳取各通路最新上傳，依品號合併
+    @Test
+    void getFormSummaryRange_mergesClosedAndOpenMonthsByProductCode() {
+        SalesForecastConfig nov = closedConfig();
+        nov.setMonth("202611");
+        SalesForecastConfig dec = new SalesForecastConfig();
+        dec.setMonth("202612");
+        dec.setIsClosed(false);
+        when(configRepository.findByMonth("202611")).thenReturn(Optional.of(nov));
+        when(configRepository.findByMonth("202612")).thenReturn(Optional.of(dec));
+        when(configRepository.findByMonth("202701")).thenReturn(Optional.empty());
+        when(formVersionRepository.findByMonthOrderByVersionNoDesc("202611"))
+                .thenReturn(List.of(formVer(2, null), formVer(1, null)));
+
+        FormSummaryResponse novSummary = summaryOf(
+                summaryRow("P001", "舊品名", "10", "5", List.of(
+                        new ChannelRemarkDTO("7-11", "202611", "11月 7-11"),
+                        new ChannelRemarkDTO(CH, "202611", "11月 PX"))));
+        FormSummaryResponse decSummary = summaryOf(
+                summaryRow("P001", "新品名", "20", "0", List.of(new ChannelRemarkDTO(CH, "202612", "12月 PX"))),
+                summaryRow("P002", "只有12月", "7", "0", List.of()));
+        doReturn(novSummary).when(service).getFormSummaryByVersion("202611", 2);
+        doReturn(decSummary).when(service).getFormSummaryLegacy("202612");
+        doReturn(summaryOf()).when(service).getFormSummaryLegacy("202701");
+
+        var resp = service.getFormSummaryRange("202611", "202701");
+
+        assertEquals(List.of("202611", "202612", "202701"),
+                resp.getMonths().stream().map(m -> m.getMonth()).toList());
+        assertTrue(resp.getMonths().get(0).isClosed());
+        assertFalse(resp.getMonths().get(1).isClosed());
+        assertFalse(resp.getMonths().get(2).isClosed());
+
+        assertEquals(2, resp.getRows().size());
+        var p001 = resp.getRows().stream().filter(r -> "P001".equals(r.getProductCode())).findFirst().orElseThrow();
+        assertEquals("新品名", p001.getProductName());
+        assertEquals(new BigDecimal("15"), p001.getMonthQuantities().get("202611"));
+        assertEquals(new BigDecimal("20"), p001.getMonthQuantities().get("202612"));
+        assertEquals(BigDecimal.ZERO, p001.getMonthQuantities().get("202701"));
+        assertEquals(new BigDecimal("35"), p001.getTotal());
+        // 備註先依月份，同月內維持單月彙總已排好的通路順序
+        assertEquals(List.of("11月 7-11", "11月 PX", "12月 PX"),
+                p001.getRemarks().stream().map(ChannelRemarkDTO::getText).toList());
+
+        var p002 = resp.getRows().stream().filter(r -> "P002".equals(r.getProductCode())).findFirst().orElseThrow();
+        assertEquals(BigDecimal.ZERO, p002.getMonthQuantities().get("202611"));
+        assertEquals(new BigDecimal("7"), p002.getTotal());
+    }
+
+    @Test
+    void getFormSummaryRange_closedMonthWithoutVersion_usesVersion1() {
+        SalesForecastConfig cfg = closedConfig();
+        when(configRepository.findByMonth(MONTH)).thenReturn(Optional.of(cfg));
+        when(formVersionRepository.findByMonthOrderByVersionNoDesc(MONTH)).thenReturn(List.of());
+        doReturn(summaryOf()).when(service).getFormSummaryByVersion(MONTH, 1);
+
+        service.getFormSummaryRange(MONTH, MONTH);
+
+        verify(service).getFormSummaryByVersion(MONTH, 1);
+    }
+
+    @Test
+    void getFormSummaryRange_invalidRange_throws() {
+        assertThrows(IllegalArgumentException.class, () -> service.getFormSummaryRange("202611", "202703"));
+        assertThrows(IllegalArgumentException.class, () -> service.getFormSummaryRange("202612", "202611"));
+        assertThrows(IllegalArgumentException.class, () -> service.getFormSummaryRange("2026-11", "202612"));
+        verifyNoInteractions(configRepository);
+    }
+
+    private static FormSummaryResponse summaryOf(FormSummaryRowDTO... rows) {
+        FormSummaryResponse r = new FormSummaryResponse();
+        r.setRows(new ArrayList<>(List.of(rows)));
+        return r;
+    }
+
+    private static FormSummaryRowDTO summaryRow(String code, String name, String qtyCh1, String qtyCh2, List<ChannelRemarkDTO> remarks) {
+        FormSummaryRowDTO row = new FormSummaryRowDTO();
+        row.setProductCode(code);
+        row.setProductName(name);
+        ChannelCellDTO c1 = new ChannelCellDTO();
+        c1.setCurrentQty(new BigDecimal(qtyCh1));
+        ChannelCellDTO c2 = new ChannelCellDTO();
+        c2.setCurrentQty(new BigDecimal(qtyCh2));
+        row.setChannelCells(List.of(c1, c2));
+        row.setRemarks(remarks);
+        return row;
     }
 
     private static String remarkOf(List<SalesForecast> saved, String channel, String code) {

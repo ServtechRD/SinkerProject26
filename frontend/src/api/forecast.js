@@ -133,6 +133,13 @@ export function getVersionDiff(month, channel, version) {
  * @param {string|number|object} month YYYYMM
  * @param {number|null|undefined} versionNo 表單版本（必須帶正整數，關帳後查表單摘要必用，否則後端會走舊版彙總且 version_no 為 null）
  */
+/** 跨月彙整：起訖月份 YYYYMM（最多 4 個月） */
+export function getFormSummaryRange(startMonth, endMonth) {
+  return api
+    .get('/api/sales-forecast/form-summary/range', { params: { start_month: startMonth, end_month: endMonth } })
+    .then((r) => r.data)
+}
+
 export function getFormSummary(month, versionNo = null) {
   const params = { month: toMonthString(month) }
   const vn = toVersionNoNumber(versionNo)

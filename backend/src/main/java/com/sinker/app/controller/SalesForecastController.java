@@ -3,6 +3,7 @@ package com.sinker.app.controller;
 import com.sinker.app.dto.forecast.CopyVersionResponse;
 import com.sinker.app.dto.forecast.CreateForecastRequest;
 import com.sinker.app.dto.forecast.ForecastResponse;
+import com.sinker.app.dto.forecast.FormSummaryRangeResponse;
 import com.sinker.app.dto.forecast.FormSummaryResponse;
 import com.sinker.app.dto.forecast.FormVersionListItemDTO;
 import com.sinker.app.dto.forecast.IntegrationRowDTO;
@@ -100,6 +101,19 @@ public class SalesForecastController {
 
         FormSummaryResponse response = formSummaryService.getFormSummary(month, version_no);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/form-summary/range")
+    @PreAuthorize("hasAuthority('sales_forecast.update_after_closed')")
+    public ResponseEntity<FormSummaryRangeResponse> getFormSummaryRange(
+            @RequestParam String start_month,
+            @RequestParam String end_month,
+            @AuthenticationPrincipal JwtUserPrincipal principal) {
+
+        log.info("GET /api/sales-forecast/form-summary/range - user={}, start_month={}, end_month={}",
+                principal.getUserId(), start_month, end_month);
+
+        return ResponseEntity.ok(formSummaryService.getFormSummaryRange(start_month, end_month));
     }
 
     @GetMapping("/form-versions")

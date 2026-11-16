@@ -8,6 +8,9 @@ import {
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../components/Toast'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import RemarkListModal from './RemarkListModal'
+import CrossMonthSummary from './CrossMonthSummary'
+import { remarksToText, downloadCsv } from './remarkUtils'
 import './ForecastList.css'
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50]
@@ -113,17 +116,6 @@ function num(v) {
   return Number.isNaN(n) ? 0 : n
 }
 
-/** 備註來源標示，如 [全聯/12月]；month 為 YYYYMM */
-function remarkLabel(r) {
-  return `[${r.channel}/${Number(String(r.month ?? '').slice(4))}月]`
-}
-
-/** CSV 欄位跳脫：含逗號、引號或換行時以雙引號包住 */
-function csvCell(v) {
-  const s = String(v ?? '')
-  return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
-}
-
 /** 通路格：目前值是否與前一版不同（用於紅字） */
 function channelValueChangedFromPrev(prevQty, currQty) {
   return Math.abs(num(currQty) - num(prevQty)) > 1e-9
@@ -170,6 +162,8 @@ export default function ForecastListPage() {
   const [remarkModal, setRemarkModal] = useState(null)
   /** 開啟中的列備註彈窗（rows 中的索引），null 為關閉 */
   const [rowRemarkModalIdx, setRowRemarkModalIdx] = useState(null)
+  /** 頁籤：single 單月彙總、range 跨月彙整 */
+  const [activeTab, setActiveTab] = useState('single')
   // 資料重新載入（查詢、儲存）後索引可能指向別列，一律關閉彈窗
   useEffect(() => { setRowRemarkModalIdx(null) }, [rows])
 
@@ -466,7 +460,6 @@ export default function ForecastListPage() {
       toast.info('無資料可匯出')
       return
     }
-    const BOM = '\uFEFF'
     const chOrder = channelOrder.length ? channelOrder : (rows[0]?.channel_cells ?? rows[0]?.channelCells ?? []).map((_, i) => `通路${i + 1}`)
     const headers = ['庫位', '中類名稱', '貨品規格', '品名', '品號', ...chOrder, '原小計', '更改後小計', '差異', '備註']
     const dataRows = sortedRows.map((row) => {
@@ -483,10 +476,7 @@ export default function ForecastListPage() {
       /** 第 1 版無前一版可比：差異仍為 0；更改後小計顯示本版列總（與畫面一致） */
       const exportAfterSum = afterTotal
       const exportDiff = isFormVersion1 && !editMode ? 0 : diff
-      const remarkLines = getRowRemarks(row, rowIdxInRows)
-        .filter((r) => (r.text ?? '').trim())
-        .map((r) => `${remarkLabel(r)} ${r.text.trim()}`)
-      const remark = remarkLines.length ? remarkLines.join('\n') : '-'
+      const remark = remarksToText(getRowRemarks(row, rowIdxInRows))
       return [
         row.warehouse_location ?? row.warehouseLocation ?? '',
         row.category ?? '',
@@ -500,16 +490,7 @@ export default function ForecastListPage() {
         remark,
       ]
     })
-    const csv = BOM + [headers, ...dataRows].map((r) => r.map(csvCell).join(',')).join('\r\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
-    const url = window.URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `總體銷售預估量_${selectedMonth}_v${selectedVersionNo}.csv`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    window.URL.revokeObjectURL(url)
+    downloadCsv(`總體銷售預估量_${selectedMonth}_v${selectedVersionNo}.csv`, [headers, ...dataRows])
   }
 
   if (accessDenied || (!loading && !canView)) {
@@ -529,7 +510,30 @@ export default function ForecastListPage() {
         <h1>銷售預估量表單</h1>
       </div>
 
-      {loading ? (
+      <div className="forecast-tabs" role="tablist">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'single'}
+          className={`forecast-tab${activeTab === 'single' ? ' forecast-tab--active' : ''}`}
+          onClick={() => setActiveTab('single')}
+        >
+          單月彙總
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'range'}
+          className={`forecast-tab${activeTab === 'range' ? ' forecast-tab--active' : ''}`}
+          onClick={() => setActiveTab('range')}
+        >
+          跨月彙整
+        </button>
+      </div>
+
+      {activeTab === 'range' ? (
+        <CrossMonthSummary configs={configs} />
+      ) : loading ? (
         <div className="forecast-loading" role="status">載入中...</div>
       ) : (
         <>
@@ -829,39 +833,14 @@ export default function ForecastListPage() {
             </div>
           )}
 
-          {rowRemarkModalIdx != null && rows[rowRemarkModalIdx] && (() => {
-            const modalRow = rows[rowRemarkModalIdx]
-            const modalRemarks = getRowRemarks(modalRow, rowRemarkModalIdx)
-            const closeModal = () => setRowRemarkModalIdx(null)
-            return (
-              <div className="forecast-remark-modal-overlay" onClick={closeModal} role="presentation">
-                <div className="forecast-remark-modal" role="dialog" aria-label="備註" onClick={(e) => e.stopPropagation()}>
-                  <div className="forecast-remark-modal-header">
-                    <h3>備註：{modalRow.product_name ?? modalRow.productName ?? ''}</h3>
-                    <button type="button" className="forecast-remark-modal-close" onClick={closeModal} aria-label="關閉">×</button>
-                  </div>
-                  <ul className="forecast-remark-modal-list">
-                    {modalRemarks.map((r, ri) => (
-                      <li key={r.channel} className="forecast-remark-line">
-                        <span className="forecast-remark-label">{remarkLabel(r)}</span>
-                        {editMode ? (
-                          <input
-                            type="text"
-                            className="form-select forecast-remark-input"
-                            value={r.text ?? ''}
-                            onChange={(e) => setEditRemarkText(rowRemarkModalIdx, ri, e.target.value)}
-                            aria-label={`${remarkLabel(r)} 備註`}
-                          />
-                        ) : (
-                          <span>{r.text}</span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            )
-          })()}
+          {rowRemarkModalIdx != null && rows[rowRemarkModalIdx] && (
+            <RemarkListModal
+              title={`備註：${rows[rowRemarkModalIdx].product_name ?? rows[rowRemarkModalIdx].productName ?? ''}`}
+              remarks={getRowRemarks(rows[rowRemarkModalIdx], rowRemarkModalIdx)}
+              onChangeText={editMode ? (ri, text) => setEditRemarkText(rowRemarkModalIdx, ri, text) : undefined}
+              onClose={() => setRowRemarkModalIdx(null)}
+            />
+          )}
         </>
       )}
     </div>

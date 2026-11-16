@@ -16,6 +16,7 @@ vi.mock('../../../api/forecast', () => ({
   getFormVersions: vi.fn(),
   getFormSummary: vi.fn(),
   saveFormSummaryVersion: vi.fn(),
+  getFormSummaryRange: vi.fn(),
   updateForecastItem: vi.fn(),
   deleteForecastItem: vi.fn(),
 }))
@@ -290,6 +291,18 @@ describe('ForecastListPage', () => {
       expect(screen.getByText('測試產品1')).toBeInTheDocument()
     })
     expect(screen.getByText('測試產品2')).toBeInTheDocument()
+  })
+
+  it('switches to cross-month tab (F127)', async () => {
+    listConfigs.mockResolvedValue(mockConfigs)
+    renderPage({ permissions: ['sales_forecast.view', 'sales_forecast.update_after_closed'] })
+    await waitFor(() => expect(screen.getByLabelText('月份')).toBeInTheDocument())
+
+    await userEvent.click(screen.getByRole('tab', { name: '跨月彙整' }))
+
+    expect(screen.getByRole('tab', { name: '跨月彙整' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByLabelText('起始月份')).toBeInTheDocument()
+    expect(screen.queryByLabelText('月份')).not.toBeInTheDocument()
   })
 
   it('shows empty state when no data', async () => {

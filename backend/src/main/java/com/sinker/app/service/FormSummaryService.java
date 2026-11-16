@@ -27,6 +27,8 @@ import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -684,5 +686,44 @@ public class FormSummaryService {
         if (a == null) return 1;
         if (b == null) return -1;
         return a.compareTo(b);
+    }
+
+    /**
+     * 該通路最新生管版本與第一版相比，數量不同的品項數（明細頁與開放補登的覆蓋提醒用）。
+     * ponytail: 含先前補登併入的差異，不區分來源
+     */
+    @Transactional(readOnly = true)
+    public int countCorrections(String month, String channel) {
+        List<SalesForecastFormVersion> versions = formVersionRepository.findByMonthOrderByVersionNoDesc(month);
+        if (versions.size() < 2) return 0;
+        Map<String, BigDecimal> latest = qtyByProduct(month, channel, "form_v" + versions.get(0).getVersionNo());
+        Map<String, BigDecimal> first = qtyByProduct(month, channel, "form_v1");
+        Set<String> keys = new HashSet<>(latest.keySet());
+        keys.addAll(first.keySet());
+        int count = 0;
+        for (String k : keys) {
+            if (latest.getOrDefault(k, BigDecimal.ZERO).compareTo(first.getOrDefault(k, BigDecimal.ZERO)) != 0) {
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /** 最新生管版本中該通路各品號數量；尚無任何生管版本時回 null */
+    @Transactional(readOnly = true)
+    public Map<String, BigDecimal> latestPlannerQuantities(String month, String channel) {
+        List<SalesForecastFormVersion> versions = formVersionRepository.findByMonthOrderByVersionNoDesc(month);
+        if (versions.isEmpty()) return null;
+        return qtyByProduct(month, channel, "form_v" + versions.get(0).getVersionNo());
+    }
+
+    private Map<String, BigDecimal> qtyByProduct(String month, String channel, String version) {
+        Map<String, BigDecimal> map = new HashMap<>();
+        for (SalesForecast r : forecastRepository
+                .findByMonthAndChannelAndVersionOrderByCategoryAscSpecAscProductCodeAsc(month, channel, version)) {
+            String code = r.getProductCode() != null ? r.getProductCode() : "";
+            map.merge(code, r.getQuantity() != null ? r.getQuantity() : BigDecimal.ZERO, BigDecimal::add);
+        }
+        return map;
     }
 }

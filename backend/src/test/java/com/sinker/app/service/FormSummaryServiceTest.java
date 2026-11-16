@@ -546,4 +546,41 @@ class FormSummaryServiceTest {
         g.setQuantity(qty);
         return g;
     }
+
+    @Test
+    void countCorrections_comparesLatestWithFirstVersion() {
+        SalesForecastFormVersion v3 = new SalesForecastFormVersion();
+        v3.setVersionNo(3);
+        SalesForecastFormVersion v1 = new SalesForecastFormVersion();
+        v1.setVersionNo(1);
+        when(formVersionRepository.findByMonthOrderByVersionNoDesc(MONTH)).thenReturn(List.of(v3, v1));
+        when(forecastRepository.findByMonthAndChannelAndVersionOrderByCategoryAscSpecAscProductCodeAsc(MONTH, "家樂福", "form_v3"))
+                .thenReturn(List.of(qtyRow("P1", "10"), qtyRow("P2", "7")));
+        when(forecastRepository.findByMonthAndChannelAndVersionOrderByCategoryAscSpecAscProductCodeAsc(MONTH, "家樂福", "form_v1"))
+                .thenReturn(List.of(qtyRow("P1", "10"), qtyRow("P2", "5"), qtyRow("P3", "1")));
+
+        assertEquals(2, service.countCorrections(MONTH, "家樂福"));
+    }
+
+    @Test
+    void latestPlannerQuantities_byProductCode_nullWhenNoVersion() {
+        when(formVersionRepository.findByMonthOrderByVersionNoDesc(MONTH)).thenReturn(List.of());
+        assertNull(service.latestPlannerQuantities(MONTH, "家樂福"));
+
+        SalesForecastFormVersion v2 = new SalesForecastFormVersion();
+        v2.setVersionNo(2);
+        when(formVersionRepository.findByMonthOrderByVersionNoDesc(MONTH)).thenReturn(List.of(v2));
+        when(forecastRepository.findByMonthAndChannelAndVersionOrderByCategoryAscSpecAscProductCodeAsc(MONTH, "家樂福", "form_v2"))
+                .thenReturn(List.of(qtyRow("P1", "150")));
+
+        Map<String, BigDecimal> q = service.latestPlannerQuantities(MONTH, "家樂福");
+        assertEquals(0, new BigDecimal("150").compareTo(q.get("P1")));
+    }
+
+    private static SalesForecast qtyRow(String code, String qty) {
+        SalesForecast r = new SalesForecast();
+        r.setProductCode(code);
+        r.setQuantity(new BigDecimal(qty));
+        return r;
+    }
 }

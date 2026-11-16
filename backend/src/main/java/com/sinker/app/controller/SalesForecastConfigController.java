@@ -2,10 +2,14 @@ package com.sinker.app.controller;
 
 import com.sinker.app.dto.forecast.ConfigResponse;
 import com.sinker.app.dto.forecast.CreateMonthsRequest;
+import com.sinker.app.dto.forecast.EditStatusResponse;
+import com.sinker.app.dto.forecast.FormDetailResponse;
+import com.sinker.app.dto.forecast.FormLogDTO;
 import com.sinker.app.dto.forecast.ReopenRequest;
 import com.sinker.app.dto.forecast.UpdateConfigRequest;
 import com.sinker.app.exception.ResourceNotFoundException;
 import com.sinker.app.security.JwtUserPrincipal;
+import com.sinker.app.service.ForecastFormDetailService;
 import com.sinker.app.service.ReopenService;
 import com.sinker.app.service.SalesForecastConfigService;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,10 +34,13 @@ public class SalesForecastConfigController {
 
     private final SalesForecastConfigService service;
     private final ReopenService reopenService;
+    private final ForecastFormDetailService detailService;
 
-    public SalesForecastConfigController(SalesForecastConfigService service, ReopenService reopenService) {
+    public SalesForecastConfigController(SalesForecastConfigService service, ReopenService reopenService,
+                                         ForecastFormDetailService detailService) {
         this.service = service;
         this.reopenService = reopenService;
+        this.detailService = detailService;
     }
 
     @PostMapping
@@ -86,6 +93,27 @@ public class SalesForecastConfigController {
         log.info("POST /api/sales-forecast/config/{}/reopen/{}/end", id, windowId);
         reopenService.end(id, windowId, principal.getUserId());
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/{id}/detail")
+    @PreAuthorize("hasAuthority('sales_forecast_config.view')")
+    public ResponseEntity<FormDetailResponse> getFormDetail(@PathVariable Integer id) {
+        log.info("GET /api/sales-forecast/config/{}/detail", id);
+        return ResponseEntity.ok(detailService.getFormDetail(id));
+    }
+
+    @GetMapping("/{id}/logs")
+    @PreAuthorize("hasAuthority('sales_forecast_config.view')")
+    public ResponseEntity<List<FormLogDTO>> getFormLogs(@PathVariable Integer id) {
+        log.info("GET /api/sales-forecast/config/{}/logs", id);
+        return ResponseEntity.ok(detailService.getLogs(id));
+    }
+
+    @GetMapping("/edit-status")
+    @PreAuthorize("hasAuthority('sales_forecast_config.view')")
+    public ResponseEntity<EditStatusResponse> getEditStatus(@RequestParam String month, @RequestParam String channel) {
+        log.info("GET /api/sales-forecast/config/edit-status - month={}, channel={}", month, channel);
+        return ResponseEntity.ok(detailService.getEditStatus(month, channel));
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)

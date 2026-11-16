@@ -76,4 +76,9 @@ public interface SalesForecastRepository extends JpaRepository<SalesForecast, In
     void setFormVersionNoForMonthChannelVersion(
             @Param("month") String month, @Param("channel") String channel,
             @Param("version") String version, @Param("formVersionNo") Integer formVersionNo);
+
+    /** 各通路業務最後上傳時間（排除生管 form_v* 版本） */
+    @Query("SELECT sf.channel, MAX(sf.createdAt) FROM SalesForecast sf " +
+           "WHERE sf.month = :month AND sf.version NOT LIKE 'form_v%' GROUP BY sf.channel")
+    List<Object[]> findLastUploadAtByChannel(@Param("month") String month);
 }

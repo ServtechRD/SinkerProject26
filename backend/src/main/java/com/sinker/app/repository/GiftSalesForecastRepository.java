@@ -44,4 +44,7 @@ public interface GiftSalesForecastRepository extends JpaRepository<GiftSalesFore
 
     @Query("SELECT MAX(g.updatedAt) FROM GiftSalesForecast g WHERE g.month = :month AND g.channel = :channel AND g.version = :version")
     java.time.LocalDateTime findMaxUpdatedAtByMonthAndChannelAndVersion(@Param("month") String month, @Param("channel") String channel, @Param("version") String version);
+
+    @Query("SELECT g.channel, MAX(g.createdAt) FROM GiftSalesForecast g WHERE g.month = :month GROUP BY g.channel")
+    List<Object[]> findLastUploadAtByChannel(@Param("month") String month);
 }

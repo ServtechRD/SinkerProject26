@@ -14,7 +14,7 @@ function getTodayString() {
 export default function CreateMonthsDialog({ open, onClose, onSuccess }) {
   const toast = useToast()
   const [month, setMonth] = useState('')
-  const [autoCloseDate, setAutoCloseDate] = useState('')
+  const [autoCloseAt, setAutoCloseAt] = useState('')
   const [loading, setLoading] = useState(false)
   const [errors, setErrors] = useState({})
 
@@ -25,7 +25,7 @@ export default function CreateMonthsDialog({ open, onClose, onSuccess }) {
   function validate() {
     const errs = {}
     if (!month) errs.month = '必填'
-    if (!autoCloseDate) errs.autoCloseDate = '必填'
+    if (!autoCloseAt) errs.autoCloseAt = '必填'
     return errs
   }
 
@@ -43,10 +43,10 @@ export default function CreateMonthsDialog({ open, onClose, onSuccess }) {
     try {
       // type="month" 回傳 YYYY-MM，後端要求 YYYYMM
       const monthValue = month.replace('-', '')
-      await createMonth(monthValue, autoCloseDate)
+      await createMonth(monthValue, autoCloseAt)
       toast.success('月份建立成功')
       setMonth('')
-      setAutoCloseDate('')
+      setAutoCloseAt('')
       setErrors({})
       onSuccess()
     } catch (err) {
@@ -66,7 +66,7 @@ export default function CreateMonthsDialog({ open, onClose, onSuccess }) {
 
   function handleClose() {
     setMonth('')
-    setAutoCloseDate('')
+    setAutoCloseAt('')
     setErrors({})
     onClose()
   }
@@ -99,20 +99,20 @@ export default function CreateMonthsDialog({ open, onClose, onSuccess }) {
             {errors.month && <div className="form-error">{errors.month}</div>}
           </div>
           <div className="fc-dialog-field">
-            <label htmlFor="autoCloseDate">系統自動結束新增設定日期</label>
+            <label htmlFor="autoCloseAt">系統自動結束新增設定時間</label>
             <input
-              id="autoCloseDate"
-              className={`form-input${errors.autoCloseDate ? ' error' : ''}`}
-              type="date"
-              value={autoCloseDate}
-              min={today}
+              id="autoCloseAt"
+              className={`form-input${errors.autoCloseAt ? ' error' : ''}`}
+              type="datetime-local"
+              value={autoCloseAt}
+              min={`${today}T00:00`}
               onChange={(e) => {
-                setAutoCloseDate(e.target.value)
-                setErrors((prev) => ({ ...prev, autoCloseDate: undefined }))
+                setAutoCloseAt(e.target.value)
+                setErrors((prev) => ({ ...prev, autoCloseAt: undefined }))
               }}
               disabled={loading}
             />
-            {errors.autoCloseDate && <div className="form-error">{errors.autoCloseDate}</div>}
+            {errors.autoCloseAt && <div className="form-error">{errors.autoCloseAt}</div>}
           </div>
           <div className="dialog-actions">
             <button

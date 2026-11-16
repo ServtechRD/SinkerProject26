@@ -1,64 +1,61 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('../axios', () => {
-  return {
-    default: {
-      get: vi.fn(),
-      post: vi.fn(),
-      put: vi.fn(),
-    },
-  }
-})
+vi.mock('../axios', () => ({
+  default: { get: vi.fn(), post: vi.fn(), put: vi.fn() },
+}))
 
 import api from '../axios'
-import { listConfigs, createMonths, updateConfig } from '../forecastConfig'
+import {
+  listConfigs,
+  createMonth,
+  updateConfig,
+  getFormDetail,
+  getFormLogs,
+  reopenChannels,
+  endReopen,
+  getEditStatus,
+} from '../forecastConfig'
 
 describe('forecastConfig API', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    api.get.mockResolvedValue({ data: 'ok' })
+    api.post.mockResolvedValue({ data: 'ok' })
+    api.put.mockResolvedValue({ data: 'ok' })
   })
 
-  it('listConfigs calls GET /api/sales-forecast/config', async () => {
-    const mockData = [
-      { id: 1, month: '202601', autoCloseDay: 10, isClosed: false },
-    ]
-    api.get.mockResolvedValue({ data: mockData })
-
-    const result = await listConfigs()
-
+  it('listConfigs', async () => {
+    expect(await listConfigs()).toBe('ok')
     expect(api.get).toHaveBeenCalledWith('/api/sales-forecast/config')
-    expect(result).toEqual(mockData)
   })
 
-  it('createMonths calls POST with correct payload', async () => {
-    const mockResponse = { createdCount: 3, months: ['202601', '202602', '202603'] }
-    api.post.mockResolvedValue({ data: mockResponse })
-
-    const result = await createMonths('202601', '202603')
-
-    expect(api.post).toHaveBeenCalledWith('/api/sales-forecast/config', {
-      startMonth: '202601',
-      endMonth: '202603',
-    })
-    expect(result).toEqual(mockResponse)
+  it('createMonth 送出月份與截止時間', async () => {
+    await createMonth('202612', '2026-12-10T18:30')
+    expect(api.post).toHaveBeenCalledWith('/api/sales-forecast/config', { month: '202612', autoCloseAt: '2026-12-10T18:30' })
   })
 
-  it('updateConfig calls PUT with correct payload', async () => {
-    const mockResponse = { id: 1, month: '202601', autoCloseDay: 20, isClosed: true }
-    api.put.mockResolvedValue({ data: mockResponse })
-
-    const result = await updateConfig(1, { autoCloseDay: 20, isClosed: true })
-
-    expect(api.put).toHaveBeenCalledWith('/api/sales-forecast/config/1', {
-      autoCloseDay: 20,
-      isClosed: true,
-    })
-    expect(result).toEqual(mockResponse)
+  it('updateConfig', async () => {
+    await updateConfig(1, { autoCloseAt: '2026-12-11T18:00', isClosed: true })
+    expect(api.put).toHaveBeenCalledWith('/api/sales-forecast/config/1', { autoCloseAt: '2026-12-11T18:00', isClosed: true })
   })
 
-  it('propagates network errors', async () => {
-    api.get.mockRejectedValue(new Error('Network Error'))
+  it('getFormDetail／getFormLogs', async () => {
+    await getFormDetail(7)
+    await getFormLogs(7)
+    expect(api.get).toHaveBeenCalledWith('/api/sales-forecast/config/7/detail')
+    expect(api.get).toHaveBeenCalledWith('/api/sales-forecast/config/7/logs')
+  })
 
-    await expect(listConfigs()).rejects.toThrow('Network Error')
+  it('reopenChannels／endReopen', async () => {
+    const payload = { channels: ['家樂福'], expiresAt: '2026-12-12T18:00', reason: '新品追加' }
+    await reopenChannels(7, payload)
+    await endReopen(7, 3)
+    expect(api.post).toHaveBeenCalledWith('/api/sales-forecast/config/7/reopen', payload)
+    expect(api.post).toHaveBeenCalledWith('/api/sales-forecast/config/7/reopen/3/end')
+  })
+
+  it('getEditStatus 以 query 帶月份與通路', async () => {
+    await getEditStatus('202612', '家樂福')
+    expect(api.get).toHaveBeenCalledWith('/api/sales-forecast/config/edit-status', { params: { month: '202612', channel: '家樂福' } })
   })
 })

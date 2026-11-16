@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { updateConfig } from '../../api/forecastConfig'
 import { useToast } from '../../components/Toast'
 import ConfirmDialog from '../../components/ConfirmDialog'
+import { toDateTimeLocalValue } from '../../utils/dateTime'
 import './ForecastConfig.css'
 
 /** 設定檔 YYYYMM → 顯示用 YYYY-MM */
@@ -15,7 +16,7 @@ function formatOpenMonthLabel(monthStr) {
 
 export default function EditConfigDialog({ open, config, onClose, onSuccess }) {
   const toast = useToast()
-  const [autoCloseDate, setAutoCloseDate] = useState('')
+  const [autoCloseAt, setAutoCloseAt] = useState('')
   const [isClosed, setIsClosed] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -23,7 +24,7 @@ export default function EditConfigDialog({ open, config, onClose, onSuccess }) {
 
   useEffect(() => {
     if (config) {
-      setAutoCloseDate(config.autoCloseDate ?? '')
+      setAutoCloseAt(toDateTimeLocalValue(config.autoCloseAt))
       setIsClosed(!!config.isClosed)
       setError('')
       setCloseConfirmOpen(false)
@@ -35,11 +36,11 @@ export default function EditConfigDialog({ open, config, onClose, onSuccess }) {
   const openMonthLabel = formatOpenMonthLabel(config.month)
   const closeConfirmMessage = `確定要結束新增設定 ${openMonthLabel} 表單嗎？關閉表單後業務同仁就無法再編輯。`
 
-  const dateValid = autoCloseDate !== ''
-  const dateError = !dateValid && autoCloseDate !== '' ? '請選擇有效日期' : ''
+  const dateValid = autoCloseAt !== ''
+  const dateError = !dateValid && autoCloseAt !== '' ? '請選擇有效日期' : ''
 
   const hasChanges =
-    (dateValid && autoCloseDate !== (config.autoCloseDate ?? '')) || isClosed !== !!config.isClosed
+    (dateValid && autoCloseAt !== toDateTimeLocalValue(config.autoCloseAt)) || isClosed !== !!config.isClosed
 
   const canSubmit = !loading && dateValid && !dateError && hasChanges
 
@@ -50,7 +51,7 @@ export default function EditConfigDialog({ open, config, onClose, onSuccess }) {
     setError('')
     try {
       await updateConfig(config.id, {
-        autoCloseDate,
+        autoCloseAt,
         isClosed,
       })
       toast.success('設定已更新')
@@ -120,13 +121,13 @@ export default function EditConfigDialog({ open, config, onClose, onSuccess }) {
             />
           </div>
           <div className="fc-dialog-field">
-            <label htmlFor="editAutoCloseDate">自動結束新增設定日期</label>
+            <label htmlFor="editAutoCloseAt">自動結束新增設定時間</label>
             <input
-              id="editAutoCloseDate"
+              id="editAutoCloseAt"
               className={`form-input${dateError ? ' error' : ''}`}
-              type="date"
-              value={autoCloseDate}
-              onChange={(e) => setAutoCloseDate(e.target.value)}
+              type="datetime-local"
+              value={autoCloseAt}
+              onChange={(e) => setAutoCloseAt(e.target.value)}
               disabled={loading}
             />
             {dateError && <div className="form-error">{dateError}</div>}
@@ -145,7 +146,7 @@ export default function EditConfigDialog({ open, config, onClose, onSuccess }) {
             </label>
           </div>
           {config.isClosed && (
-            <div className="form-hint">已結束新增設定，無法再開放；仍可修改自動結束新增設定日期。</div>
+            <div className="form-hint">已結束新增設定，無法再開放；需要業務再填請到明細頁「開放補登」。</div>
           )}
           <div className="dialog-actions">
             <button

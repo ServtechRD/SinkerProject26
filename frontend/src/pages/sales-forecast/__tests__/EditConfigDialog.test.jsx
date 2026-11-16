@@ -1,39 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, within } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ToastProvider } from '../../../components/Toast'
 import EditConfigDialog from '../EditConfigDialog'
 
-vi.mock('../../../api/forecastConfig', () => ({
-  updateConfig: vi.fn(),
-}))
+vi.mock('../../../api/forecastConfig', () => ({ updateConfig: vi.fn() }))
 
 import { updateConfig } from '../../../api/forecastConfig'
 
-const sampleConfig = {
-  id: 1,
-  month: '202601',
-  autoCloseDay: 10,
-  isClosed: false,
-  closedAt: null,
-}
+const openConfig = { id: 1, month: '202612', autoCloseAt: '2026-12-10T00:00:00', isClosed: false, closedAt: null }
+const closedConfig = { ...openConfig, isClosed: true, closedAt: '2026-12-09T16:00:00' }
 
-function renderDialog(props = {}) {
-  const defaultProps = {
-    open: true,
-    config: sampleConfig,
-    onClose: vi.fn(),
-    onSuccess: vi.fn(),
-    ...props,
-  }
-  return {
-    ...render(
-      <ToastProvider>
-        <EditConfigDialog {...defaultProps} />
-      </ToastProvider>
-    ),
-    props: defaultProps,
-  }
+function renderDialog(config) {
+  const onSuccess = vi.fn()
+  const utils = render(
+    <ToastProvider>
+      <EditConfigDialog open config={config} onClose={vi.fn()} onSuccess={onSuccess} />
+    </ToastProvider>
+  )
+  return { ...utils, onSuccess }
 }
 
 describe('EditConfigDialog', () => {
@@ -41,129 +25,38 @@ describe('EditConfigDialog', () => {
     vi.clearAllMocks()
   })
 
-  it('displays current config values', () => {
-    renderDialog()
-
-    expect(screen.getByLabelText('填寫月份')).toHaveValue('202601')
-    expect(screen.getByLabelText('自動結束新增設定日期')).toHaveValue(10)
-    expect(screen.getByLabelText('結束新增設定')).not.toBeChecked()
+  it('帶入既有截止時間（日期加時間）', () => {
+    renderDialog(openConfig)
+    const input = screen.getByLabelText('自動結束新增設定時間')
+    expect(input).toHaveAttribute('type', 'datetime-local')
+    expect(input).toHaveValue('2026-12-10T00:00')
   })
 
-  it('month field is disabled (read-only)', () => {
-    renderDialog()
-    expect(screen.getByLabelText('填寫月份')).toBeDisabled()
-  })
-
-  it('shows validation error for auto_close_day > 31', async () => {
-    const user = userEvent.setup()
-    renderDialog()
-
-    const input = screen.getByLabelText('自動結束新增設定日期')
-    await user.clear(input)
-    await user.type(input, '32')
-
-    expect(screen.getByText('自動結束新增設定日期需為 1-31')).toBeInTheDocument()
-  })
-
-  it('shows validation error for auto_close_day < 1', async () => {
-    const user = userEvent.setup()
-    renderDialog()
-
-    const input = screen.getByLabelText('自動結束新增設定日期')
-    await user.clear(input)
-    await user.type(input, '0')
-
-    expect(screen.getByText('自動結束新增設定日期需為 1-31')).toBeInTheDocument()
-  })
-
-  it('no validation error for valid auto_close_day', async () => {
-    const user = userEvent.setup()
-    renderDialog()
-
-    const input = screen.getByLabelText('自動結束新增設定日期')
-    await user.clear(input)
-    await user.type(input, '15')
-
-    expect(screen.queryByText('自動結束新增設定日期需為 1-31')).not.toBeInTheDocument()
-  })
-
-  it('toggle changes is_closed state', async () => {
-    const user = userEvent.setup()
-    renderDialog()
-
-    const toggle = screen.getByLabelText('結束新增設定')
-    expect(toggle).not.toBeChecked()
-
-    await user.click(toggle)
-    const confirmDlg = await screen.findByRole('alertdialog')
-    await user.click(within(confirmDlg).getByRole('button', { name: '確定' }))
-
-    expect(toggle).toBeChecked()
-  })
-
-  it('save button disabled when no changes', () => {
-    renderDialog()
+  it('未變更時不能儲存', () => {
+    renderDialog(openConfig)
     expect(screen.getByRole('button', { name: '儲存' })).toBeDisabled()
   })
 
-  it('save button enabled when auto_close_day changes', async () => {
-    const user = userEvent.setup()
-    renderDialog()
-
-    const input = screen.getByLabelText('自動結束新增設定日期')
-    await user.clear(input)
-    await user.type(input, '20')
-
-    expect(screen.getByRole('button', { name: '儲存' })).toBeEnabled()
+  it('修改截止時間後送出', async () => {
+    updateConfig.mockResolvedValue({})
+    const { onSuccess } = renderDialog(openConfig)
+    fireEvent.change(screen.getByLabelText('自動結束新增設定時間'), { target: { value: '2026-12-11T18:00' } })
+    fireEvent.click(screen.getByRole('button', { name: '儲存' }))
+    await waitFor(() => expect(updateConfig).toHaveBeenCalledWith(1, { autoCloseAt: '2026-12-11T18:00', isClosed: false }))
+    expect(onSuccess).toHaveBeenCalled()
   })
 
-  it('calls API and onSuccess on successful update', async () => {
-    updateConfig.mockResolvedValue({ ...sampleConfig, autoCloseDay: 20 })
-    const user = userEvent.setup()
-    const { props } = renderDialog()
-
-    const input = screen.getByLabelText('自動結束新增設定日期')
-    await user.clear(input)
-    await user.type(input, '20')
-    await user.click(screen.getByRole('button', { name: '儲存' }))
-
-    await waitFor(() => {
-      expect(updateConfig).toHaveBeenCalledWith(1, { autoCloseDay: 20, isClosed: false })
-    })
-    await waitFor(() => {
-      expect(props.onSuccess).toHaveBeenCalled()
-    })
+  it('已結束的月份不能改回開放', () => {
+    const { container } = renderDialog(closedConfig)
+    expect(container.querySelector('#editIsClosed')).toBeDisabled()
+    expect(screen.getByText(/已結束新增設定，無法再開放/)).toBeInTheDocument()
   })
 
-  it('shows error on 400 bad request', async () => {
-    updateConfig.mockRejectedValue({
-      response: { status: 400, data: { message: 'Invalid input' } },
-    })
-    const user = userEvent.setup()
-    renderDialog()
-
-    const input = screen.getByLabelText('自動結束新增設定日期')
-    await user.clear(input)
-    await user.type(input, '20')
-    await user.click(screen.getByRole('button', { name: '儲存' }))
-
-    await waitFor(() => {
-      const alerts = screen.getAllByRole('alert')
-      const hasError = alerts.some((el) => el.textContent.includes('Invalid input'))
-      expect(hasError).toBe(true)
-    })
-  })
-
-  it('does not render when not open', () => {
-    renderDialog({ open: false })
-    expect(screen.queryByText('編輯填寫月份')).not.toBeInTheDocument()
-  })
-
-  it('calls onClose when cancel clicked', async () => {
-    const user = userEvent.setup()
-    const { props } = renderDialog()
-
-    await user.click(screen.getByRole('button', { name: '取消' }))
-    expect(props.onClose).toHaveBeenCalled()
+  it('400 顯示後端訊息', async () => {
+    updateConfig.mockRejectedValue({ response: { status: 400, data: { message: 'autoCloseAt format must be YYYY-MM-DDTHH:mm' } } })
+    renderDialog(openConfig)
+    fireEvent.change(screen.getByLabelText('自動結束新增設定時間'), { target: { value: '2026-12-11T18:00' } })
+    fireEvent.click(screen.getByRole('button', { name: '儲存' }))
+    expect((await screen.findAllByRole('alert'))[0]).toHaveTextContent('autoCloseAt format')
   })
 })

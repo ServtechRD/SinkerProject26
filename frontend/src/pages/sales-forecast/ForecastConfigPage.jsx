@@ -1,33 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { listConfigs } from '../../api/forecastConfig'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../components/Toast'
 import CreateMonthsDialog from './CreateMonthsDialog'
 import EditConfigDialog from './EditConfigDialog'
+import { formatLocalDateTime, formatTaipeiDateTime } from '../../utils/dateTime'
 import './ForecastConfig.css'
 
 const PAGE_SIZE = 10
 
 function hasPermission(user, perm) {
   return Boolean(user?.permissions && Array.isArray(user.permissions) && user.permissions.includes(perm))
-}
-
-/** 將後端時間轉成台灣時間顯示（後端多為 UTC 或無時區） */
-function formatClosedAt(dateStr) {
-  if (!dateStr) return '-'
-  const utcStr = typeof dateStr === 'string' && !/Z|[+-]\d{2}:?\d{2}$/.test(dateStr) ? dateStr + 'Z' : dateStr
-  const d = new Date(utcStr)
-  if (isNaN(d.getTime())) return String(dateStr)
-  return d.toLocaleString('zh-TW', {
-    timeZone: 'Asia/Taipei',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  })
 }
 
 export default function ForecastConfigPage() {
@@ -113,7 +97,7 @@ export default function ForecastConfigPage() {
             <thead>
               <tr>
                 <th>開放填寫月份</th>
-                <th>自動結束新增設定日期</th>
+                <th>自動結束新增設定時間</th>
                 <th>結束新增設定</th>
                 <th>最後編輯時間</th>
                 {canEdit && <th className="actions-cell">編輯</th>}
@@ -122,14 +106,17 @@ export default function ForecastConfigPage() {
             <tbody>
               {pageConfigs.map((c) => (
                 <tr key={c.id}>
-                  <td>{c.month}</td>
-                  <td>{c.autoCloseDate ?? '-'}</td>
+                  <td><Link to={`/sales-forecast/config/${c.id}`}>{c.month}</Link></td>
+                  <td>{formatLocalDateTime(c.autoCloseAt)}</td>
                   <td>
                     <span className={c.isClosed ? 'badge--closed' : 'badge--open'}>
                       {c.isClosed ? '已結束新增設定' : '開放中'}
                     </span>
+                    {c.isClosed && c.activeReopenCount > 0 && (
+                      <span className="badge--reopen">補登中 {c.activeReopenCount} 通路</span>
+                    )}
                   </td>
-                  <td>{formatClosedAt(c.closedAt)}</td>
+                  <td>{formatTaipeiDateTime(c.closedAt)}</td>
                   {canEdit && (
                     <td className="actions-cell">
                       <button

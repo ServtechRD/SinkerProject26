@@ -8,7 +8,7 @@ import ForecastConfigPage from '../ForecastConfigPage'
 
 vi.mock('../../../api/forecastConfig', () => ({
   listConfigs: vi.fn(),
-  createMonths: vi.fn(),
+  createMonth: vi.fn(),
   updateConfig: vi.fn(),
 }))
 
@@ -18,7 +18,7 @@ const mockConfigs = [
   {
     id: 1,
     month: '202601',
-    autoCloseDay: 10,
+    autoCloseAt: '2026-01-10T00:00:00', activeReopenCount: 0,
     isClosed: false,
     closedAt: null,
     createdAt: '2026-01-01T00:00:00',
@@ -27,7 +27,7 @@ const mockConfigs = [
   {
     id: 2,
     month: '202512',
-    autoCloseDay: 15,
+    autoCloseAt: '2025-12-15T00:00:00', activeReopenCount: 2,
     isClosed: true,
     closedAt: '2025-12-15T10:30:00',
     createdAt: '2025-12-01T00:00:00',
@@ -74,8 +74,8 @@ describe('ForecastConfigPage', () => {
       expect(screen.getByText('202601')).toBeInTheDocument()
     })
     expect(screen.getByText('202512')).toBeInTheDocument()
-    expect(screen.getByText('10')).toBeInTheDocument()
-    expect(screen.getByText('15')).toBeInTheDocument()
+    expect(screen.getByText('2026/01/10 00:00')).toBeInTheDocument()
+    expect(screen.getByText('2025/12/15 00:00')).toBeInTheDocument()
     expect(screen.getByText('開放中')).toBeInTheDocument()
     expect(screen.getByText('已結束新增設定')).toBeInTheDocument()
   })
@@ -147,5 +147,18 @@ describe('ForecastConfigPage', () => {
     await waitFor(() => {
       expect(screen.getByText('您沒有權限檢視此頁面')).toBeInTheDocument()
     })
+  })
+
+  it('已結束且有補登中通路時顯示橘色標籤', async () => {
+    listConfigs.mockResolvedValue(mockConfigs)
+    renderPage({ permissions: ['sales_forecast_config.view'] })
+    expect(await screen.findByText('補登中 2 通路')).toBeInTheDocument()
+  })
+
+  it('月份連結導向表單明細頁', async () => {
+    listConfigs.mockResolvedValue(mockConfigs)
+    renderPage({ permissions: ['sales_forecast_config.view'] })
+    const link = await screen.findByRole('link', { name: '202601' })
+    expect(link).toHaveAttribute('href', '/sales-forecast/config/1')
   })
 })

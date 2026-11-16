@@ -245,3 +245,32 @@
   margin-bottom: 16px;
   font-size: 0.85rem;
 }
+
+.badge--reopen {
+  margin-left: 6px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #fff3e0;
+  color: #e65100;
+  font-size: 12px;
+}
+
+.fc-reopen-warning {
+  margin: 8px 0;
+  padding: 8px 12px;
+  border: 1px solid #ffcc80;
+  border-radius: 4px;
+  background: #fff8e1;
+  color: #8d6e00;
+  font-size: 13px;
+}
+
+.fc-channel-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+}
+
+.fc-detail-section {
+  margin-top: 20px;
+}

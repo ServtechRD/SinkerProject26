@@ -1,30 +1,26 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ToastProvider } from '../../../components/Toast'
 import CreateMonthsDialog from '../CreateMonthsDialog'
 
-vi.mock('../../../api/forecastConfig', () => ({
-  createMonths: vi.fn(),
-}))
+vi.mock('../../../api/forecastConfig', () => ({ createMonth: vi.fn() }))
 
-import { createMonths } from '../../../api/forecastConfig'
+import { createMonth } from '../../../api/forecastConfig'
 
-function renderDialog(props = {}) {
-  const defaultProps = {
-    open: true,
-    onClose: vi.fn(),
-    onSuccess: vi.fn(),
-    ...props,
-  }
-  return {
-    ...render(
-      <ToastProvider>
-        <CreateMonthsDialog {...defaultProps} />
-      </ToastProvider>
-    ),
-    props: defaultProps,
-  }
+function renderDialog(open = true) {
+  const onClose = vi.fn()
+  const onSuccess = vi.fn()
+  render(
+    <ToastProvider>
+      <CreateMonthsDialog open={open} onClose={onClose} onSuccess={onSuccess} />
+    </ToastProvider>
+  )
+  return { onClose, onSuccess }
+}
+
+function fillForm() {
+  fireEvent.change(screen.getByLabelText('填寫月份'), { target: { value: '2026-12' } })
+  fireEvent.change(screen.getByLabelText('系統自動結束新增設定時間'), { target: { value: '2026-12-10T18:30' } })
 }
 
 describe('CreateMonthsDialog', () => {
@@ -32,91 +28,39 @@ describe('CreateMonthsDialog', () => {
     vi.clearAllMocks()
   })
 
-  it('renders dialog when open', () => {
+  it('open=false 時不渲染', () => {
+    renderDialog(false)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('截止欄位為日期加時間，兩欄都填才能建立', () => {
     renderDialog()
-    expect(screen.getByText('新增填寫月份')).toBeInTheDocument()
-    expect(screen.getByLabelText('起始月份')).toBeInTheDocument()
-    expect(screen.getByLabelText('結束月份')).toBeInTheDocument()
-  })
-
-  it('does not render when not open', () => {
-    renderDialog({ open: false })
-    expect(screen.queryByText('新增填寫月份')).not.toBeInTheDocument()
-  })
-
-  it('calls onClose when cancel clicked', async () => {
-    const user = userEvent.setup()
-    const { props } = renderDialog()
-
-    await user.click(screen.getByRole('button', { name: '取消' }))
-    expect(props.onClose).toHaveBeenCalled()
-  })
-
-  it('create button disabled with empty fields', () => {
-    renderDialog()
+    expect(screen.getByLabelText('系統自動結束新增設定時間')).toHaveAttribute('type', 'datetime-local')
     expect(screen.getByRole('button', { name: '建立' })).toBeDisabled()
-  })
-
-  it('create button disabled when start > end', async () => {
-    const user = userEvent.setup()
-    renderDialog()
-
-    await user.type(screen.getByLabelText('起始月份'), '202605')
-    await user.type(screen.getByLabelText('結束月份'), '202601')
-
-    expect(screen.getByRole('button', { name: '建立' })).toBeDisabled()
-  })
-
-  it('create button enabled with valid input', async () => {
-    const user = userEvent.setup()
-    renderDialog()
-
-    await user.type(screen.getByLabelText('起始月份'), '202601')
-    await user.type(screen.getByLabelText('結束月份'), '202603')
-
+    fillForm()
     expect(screen.getByRole('button', { name: '建立' })).toBeEnabled()
   })
 
-  it('calls API and onSuccess on successful creation', async () => {
-    createMonths.mockResolvedValue({ createdCount: 3, months: ['202601', '202602', '202603'] })
-    const user = userEvent.setup()
-    const { props } = renderDialog()
-
-    await user.type(screen.getByLabelText('起始月份'), '202601')
-    await user.type(screen.getByLabelText('結束月份'), '202603')
-    await user.click(screen.getByRole('button', { name: '建立' }))
-
-    await waitFor(() => {
-      expect(createMonths).toHaveBeenCalledWith('202601', '202603', 10)
-    })
-    await waitFor(() => {
-      expect(props.onSuccess).toHaveBeenCalled()
-    })
+  it('送出 YYYYMM 與截止時間', async () => {
+    createMonth.mockResolvedValue({})
+    const { onSuccess } = renderDialog()
+    fillForm()
+    fireEvent.click(screen.getByRole('button', { name: '建立' }))
+    await waitFor(() => expect(createMonth).toHaveBeenCalledWith('202612', '2026-12-10T18:30'))
+    expect(onSuccess).toHaveBeenCalled()
   })
 
-  it('shows error toast on 409 conflict', async () => {
-    createMonths.mockRejectedValue({
-      response: { status: 409, data: { message: 'Some months already exist' } },
-    })
-    const user = userEvent.setup()
+  it('409 顯示後端訊息', async () => {
+    createMonth.mockRejectedValue({ response: { status: 409, data: { message: '該月份已存在' } } })
     renderDialog()
-
-    await user.type(screen.getByLabelText('起始月份'), '202601')
-    await user.type(screen.getByLabelText('結束月份'), '202603')
-    await user.click(screen.getByRole('button', { name: '建立' }))
-
-    await waitFor(() => {
-      expect(createMonths).toHaveBeenCalled()
-    })
+    fillForm()
+    fireEvent.click(screen.getByRole('button', { name: '建立' }))
+    expect(await screen.findByText('該月份已存在')).toBeInTheDocument()
   })
 
-  it('shows validation error for invalid month format', async () => {
-    const user = userEvent.setup()
-    renderDialog()
-
-    await user.type(screen.getByLabelText('起始月份'), '2026')
-    await user.type(screen.getByLabelText('結束月份'), '202603')
-
-    expect(screen.getByRole('button', { name: '建立' })).toBeDisabled()
+  it('取消呼叫 onClose', () => {
+    const { onClose } = renderDialog()
+    fireEvent.click(screen.getByRole('button', { name: '取消' }))
+    expect(onClose).toHaveBeenCalled()
   })
 })

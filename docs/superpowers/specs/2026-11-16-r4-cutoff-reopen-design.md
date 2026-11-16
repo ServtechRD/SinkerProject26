@@ -176,3 +176,10 @@
 
 ## 7. 不在本範圍
 - Email 通知（D6）、國定假日（D5）、檔期截止（D8）、通路主檔（R3）。
+
+## 8. 寫實作計畫時的調整（2026-11-16）
+- Flyway 拆成兩支：`V35__forecast_reopen_window_and_form_log.sql`（新表＋權限 35）、`V36__forecast_config_auto_close_at.sql`（截止改日期＋時間），讓每個任務提交後都能獨立運作。
+- 業務上傳頁的編輯狀態與「生管最新版數量」改由新端點 `GET /api/sales-forecast/config/edit-status?month=&channel=` 提供，不改既有銷售／禮品查詢回應，避免影響現有呼叫端。
+- 紅／橘提示列改為新元件 `ForecastEditStatusBanner`；既有 `SalesForecastFillDeadlineBanner`（全站 7 天內截止提醒）仍讀已移除的 `autoCloseDay`，一併修正為讀 `autoCloseAt`。
+- 「生管最新版數量」取自生管表單版本，該版本已含禮品數量，故銷售頁與禮品頁顯示的是同一個合計數字。
+- `correctionCount` 為最新生管版本與 `form_v1` 的差異品項數，包含先前補登併入的差異。

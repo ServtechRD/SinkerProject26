@@ -30,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.TreeMap;
 
 @Service
@@ -380,6 +381,95 @@ public class FormSummaryService {
         formLogService.record(month, null, FormLogAction.CORRECTION, userId,
                 "產生版本 " + versionLabel + "；原因：" + request.getChangeReason());
         return nextNo;
+    }
+
+    /**
+     * 補登結束：以最新生管版本為底，指定通路改用業務最新上傳（銷售＋禮品），存成新版本。
+     * 同一次結束的多個通路合併成一個版本。
+     */
+    @Transactional
+    public int mergeReopenedChannels(String month, Set<String> channels, String changeReason) {
+        validateMonth(month);
+        SalesForecastConfig config = configRepository.findByMonth(month)
+                .orElseThrow(() -> new IllegalArgumentException("Month config not found: " + month));
+        ensureFormVersion1Exists(month, config);
+        int latestNo = formVersionRepository.findByMonthOrderByVersionNoDesc(month).get(0).getVersionNo();
+        String latestLabel = "form_v" + latestNo;
+        int nextNo = latestNo + 1;
+
+        Map<String, FormSummaryRowDTO> keyToRow = new TreeMap<>();
+        Map<String, Map<String, String>> remarksByKey = new LinkedHashMap<>();
+        List<Map<String, BigDecimal>> qtyByChannel = new ArrayList<>();
+        for (String channel : CHANNEL_ORDER) {
+            Map<String, BigDecimal> qty = new LinkedHashMap<>();
+            if (channels.contains(channel)) {
+                collectBusinessLatest(month, channel, keyToRow, remarksByKey, qty);
+            } else {
+                for (SalesForecast r : forecastRepository
+                        .findByMonthAndChannelAndVersionOrderByCategoryAscSpecAscProductCodeAsc(month, channel, latestLabel)) {
+                    String pk = productKey(r);
+                    keyToRow.putIfAbsent(pk, rowFrom(r));
+                    collectRemark(remarksByKey, pk, channel, r.getRemark());
+                    qty.put(pk, r.getQuantity());
+                }
+            }
+            qtyByChannel.add(qty);
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        SalesForecastFormVersion ver = new SalesForecastFormVersion();
+        ver.setMonth(month);
+        ver.setVersionNo(nextNo);
+        ver.setCreatedAt(now);
+        ver.setChangeReason(changeReason);
+        formVersionRepository.save(ver);
+
+        String versionLabel = "form_v" + nextNo;
+        for (int chIdx = 0; chIdx < CHANNEL_ORDER.size(); chIdx++) {
+            String channel = CHANNEL_ORDER.get(chIdx);
+            for (Map.Entry<String, FormSummaryRowDTO> e : keyToRow.entrySet()) {
+                FormSummaryRowDTO row = e.getValue();
+                SalesForecast sf = new SalesForecast();
+                sf.setMonth(month);
+                sf.setChannel(channel);
+                sf.setVersion(versionLabel);
+                sf.setFormVersionNo(nextNo);
+                sf.setWarehouseLocation(row.getWarehouseLocation());
+                sf.setCategory(row.getCategory());
+                sf.setSpec(row.getSpec());
+                sf.setProductName(row.getProductName());
+                sf.setProductCode(row.getProductCode() != null ? row.getProductCode() : "");
+                sf.setQuantity(qtyByChannel.get(chIdx).getOrDefault(e.getKey(), BigDecimal.ZERO));
+                sf.setRemark(remarksByKey.getOrDefault(e.getKey(), Map.of()).getOrDefault(channel, ""));
+                sf.setIsModified(true);
+                sf.setCreatedAt(now);
+                sf.setUpdatedAt(now);
+                forecastRepository.save(sf);
+            }
+        }
+        log.info("Merged reopened channels {} into form version {} for month {}", channels, nextNo, month);
+        return nextNo;
+    }
+
+    /** 某通路業務最新上傳（排除 form_v*）＋禮品最新版，累加到同一品項 */
+    private void collectBusinessLatest(String month, String channel, Map<String, FormSummaryRowDTO> keyToRow,
+                                       Map<String, Map<String, String>> remarksByKey, Map<String, BigDecimal> qty) {
+        List<String> versions = forecastRepository.findDistinctBusinessVersionsByMonthAndChannel(month, channel);
+        if (!versions.isEmpty()) {
+            for (SalesForecast r : forecastRepository
+                    .findByMonthAndChannelAndVersionOrderByCategoryAscSpecAscProductCodeAsc(month, channel, versions.get(0))) {
+                String pk = productKey(r);
+                keyToRow.putIfAbsent(pk, rowFrom(r));
+                collectRemark(remarksByKey, pk, channel, r.getRemark());
+                qty.put(pk, r.getQuantity());
+            }
+        }
+        for (GiftSalesForecast g : giftForecastRepository.findLatestByMonthAndChannel(month, channel)) {
+            String pk = productKeyGift(g);
+            keyToRow.putIfAbsent(pk, rowFromGift(g));
+            collectRemark(remarksByKey, pk, channel, g.getRemark());
+            qty.put(pk, qty.getOrDefault(pk, BigDecimal.ZERO).add(g.getQuantity()));
+        }
     }
 
     /**

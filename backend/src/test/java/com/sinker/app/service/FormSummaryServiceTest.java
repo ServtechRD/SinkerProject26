@@ -28,7 +28,9 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -57,6 +59,56 @@ class FormSummaryServiceTest {
     @Spy
     @InjectMocks
     private FormSummaryService service;
+
+    @Test
+    void mergeReopenedChannels_replacesOnlyReopenedChannelsInNewVersion() {
+        SalesForecastConfig cfg = new SalesForecastConfig();
+        cfg.setMonth(MONTH);
+        cfg.setIsClosed(true);
+        when(configRepository.findByMonth(MONTH)).thenReturn(Optional.of(cfg));
+        when(formVersionRepository.countByMonth(MONTH)).thenReturn(2L);
+        SalesForecastFormVersion v2 = new SalesForecastFormVersion();
+        v2.setVersionNo(2);
+        when(formVersionRepository.findByMonthOrderByVersionNoDesc(MONTH)).thenReturn(List.of(v2));
+
+        SalesForecast plannerRow = new SalesForecast();
+        plannerRow.setProductCode("P1");
+        plannerRow.setProductName("品1");
+        plannerRow.setQuantity(new BigDecimal("5"));
+        plannerRow.setRemark("");
+        // 其他通路會以不同參數呼叫同一方法（回傳空清單），strict stubs 下需 lenient
+        lenient().when(forecastRepository.findByMonthAndChannelAndVersionOrderByCategoryAscSpecAscProductCodeAsc(MONTH, "愛買", "form_v2"))
+                .thenReturn(List.of(plannerRow));
+
+        String bizVersion = "2026/12/11 10:00:00(家樂福)";
+        lenient().when(forecastRepository.findDistinctBusinessVersionsByMonthAndChannel(MONTH, "家樂福")).thenReturn(List.of(bizVersion));
+        SalesForecast bizRow = new SalesForecast();
+        bizRow.setProductCode("P1");
+        bizRow.setProductName("品1");
+        bizRow.setQuantity(new BigDecimal("99"));
+        bizRow.setRemark("補登加量");
+        lenient().when(forecastRepository.findByMonthAndChannelAndVersionOrderByCategoryAscSpecAscProductCodeAsc(MONTH, "家樂福", bizVersion))
+                .thenReturn(List.of(bizRow));
+
+        int versionNo = service.mergeReopenedChannels(MONTH, Set.of("家樂福"), "補登：家樂福／原因");
+
+        assertEquals(3, versionNo);
+        ArgumentCaptor<SalesForecastFormVersion> verCaptor = ArgumentCaptor.forClass(SalesForecastFormVersion.class);
+        verify(formVersionRepository).save(verCaptor.capture());
+        assertEquals(3, verCaptor.getValue().getVersionNo());
+        assertEquals("補登：家樂福／原因", verCaptor.getValue().getChangeReason());
+
+        ArgumentCaptor<SalesForecast> rowCaptor = ArgumentCaptor.forClass(SalesForecast.class);
+        verify(forecastRepository, times(FormSummaryService.CHANNEL_ORDER.size())).save(rowCaptor.capture());
+        Map<String, SalesForecast> byChannel = rowCaptor.getAllValues().stream()
+                .collect(java.util.stream.Collectors.toMap(SalesForecast::getChannel, r -> r));
+        assertEquals(0, new BigDecimal("99").compareTo(byChannel.get("家樂福").getQuantity()));
+        assertEquals("補登加量", byChannel.get("家樂福").getRemark());
+        assertEquals(0, new BigDecimal("5").compareTo(byChannel.get("愛買").getQuantity()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(byChannel.get("7-11").getQuantity()));
+        assertEquals("form_v3", byChannel.get("家樂福").getVersion());
+        verify(forecastRepository, never()).deleteByMonthAndChannel(anyString(), anyString());
+    }
 
     @Test
     void listFormVersions_openMonth_returnsEmptyList() {

@@ -121,4 +121,62 @@ class ReopenServiceTest {
         verify(formLogService).record(eq("202612"), eq("家樂福"), eq(FormLogAction.REOPEN), eq(7L), contains("全聯新品提案追加"));
         verify(formLogService).record(eq("202612"), eq("愛買"), eq(FormLogAction.REOPEN), eq(7L), anyString());
     }
+
+    private static SalesForecastReopenWindow window(int id, String month, String channel) {
+        SalesForecastReopenWindow w = new SalesForecastReopenWindow();
+        w.setId(id);
+        w.setMonth(month);
+        w.setChannel(channel);
+        w.setReason("新品追加");
+        w.setExpiresAt(NOW.minusMinutes(1));
+        return w;
+    }
+
+    @Test
+    void end_mergesChannelAndMarksWindow() {
+        SalesForecastReopenWindow w = window(3, "202612", "家樂福");
+        when(configRepository.findById(1)).thenReturn(Optional.of(config(true)));
+        when(windowRepository.findById(3)).thenReturn(Optional.of(w));
+        when(formSummaryService.mergeReopenedChannels(eq("202612"), eq(java.util.Set.of("家樂福")), contains("家樂福")))
+                .thenReturn(3);
+
+        service.end(1, 3, 7L);
+
+        assertEquals(NOW, w.getEndedAt());
+        assertEquals(7L, w.getEndedBy());
+        assertEquals("form_v3", w.getMergedVersion());
+        verify(windowRepository).save(w);
+        verify(formLogService).record(eq("202612"), eq("家樂福"), eq(FormLogAction.REOPEN_END), eq(7L), contains("form_v3"));
+    }
+
+    @Test
+    void end_alreadyEnded_throws() {
+        SalesForecastReopenWindow w = window(3, "202612", "家樂福");
+        w.setEndedAt(NOW.minusHours(1));
+        when(configRepository.findById(1)).thenReturn(Optional.of(config(true)));
+        when(windowRepository.findById(3)).thenReturn(Optional.of(w));
+        assertThrows(IllegalArgumentException.class, () -> service.end(1, 3, 7L));
+        verifyNoInteractions(formSummaryService);
+    }
+
+    @Test
+    void processExpired_groupsSameMonthIntoOneVersion() {
+        SalesForecastReopenWindow a = window(1, "202612", "家樂福");
+        SalesForecastReopenWindow b = window(2, "202612", "愛買");
+        SalesForecastReopenWindow c = window(3, "202701", "全家");
+        when(windowRepository.findByEndedAtIsNullAndExpiresAtLessThanEqual(NOW)).thenReturn(List.of(a, b, c));
+        when(formSummaryService.mergeReopenedChannels(eq("202612"), eq(java.util.Set.of("家樂福", "愛買")), anyString()))
+                .thenReturn(4);
+        when(formSummaryService.mergeReopenedChannels(eq("202701"), eq(java.util.Set.of("全家")), anyString()))
+                .thenReturn(2);
+
+        int count = service.processExpired();
+
+        assertEquals(3, count);
+        assertEquals("form_v4", a.getMergedVersion());
+        assertEquals("form_v4", b.getMergedVersion());
+        assertEquals("form_v2", c.getMergedVersion());
+        assertNull(a.getEndedBy());
+        verify(formLogService, times(3)).record(anyString(), anyString(), eq(FormLogAction.REOPEN_END), isNull(), contains("到期自動鎖回"));
+    }
 }

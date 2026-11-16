@@ -16,8 +16,13 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /** 開放補登與補登結束 */
 @Service
@@ -90,5 +95,54 @@ public class ReopenService {
                     "期限 " + expiresAt.format(DISPLAY) + "；原因：" + reason);
         }
         log.info("Reopened month {} channels {} until {}", month, channels, expiresAt);
+    }
+
+    /** 生管提前結束單一通路的補登 */
+    @Transactional
+    public void end(Integer configId, Integer windowId, Long userId) {
+        SalesForecastConfig config = configRepository.findById(configId)
+                .orElseThrow(() -> new ResourceNotFoundException("Forecast config not found with id: " + configId));
+        SalesForecastReopenWindow w = windowRepository.findById(windowId)
+                .filter(x -> x.getMonth().equals(config.getMonth()))
+                .orElseThrow(() -> new ResourceNotFoundException("Reopen window not found with id: " + windowId));
+        if (w.getEndedAt() != null) {
+            throw new IllegalArgumentException("此補登已結束");
+        }
+        finishWindows(config.getMonth(), List.of(w), userId);
+    }
+
+    /**
+     * 排程每分鐘呼叫：結束已到期的補登，同月份合併成一個新版本。
+     * ponytail: 全部在同一交易，任一月份合併失敗則整批回滾、下一分鐘重試
+     */
+    @Transactional
+    public int processExpired() {
+        List<SalesForecastReopenWindow> expired =
+                windowRepository.findByEndedAtIsNullAndExpiresAtLessThanEqual(LocalDateTime.now(clock));
+        Map<String, List<SalesForecastReopenWindow>> byMonth = new LinkedHashMap<>();
+        for (SalesForecastReopenWindow w : expired) {
+            byMonth.computeIfAbsent(w.getMonth(), k -> new ArrayList<>()).add(w);
+        }
+        byMonth.forEach((month, windows) -> finishWindows(month, windows, null));
+        return expired.size();
+    }
+
+    private void finishWindows(String month, List<SalesForecastReopenWindow> windows, Long userId) {
+        Set<String> channels = windows.stream().map(SalesForecastReopenWindow::getChannel)
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+        String reasons = windows.stream().map(SalesForecastReopenWindow::getReason).distinct()
+                .collect(Collectors.joining("；"));
+        int versionNo = formSummaryService.mergeReopenedChannels(month, channels,
+                "補登：" + String.join("、", channels) + "／" + reasons);
+        String label = "form_v" + versionNo;
+        LocalDateTime now = LocalDateTime.now(clock);
+        for (SalesForecastReopenWindow w : windows) {
+            w.setEndedAt(now);
+            w.setEndedBy(userId);
+            w.setMergedVersion(label);
+            windowRepository.save(w);
+            formLogService.record(month, w.getChannel(), FormLogAction.REOPEN_END, userId,
+                    (userId == null ? "到期自動鎖回" : "生管提前結束") + "，產生版本 " + label);
+        }
     }
 }

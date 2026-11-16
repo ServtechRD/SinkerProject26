@@ -77,6 +77,17 @@ public class SalesForecastConfigController {
         return ResponseEntity.status(HttpStatus.CREATED).build();
     }
 
+    @PostMapping("/{id}/reopen/{windowId}/end")
+    @PreAuthorize("hasAuthority('sales_forecast_config.reopen')")
+    public ResponseEntity<Void> endReopen(
+            @PathVariable Integer id,
+            @PathVariable Integer windowId,
+            @AuthenticationPrincipal JwtUserPrincipal principal) {
+        log.info("POST /api/sales-forecast/config/{}/reopen/{}/end", id, windowId);
+        reopenService.end(id, windowId, principal.getUserId());
+        return ResponseEntity.ok().build();
+    }
+
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleNotFound(
             ResourceNotFoundException ex, HttpServletRequest request) {

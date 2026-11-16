@@ -45,17 +45,20 @@ public class SalesForecastUploadService {
     private final ExcelParserService excelParserService;
     private final ErpProductService erpProductService;
     private final JdbcTemplate jdbcTemplate;
+    private final ForecastEditGuard editGuard;
 
     public SalesForecastUploadService(SalesForecastRepository forecastRepository,
                                       SalesForecastConfigRepository configRepository,
                                       ExcelParserService excelParserService,
                                       ErpProductService erpProductService,
-                                      JdbcTemplate jdbcTemplate) {
+                                      JdbcTemplate jdbcTemplate,
+                                      ForecastEditGuard editGuard) {
         this.forecastRepository = forecastRepository;
         this.configRepository = configRepository;
         this.excelParserService = excelParserService;
         this.erpProductService = erpProductService;
         this.jdbcTemplate = jdbcTemplate;
+        this.editGuard = editGuard;
     }
 
     @Transactional
@@ -76,9 +79,7 @@ public class SalesForecastUploadService {
         SalesForecastConfig config = configRepository.findByMonth(month)
                 .orElseThrow(() -> new ResourceNotFoundException("Month " + month + " not configured"));
 
-        if (Boolean.TRUE.equals(config.getIsClosed())) {
-            throw new AccessDeniedException("Month " + month + " is closed");
-        }
+        editGuard.assertBusinessEditable(config, channel);
 
         // 4. Check user owns channel (admin bypasses this check)
         if (!"admin".equals(roleCode)) {
@@ -123,7 +124,7 @@ public class SalesForecastUploadService {
         Map<String, ProductDTO> productCache = new HashMap<>();
 
         // 8. Delete existing data for same month+channel
-        forecastRepository.deleteByMonthAndChannel(month, channel);
+        forecastRepository.deleteBusinessRowsByMonthAndChannel(month, channel);
 
         // 9. Insert all rows
         List<SalesForecast> entities = new ArrayList<>();

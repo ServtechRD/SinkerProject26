@@ -46,6 +46,8 @@ class GiftSalesForecastServiceTest {
     private ErpProductService erpProductService;
     @Mock
     private JdbcTemplate jdbcTemplate;
+    @Mock
+    private ForecastEditGuard editGuard;
 
     @InjectMocks
     private GiftSalesForecastService service;
@@ -212,6 +214,8 @@ class GiftSalesForecastServiceTest {
         SalesForecastConfig config = new SalesForecastConfig();
         config.setIsClosed(true);
         when(configRepository.findByMonth(MONTH)).thenReturn(Optional.of(config));
+        doThrow(new org.springframework.security.access.AccessDeniedException("表單已截止"))
+                .when(editGuard).assertBusinessEditable(any(), anyString());
 
         assertThrows(AccessDeniedException.class, () -> service.deleteForecast(1, 1L, "admin"));
         verify(forecastRepository, never()).delete(any());

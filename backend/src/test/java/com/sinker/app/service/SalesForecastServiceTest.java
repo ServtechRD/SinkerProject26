@@ -47,6 +47,8 @@ class SalesForecastServiceTest {
 
     @Mock
     private JdbcTemplate jdbcTemplate;
+    @Mock
+    private ForecastEditGuard editGuard;
 
     @InjectMocks
     private SalesForecastService service;
@@ -165,6 +167,8 @@ class SalesForecastServiceTest {
         request.setQuantity(new BigDecimal("100.50"));
 
         when(configRepository.findByMonth("202512")).thenReturn(Optional.of(closedConfig));
+        doThrow(new org.springframework.security.access.AccessDeniedException("表單已截止"))
+                .when(editGuard).assertBusinessEditable(any(), anyString());
 
         assertThrows(AccessDeniedException.class, () ->
                 service.createForecast(request, 1L, "user", Set.of()));

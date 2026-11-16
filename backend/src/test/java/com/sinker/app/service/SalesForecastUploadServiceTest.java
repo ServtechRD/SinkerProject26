@@ -37,6 +37,7 @@ class SalesForecastUploadServiceTest {
     @Mock private ExcelParserService excelParserService;
     @Mock private ErpProductService erpProductService;
     @Mock private JdbcTemplate jdbcTemplate;
+    @Mock private ForecastEditGuard editGuard;
 
     private SalesForecastUploadService service;
 
@@ -49,7 +50,7 @@ class SalesForecastUploadServiceTest {
     @BeforeEach
     void setUp() {
         service = new SalesForecastUploadService(forecastRepository, configRepository,
-                excelParserService, erpProductService, jdbcTemplate);
+                excelParserService, erpProductService, jdbcTemplate, editGuard);
         when(erpProductService.findProduct(anyString())).thenAnswer(inv -> {
             String code = inv.getArgument(0);
             ProductDTO dto = new ProductDTO();
@@ -110,7 +111,7 @@ class SalesForecastUploadServiceTest {
         assertTrue(response.getVersion().endsWith("(" + CHANNEL + ")"));
         assertNotNull(response.getUploadTimestamp());
 
-        verify(forecastRepository).deleteByMonthAndChannel(MONTH, CHANNEL);
+        verify(forecastRepository).deleteBusinessRowsByMonthAndChannel(MONTH, CHANNEL);
         verify(forecastRepository).saveAll(anyList());
     }
 
@@ -132,6 +133,8 @@ class SalesForecastUploadServiceTest {
     @Test
     void testUpload_MonthClosed() {
         when(configRepository.findByMonth(MONTH)).thenReturn(Optional.of(closedConfig()));
+        doThrow(new org.springframework.security.access.AccessDeniedException("表單已截止"))
+                .when(editGuard).assertBusinessEditable(any(), anyString());
 
         assertThrows(AccessDeniedException.class,
                 () -> service.upload(dummyFile(), MONTH, CHANNEL, USER_ID, ROLE_SALES));
@@ -234,7 +237,7 @@ class SalesForecastUploadServiceTest {
 
         // Delete should be called before saveAll
         var inOrder = inOrder(forecastRepository);
-        inOrder.verify(forecastRepository).deleteByMonthAndChannel(MONTH, CHANNEL);
+        inOrder.verify(forecastRepository).deleteBusinessRowsByMonthAndChannel(MONTH, CHANNEL);
         inOrder.verify(forecastRepository).saveAll(anyList());
     }
 

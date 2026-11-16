@@ -45,17 +45,20 @@ public class GiftSalesForecastUploadService {
     private final ExcelParserService excelParserService;
     private final ErpProductService erpProductService;
     private final JdbcTemplate jdbcTemplate;
+    private final ForecastEditGuard editGuard;
 
     public GiftSalesForecastUploadService(GiftSalesForecastRepository forecastRepository,
                                           SalesForecastConfigRepository configRepository,
                                           ExcelParserService excelParserService,
                                           ErpProductService erpProductService,
-                                          JdbcTemplate jdbcTemplate) {
+                                          JdbcTemplate jdbcTemplate,
+                                          ForecastEditGuard editGuard) {
         this.forecastRepository = forecastRepository;
         this.configRepository = configRepository;
         this.excelParserService = excelParserService;
         this.erpProductService = erpProductService;
         this.jdbcTemplate = jdbcTemplate;
+        this.editGuard = editGuard;
     }
 
     @Transactional
@@ -71,9 +74,7 @@ public class GiftSalesForecastUploadService {
 
         SalesForecastConfig config = configRepository.findByMonth(month)
                 .orElseThrow(() -> new ResourceNotFoundException("Month " + month + " not configured"));
-        if (Boolean.TRUE.equals(config.getIsClosed())) {
-            throw new AccessDeniedException("Month " + month + " is closed");
-        }
+        editGuard.assertBusinessEditable(config, channel);
         if (!"admin".equals(roleCode)) {
             checkChannelOwnership(userId, channel);
         }

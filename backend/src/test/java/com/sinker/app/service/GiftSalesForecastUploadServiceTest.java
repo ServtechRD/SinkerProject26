@@ -39,13 +39,15 @@ class GiftSalesForecastUploadServiceTest {
     private ErpProductService erpProductService;
     @Mock
     private JdbcTemplate jdbcTemplate;
+    @Mock
+    private ForecastEditGuard editGuard;
 
     private GiftSalesForecastUploadService service;
 
     @BeforeEach
     void setUp() {
         service = new GiftSalesForecastUploadService(
-                forecastRepository, configRepository, excelParserService, erpProductService, jdbcTemplate
+                forecastRepository, configRepository, excelParserService, erpProductService, jdbcTemplate, editGuard
         );
     }
 

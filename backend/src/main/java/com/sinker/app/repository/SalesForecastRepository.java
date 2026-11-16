@@ -21,6 +21,18 @@ public interface SalesForecastRepository extends JpaRepository<SalesForecast, In
     @Query("DELETE FROM SalesForecast sf WHERE sf.month = :month AND sf.channel = :channel AND sf.version = :version")
     void deleteByMonthAndChannelAndVersion(@Param("month") String month, @Param("channel") String channel, @Param("version") String version);
 
+    /** 只刪業務上傳資料，保留生管表單版本（form_v*） */
+    @Modifying
+    @Query("DELETE FROM SalesForecast sf WHERE sf.month = :month AND sf.channel = :channel " +
+           "AND sf.version NOT LIKE 'form_v%'")
+    void deleteBusinessRowsByMonthAndChannel(@Param("month") String month, @Param("channel") String channel);
+
+    /** 業務版本（排除 form_v*），新到舊 */
+    @Query("SELECT DISTINCT sf.version FROM SalesForecast sf " +
+           "WHERE sf.month = :month AND sf.channel = :channel AND sf.version NOT LIKE 'form_v%' " +
+           "ORDER BY sf.version DESC")
+    List<String> findDistinctBusinessVersionsByMonthAndChannel(@Param("month") String month, @Param("channel") String channel);
+
     int countByMonthAndChannel(String month, String channel);
 
     Optional<SalesForecast> findByMonthAndChannelAndProductCode(String month, String channel, String productCode);

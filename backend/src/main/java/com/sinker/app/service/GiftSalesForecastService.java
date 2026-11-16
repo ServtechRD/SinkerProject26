@@ -42,17 +42,20 @@ public class GiftSalesForecastService {
     private final GiftSalesForecastVersionReasonRepository versionReasonRepository;
     private final ErpProductService erpProductService;
     private final JdbcTemplate jdbcTemplate;
+    private final ForecastEditGuard editGuard;
 
     public GiftSalesForecastService(GiftSalesForecastRepository forecastRepository,
                                     SalesForecastConfigRepository configRepository,
                                     GiftSalesForecastVersionReasonRepository versionReasonRepository,
                                     ErpProductService erpProductService,
-                                    JdbcTemplate jdbcTemplate) {
+                                    JdbcTemplate jdbcTemplate,
+                                    ForecastEditGuard editGuard) {
         this.forecastRepository = forecastRepository;
         this.configRepository = configRepository;
         this.versionReasonRepository = versionReasonRepository;
         this.erpProductService = erpProductService;
         this.jdbcTemplate = jdbcTemplate;
+        this.editGuard = editGuard;
     }
 
     @Transactional
@@ -62,7 +65,7 @@ public class GiftSalesForecastService {
 
         validateMonthFormat(request.getMonth());
         if (!Boolean.TRUE.equals(authorities != null && authorities.contains("sales_forecast.update_after_closed"))) {
-            validateMonthOpen(request.getMonth());
+            validateMonthOpen(request.getMonth(), request.getChannel());
         }
         checkChannelOwnership(userId, request.getChannel(), roleCode);
 
@@ -109,7 +112,7 @@ public class GiftSalesForecastService {
                 .orElseThrow(() -> new ResourceNotFoundException("Forecast not found with id: " + id));
 
         if (!Boolean.TRUE.equals(authorities != null && authorities.contains("sales_forecast.update_after_closed"))) {
-            validateMonthOpen(forecast.getMonth());
+            validateMonthOpen(forecast.getMonth(), forecast.getChannel());
         }
         checkChannelOwnership(userId, forecast.getChannel(), roleCode);
 
@@ -125,7 +128,7 @@ public class GiftSalesForecastService {
     public void deleteForecast(Integer id, Long userId, String roleCode) {
         GiftSalesForecast forecast = forecastRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Forecast not found with id: " + id));
-        validateMonthOpen(forecast.getMonth());
+        validateMonthOpen(forecast.getMonth(), forecast.getChannel());
         checkChannelOwnership(userId, forecast.getChannel(), roleCode);
         forecastRepository.delete(forecast);
     }
@@ -136,12 +139,10 @@ public class GiftSalesForecastService {
         }
     }
 
-    private void validateMonthOpen(String month) {
+    private void validateMonthOpen(String month, String channel) {
         SalesForecastConfig config = configRepository.findByMonth(month)
                 .orElseThrow(() -> new ResourceNotFoundException("Month " + month + " not configured"));
-        if (Boolean.TRUE.equals(config.getIsClosed())) {
-            throw new AccessDeniedException("Month " + month + " is closed");
-        }
+        editGuard.assertBusinessEditable(config, channel);
     }
 
     private void checkChannelOwnership(Long userId, String channel, String roleCode) {

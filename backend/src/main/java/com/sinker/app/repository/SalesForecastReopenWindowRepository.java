@@ -18,6 +18,8 @@ public interface SalesForecastReopenWindowRepository extends JpaRepository<Sales
 
     List<SalesForecastReopenWindow> findByEndedAtIsNullAndExpiresAtLessThanEqual(LocalDateTime now);
 
+    List<SalesForecastReopenWindow> findByMonthAndEndedAtIsNullAndExpiresAtLessThanEqual(String month, LocalDateTime now);
+
     List<SalesForecastReopenWindow> findByMonthAndEndedAtIsNull(String month);
 
     long countByMonthAndEndedAtIsNull(String month);

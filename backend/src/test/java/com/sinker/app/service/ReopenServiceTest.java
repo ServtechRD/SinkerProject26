@@ -160,23 +160,40 @@ class ReopenServiceTest {
     }
 
     @Test
-    void processExpired_groupsSameMonthIntoOneVersion() {
+    void findExpiredMonths_returnsDistinctMonthsInOrder() {
         SalesForecastReopenWindow a = window(1, "202612", "家樂福");
         SalesForecastReopenWindow b = window(2, "202612", "愛買");
         SalesForecastReopenWindow c = window(3, "202701", "全家");
         when(windowRepository.findByEndedAtIsNullAndExpiresAtLessThanEqual(NOW)).thenReturn(List.of(a, b, c));
+
+        assertEquals(List.of("202612", "202701"), service.findExpiredMonths());
+    }
+
+    @Test
+    void finishExpiredMonth_groupsSameMonthIntoOneVersion() {
+        SalesForecastReopenWindow a = window(1, "202612", "家樂福");
+        SalesForecastReopenWindow b = window(2, "202612", "愛買");
+        when(windowRepository.findByMonthAndEndedAtIsNullAndExpiresAtLessThanEqual("202612", NOW))
+                .thenReturn(List.of(a, b));
         when(formSummaryService.mergeReopenedChannels(eq("202612"), eq(java.util.Set.of("家樂福", "愛買")), anyString()))
                 .thenReturn(4);
-        when(formSummaryService.mergeReopenedChannels(eq("202701"), eq(java.util.Set.of("全家")), anyString()))
-                .thenReturn(2);
 
-        int count = service.processExpired();
+        int count = service.finishExpiredMonth("202612");
 
-        assertEquals(3, count);
+        assertEquals(2, count);
         assertEquals("form_v4", a.getMergedVersion());
         assertEquals("form_v4", b.getMergedVersion());
-        assertEquals("form_v2", c.getMergedVersion());
         assertNull(a.getEndedBy());
-        verify(formLogService, times(3)).record(anyString(), anyString(), eq(FormLogAction.REOPEN_END), isNull(), contains("到期自動鎖回"));
+        verify(formSummaryService, times(1)).mergeReopenedChannels(anyString(), any(), anyString());
+        verify(formLogService, times(2)).record(eq("202612"), anyString(), eq(FormLogAction.REOPEN_END), isNull(), contains("到期自動鎖回"));
+    }
+
+    @Test
+    void finishExpiredMonth_emptyReturnsZeroWithoutMerge() {
+        when(windowRepository.findByMonthAndEndedAtIsNullAndExpiresAtLessThanEqual("202612", NOW))
+                .thenReturn(List.of());
+
+        assertEquals(0, service.finishExpiredMonth("202612"));
+        verifyNoInteractions(formSummaryService);
     }
 }

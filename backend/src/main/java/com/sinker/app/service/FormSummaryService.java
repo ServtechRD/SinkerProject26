@@ -26,6 +26,7 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -283,34 +284,42 @@ public class FormSummaryService {
             }
         }
 
-        String versionLabel = "form_v1";
+        int inserted = writeFormVersionRows(month, 1, keyToRow, remarksByKey, Arrays.asList(qtyByChannel), false, now);
+        log.info("Created form version 1 snapshot for month {}, {} rows", month, inserted);
+    }
+
+    /** 依「通路 × 品項」寫入一個表單版本的所有資料列，回傳寫入筆數 */
+    private int writeFormVersionRows(String month, int versionNo, Map<String, FormSummaryRowDTO> keyToRow,
+                                     Map<String, Map<String, String>> remarksByKey,
+                                     List<Map<String, BigDecimal>> qtyByChannel,
+                                     boolean isModified, LocalDateTime now) {
+        String versionLabel = "form_v" + versionNo;
         int inserted = 0;
         for (int chIdx = 0; chIdx < CHANNEL_ORDER.size(); chIdx++) {
             String channel = CHANNEL_ORDER.get(chIdx);
             for (Map.Entry<String, FormSummaryRowDTO> e : keyToRow.entrySet()) {
                 String pk = e.getKey();
                 FormSummaryRowDTO row = e.getValue();
-                BigDecimal qty = qtyByChannel[chIdx].getOrDefault(pk, BigDecimal.ZERO);
                 SalesForecast sf = new SalesForecast();
                 sf.setMonth(month);
                 sf.setChannel(channel);
                 sf.setVersion(versionLabel);
-                sf.setFormVersionNo(1);
+                sf.setFormVersionNo(versionNo);
                 sf.setWarehouseLocation(row.getWarehouseLocation());
                 sf.setCategory(row.getCategory());
                 sf.setSpec(row.getSpec());
                 sf.setProductName(row.getProductName());
                 sf.setProductCode(row.getProductCode() != null ? row.getProductCode() : "");
-                sf.setQuantity(qty);
+                sf.setQuantity(qtyByChannel.get(chIdx).getOrDefault(pk, BigDecimal.ZERO));
                 sf.setRemark(remarksByKey.getOrDefault(pk, Map.of()).getOrDefault(channel, ""));
-                sf.setIsModified(false);
+                sf.setIsModified(isModified);
                 sf.setCreatedAt(now);
                 sf.setUpdatedAt(now);
                 forecastRepository.save(sf);
                 inserted++;
             }
         }
-        log.info("Created form version 1 snapshot for month {}, {} rows", month, inserted);
+        return inserted;
     }
 
     @Transactional
@@ -424,29 +433,7 @@ public class FormSummaryService {
         ver.setChangeReason(changeReason);
         formVersionRepository.save(ver);
 
-        String versionLabel = "form_v" + nextNo;
-        for (int chIdx = 0; chIdx < CHANNEL_ORDER.size(); chIdx++) {
-            String channel = CHANNEL_ORDER.get(chIdx);
-            for (Map.Entry<String, FormSummaryRowDTO> e : keyToRow.entrySet()) {
-                FormSummaryRowDTO row = e.getValue();
-                SalesForecast sf = new SalesForecast();
-                sf.setMonth(month);
-                sf.setChannel(channel);
-                sf.setVersion(versionLabel);
-                sf.setFormVersionNo(nextNo);
-                sf.setWarehouseLocation(row.getWarehouseLocation());
-                sf.setCategory(row.getCategory());
-                sf.setSpec(row.getSpec());
-                sf.setProductName(row.getProductName());
-                sf.setProductCode(row.getProductCode() != null ? row.getProductCode() : "");
-                sf.setQuantity(qtyByChannel.get(chIdx).getOrDefault(e.getKey(), BigDecimal.ZERO));
-                sf.setRemark(remarksByKey.getOrDefault(e.getKey(), Map.of()).getOrDefault(channel, ""));
-                sf.setIsModified(true);
-                sf.setCreatedAt(now);
-                sf.setUpdatedAt(now);
-                forecastRepository.save(sf);
-            }
-        }
+        writeFormVersionRows(month, nextNo, keyToRow, remarksByKey, qtyByChannel, true, now);
         log.info("Merged reopened channels {} into form version {} for month {}", channels, nextNo, month);
         return nextNo;
     }

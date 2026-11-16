@@ -16,11 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -111,20 +108,23 @@ public class ReopenService {
         finishWindows(config.getMonth(), List.of(w), userId);
     }
 
-    /**
-     * 排程每分鐘呼叫：結束已到期的補登，同月份合併成一個新版本。
-     * ponytail: 全部在同一交易，任一月份合併失敗則整批回滾、下一分鐘重試
-     */
+    /** 已到期但尚未結束補登的月份（不重複，保持出現順序） */
+    @Transactional(readOnly = true)
+    public List<String> findExpiredMonths() {
+        return windowRepository.findByEndedAtIsNullAndExpiresAtLessThanEqual(LocalDateTime.now(clock)).stream()
+                .map(SalesForecastReopenWindow::getMonth).distinct().toList();
+    }
+
+    /** 結束單一月份已到期的補登（同月份合併成一個新版本）；每個月份各自一個交易，由排程逐月呼叫 */
     @Transactional
-    public int processExpired() {
-        List<SalesForecastReopenWindow> expired =
-                windowRepository.findByEndedAtIsNullAndExpiresAtLessThanEqual(LocalDateTime.now(clock));
-        Map<String, List<SalesForecastReopenWindow>> byMonth = new LinkedHashMap<>();
-        for (SalesForecastReopenWindow w : expired) {
-            byMonth.computeIfAbsent(w.getMonth(), k -> new ArrayList<>()).add(w);
+    public int finishExpiredMonth(String month) {
+        List<SalesForecastReopenWindow> windows = windowRepository
+                .findByMonthAndEndedAtIsNullAndExpiresAtLessThanEqual(month, LocalDateTime.now(clock));
+        if (windows.isEmpty()) {
+            return 0;
         }
-        byMonth.forEach((month, windows) -> finishWindows(month, windows, null));
-        return expired.size();
+        finishWindows(month, windows, null);
+        return windows.size();
     }
 
     private void finishWindows(String month, List<SalesForecastReopenWindow> windows, Long userId) {

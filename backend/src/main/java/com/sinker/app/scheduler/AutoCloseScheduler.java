@@ -7,6 +7,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
+
 @Component
 public class AutoCloseScheduler {
 
@@ -32,13 +34,21 @@ public class AutoCloseScheduler {
         } catch (Exception e) {
             log.error("AutoCloseScheduler - 自動截止失敗", e);
         }
+        List<String> months;
         try {
-            int ended = reopenService.processExpired();
-            if (ended > 0) {
-                log.info("AutoCloseScheduler - {} reopen window(s) ended", ended);
-            }
+            months = reopenService.findExpiredMonths();
         } catch (Exception e) {
-            log.error("AutoCloseScheduler - 補登到期處理失敗", e);
+            log.error("AutoCloseScheduler - 查詢到期補登失敗", e);
+            return;
+        }
+        for (String month : months) {
+            try {
+                int ended = reopenService.finishExpiredMonth(month);
+                log.info("AutoCloseScheduler - month {} 結束 {} 筆補登", month, ended);
+            } catch (Exception e) {
+                // 單一月份失敗不影響其他月份；下一分鐘重試
+                log.error("AutoCloseScheduler - 月份 {} 補登到期處理失敗", month, e);
+            }
         }
     }
 }

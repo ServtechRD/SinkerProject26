@@ -130,7 +130,7 @@ class FlywayMigrationTest {
         List<Map<String, Object>> moduleCounts = jdbc.queryForList(
                 "SELECT module, COUNT(*) as cnt FROM permissions GROUP BY module ORDER BY module");
 
-        // V2 seed + V14 (sales_forecast +1), V15 (material_demand +2), V16 (material_purchase +2), V23 (material_demand +1)
+        // V2 seed + V14 (sales_forecast +1), V15 (material_demand +2), V16 (material_purchase +2), V23 (material_demand +1), V35 (sales_forecast_config.reopen +1)
         Map<String, Integer> expected = Map.of(
                 "inventory", 2,
                 "material_demand", 4,
@@ -138,7 +138,7 @@ class FlywayMigrationTest {
                 "production_plan", 2,
                 "role", 4,
                 "sales_forecast", 7,
-                "sales_forecast_config", 2,
+                "sales_forecast_config", 3,
                 "semi_product", 3,
                 "user", 4,
                 "weekly_schedule", 3

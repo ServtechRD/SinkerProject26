@@ -674,6 +674,23 @@ describe('ForecastUploadPage', () => {
     })
   })
 
+  it('切換通路後忽略上一次查詢晚到的編輯狀態', async () => {
+    const user = userEvent.setup()
+    listConfigs.mockResolvedValue(mockConfigs)
+    let resolveStatus
+    getEditStatus.mockReturnValueOnce(new Promise((resolve) => { resolveStatus = resolve }))
+    renderPage({ permissions: ['sales_forecast.upload'], channels: ['家樂福', '7-11'] })
+
+    await selectMonthChannelAndQuery(user)
+    await waitFor(() => expect(getEditStatus).toHaveBeenCalledTimes(1))
+    // 查詢未回來就切換通路
+    await user.selectOptions(screen.getByLabelText('通路', { exact: false }), '7-11')
+    resolveStatus({ status: 'CLOSED', autoCloseAt: '2025-12-10T00:00:00' })
+    await new Promise((r) => setTimeout(r, 20))
+
+    expect(screen.queryByText('已結束新增')).not.toBeInTheDocument()
+  })
+
   it('paginates result table', async () => {
     const user = userEvent.setup()
     listConfigs.mockResolvedValue(mockConfigs)

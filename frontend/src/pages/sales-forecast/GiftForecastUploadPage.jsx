@@ -164,7 +164,10 @@ export default function GiftForecastUploadPage() {
   const isMonthOpen = editStatus ? editStatus.status !== 'CLOSED' : Boolean(selectedConfig && !selectedConfig.isClosed)
   const showPlanner = Boolean(editStatus?.plannerQuantities)
 
+  // 請求序號：切換月份或通路時遞增，讓尚未回來的舊查詢失效
+  const editStatusSeq = useRef(0)
   useEffect(() => {
+    editStatusSeq.current += 1
     setEditStatus(null)
   }, [selectedMonth, selectedChannel])
   const isOwnerOfChannel = canViewAllChannels || userChannels.includes(selectedChannel)
@@ -213,9 +216,10 @@ export default function GiftForecastUploadPage() {
     setEditingNewVersion(false)
     setNewVersionVersion('')
     setLoadingQuery(true)
+    const seq = ++editStatusSeq.current
     getEditStatus(selectedMonth, selectedChannel)
-      .then(setEditStatus)
-      .catch(() => setEditStatus(null))
+      .then((s) => { if (seq === editStatusSeq.current) setEditStatus(s) })
+      .catch(() => { if (seq === editStatusSeq.current) setEditStatus(null) })
     setVersions([])
     setSelectedVersion('')
     setForecastData([])

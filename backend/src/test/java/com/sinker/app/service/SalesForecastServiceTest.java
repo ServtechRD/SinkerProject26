@@ -83,8 +83,6 @@ class SalesForecastServiceTest {
         when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), anyLong(), anyString()))
                 .thenReturn(1);
         when(erpProductService.validateProduct("P001")).thenReturn(true);
-        when(forecastRepository.findByMonthAndChannelAndProductCode("202601", "大全聯", "P001"))
-                .thenReturn(Optional.empty());
         when(forecastRepository.findDistinctVersionsByMonthAndChannel("202601", "大全聯"))
                 .thenReturn(List.of("2026/01/15 14:30:00(大全聯)"));
 
@@ -149,8 +147,7 @@ class SalesForecastServiceTest {
         when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), anyLong(), anyString()))
                 .thenReturn(1);
         when(erpProductService.validateProduct("P001")).thenReturn(true);
-        when(forecastRepository.findByMonthAndChannelAndProductCode("202601", "大全聯", "P001"))
-                .thenReturn(Optional.of(new SalesForecast()));
+        when(forecastRepository.existsBusinessRow("202601", "大全聯", "P001")).thenReturn(true);
 
         assertThrows(SalesForecastService.DuplicateEntryException.class, () ->
                 service.createForecast(request, 1L, "user", Set.of()));
@@ -274,8 +271,6 @@ class SalesForecastServiceTest {
 
         when(configRepository.findByMonth("202601")).thenReturn(Optional.of(openConfig));
         when(erpProductService.validateProduct("P001")).thenReturn(true);
-        when(forecastRepository.findByMonthAndChannelAndProductCode("202601", "大全聯", "P001"))
-                .thenReturn(Optional.empty());
         when(forecastRepository.findDistinctVersionsByMonthAndChannel("202601", "大全聯"))
                 .thenReturn(List.of("2026/01/15 14:30:00(大全聯)"));
 
@@ -575,5 +570,59 @@ class SalesForecastServiceTest {
         forecast.setCreatedAt(LocalDateTime.now());
         forecast.setUpdatedAt(LocalDateTime.now());
         return forecast;
+    }
+
+    @Test
+    void updateForecast_plannerVersionRow_forbidden() {
+        UpdateForecastRequest request = new UpdateForecastRequest();
+        request.setQuantity(new BigDecimal("1"));
+
+        SalesForecast plannerRow = new SalesForecast();
+        plannerRow.setId(7);
+        plannerRow.setMonth("202601");
+        plannerRow.setChannel("大全聯");
+        plannerRow.setVersion("form_v2");
+
+        when(forecastRepository.findById(7)).thenReturn(Optional.of(plannerRow));
+        when(configRepository.findByMonth("202601")).thenReturn(Optional.of(openConfig));
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), anyLong(), anyString())).thenReturn(1);
+
+        AccessDeniedException ex = assertThrows(AccessDeniedException.class, () ->
+                service.updateForecast(7, request, 1L, "user", Set.of()));
+
+        assertEquals("生管表單版本不可由業務修改", ex.getMessage());
+        verify(forecastRepository, never()).save(any());
+    }
+
+    @Test
+    void deleteForecast_plannerVersionRow_forbidden() {
+        SalesForecast plannerRow = new SalesForecast();
+        plannerRow.setId(7);
+        plannerRow.setMonth("202601");
+        plannerRow.setChannel("大全聯");
+        plannerRow.setVersion("form_v2");
+
+        when(forecastRepository.findById(7)).thenReturn(Optional.of(plannerRow));
+        when(configRepository.findByMonth("202601")).thenReturn(Optional.of(openConfig));
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), anyLong(), anyString())).thenReturn(1);
+
+        assertThrows(AccessDeniedException.class, () -> service.deleteForecast(7, 1L, "user"));
+
+        verify(forecastRepository, never()).delete(any());
+    }
+
+    @Test
+    void assertChannelAccessible_reopenAuthority_skipsOwnership() {
+        assertDoesNotThrow(() -> service.assertChannelAccessible(1L, "大全聯", "production_planner",
+                Set.of("sales_forecast_config.reopen")));
+        verify(jdbcTemplate, never()).queryForObject(anyString(), eq(Integer.class), anyLong(), anyString());
+    }
+
+    @Test
+    void assertChannelAccessible_notOwned_forbidden() {
+        when(jdbcTemplate.queryForObject(anyString(), eq(Integer.class), anyLong(), anyString())).thenReturn(0);
+
+        assertThrows(AccessDeniedException.class, () ->
+                service.assertChannelAccessible(1L, "大全聯", "sales", Set.of("sales_forecast_config.view")));
     }
 }

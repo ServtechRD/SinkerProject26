@@ -7,7 +7,6 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
-import java.util.Optional;
 
 public interface SalesForecastRepository extends JpaRepository<SalesForecast, Integer> {
 
@@ -35,20 +34,25 @@ public interface SalesForecastRepository extends JpaRepository<SalesForecast, In
 
     int countByMonthAndChannel(String month, String channel);
 
-    Optional<SalesForecast> findByMonthAndChannelAndProductCode(String month, String channel, String productCode);
+    /** 業務單筆新增的重複檢查：只看業務列，不含生管表單版本（form_v*） */
+    @Query("SELECT COUNT(sf) > 0 FROM SalesForecast sf WHERE sf.month = :month AND sf.channel = :channel " +
+           "AND sf.productCode = :productCode AND sf.version NOT LIKE 'form_v%'")
+    boolean existsBusinessRow(@Param("month") String month, @Param("channel") String channel,
+                              @Param("productCode") String productCode);
 
     // Query methods for T017
     List<SalesForecast> findByMonthAndChannelAndVersionOrderByCategoryAscSpecAscProductCodeAsc(
             String month, String channel, String version);
 
+    // 以下「最新版本／版本清單」為業務端用，排除生管表單版本（form_v*）
     @Query("SELECT sf FROM SalesForecast sf WHERE sf.month = :month AND sf.channel = :channel " +
            "AND sf.version = (SELECT MAX(sf2.version) FROM SalesForecast sf2 " +
-           "WHERE sf2.month = :month AND sf2.channel = :channel) " +
+           "WHERE sf2.month = :month AND sf2.channel = :channel AND sf2.version NOT LIKE 'form_v%') " +
            "ORDER BY sf.category ASC, sf.spec ASC, sf.productCode ASC")
     List<SalesForecast> findLatestByMonthAndChannel(@Param("month") String month, @Param("channel") String channel);
 
     @Query("SELECT DISTINCT sf.version FROM SalesForecast sf " +
-           "WHERE sf.month = :month AND sf.channel = :channel " +
+           "WHERE sf.month = :month AND sf.channel = :channel AND sf.version NOT LIKE 'form_v%' " +
            "ORDER BY sf.version DESC")
     List<String> findDistinctVersionsByMonthAndChannel(@Param("month") String month, @Param("channel") String channel);
 

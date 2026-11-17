@@ -12,6 +12,7 @@ import com.sinker.app.security.JwtUserPrincipal;
 import com.sinker.app.service.ForecastFormDetailService;
 import com.sinker.app.service.ReopenService;
 import com.sinker.app.service.SalesForecastConfigService;
+import com.sinker.app.service.SalesForecastService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
@@ -19,12 +20,16 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/sales-forecast/config")
@@ -35,12 +40,15 @@ public class SalesForecastConfigController {
     private final SalesForecastConfigService service;
     private final ReopenService reopenService;
     private final ForecastFormDetailService detailService;
+    private final SalesForecastService forecastService;
 
     public SalesForecastConfigController(SalesForecastConfigService service, ReopenService reopenService,
-                                         ForecastFormDetailService detailService) {
+                                         ForecastFormDetailService detailService,
+                                         SalesForecastService forecastService) {
         this.service = service;
         this.reopenService = reopenService;
         this.detailService = detailService;
+        this.forecastService = forecastService;
     }
 
     @PostMapping
@@ -111,8 +119,13 @@ public class SalesForecastConfigController {
 
     @GetMapping("/edit-status")
     @PreAuthorize("hasAuthority('sales_forecast_config.view')")
-    public ResponseEntity<EditStatusResponse> getEditStatus(@RequestParam String month, @RequestParam String channel) {
+    public ResponseEntity<EditStatusResponse> getEditStatus(@RequestParam String month, @RequestParam String channel,
+                                                        @AuthenticationPrincipal JwtUserPrincipal principal,
+                                                        Authentication authentication) {
         log.info("GET /api/sales-forecast/config/edit-status - month={}, channel={}", month, channel);
+        Set<String> authorities = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority).collect(Collectors.toSet());
+        forecastService.assertChannelAccessible(principal.getUserId(), channel, principal.getRoleCode(), authorities);
         return ResponseEntity.ok(detailService.getEditStatus(month, channel));
     }
 

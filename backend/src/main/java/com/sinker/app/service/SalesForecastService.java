@@ -84,8 +84,8 @@ public class SalesForecastService {
         }
 
         // Check for duplicate
-        if (forecastRepository.findByMonthAndChannelAndProductCode(
-                request.getMonth(), request.getChannel(), request.getProductCode()).isPresent()) {
+        if (forecastRepository.existsBusinessRow(
+                request.getMonth(), request.getChannel(), request.getProductCode())) {
             throw new DuplicateEntryException(
                     "Product " + request.getProductCode() + " already exists for month "
                             + request.getMonth() + " and channel " + request.getChannel());
@@ -133,6 +133,7 @@ public class SalesForecastService {
             validateMonthOpen(forecast.getMonth(), forecast.getChannel());
         }
         checkChannelOwnership(userId, forecast.getChannel(), roleCode);
+        assertNotPlannerVersion(forecast);
 
         LocalDateTime now = LocalDateTime.now();
 
@@ -161,6 +162,7 @@ public class SalesForecastService {
 
         // Check channel ownership
         checkChannelOwnership(userId, forecast.getChannel(), roleCode);
+        assertNotPlannerVersion(forecast);
 
         // Hard delete
         forecastRepository.delete(forecast);
@@ -178,6 +180,21 @@ public class SalesForecastService {
         SalesForecastConfig config = configRepository.findByMonth(month)
                 .orElseThrow(() -> new ResourceNotFoundException("Month " + month + " not configured"));
         editGuard.assertBusinessEditable(config, channel);
+    }
+
+    /** 生管表單版本（form_v*）不可由業務編輯或刪除 */
+    private void assertNotPlannerVersion(SalesForecast forecast) {
+        if (forecast.getVersion() != null && forecast.getVersion().startsWith("form_v")) {
+            throw new AccessDeniedException("生管表單版本不可由業務修改");
+        }
+    }
+
+    /** 編輯狀態查詢的通路歸屬檢查：admin 與可開放補登者（生管）看全部，其餘須為本人通路 */
+    public void assertChannelAccessible(Long userId, String channel, String roleCode, Set<String> authorities) {
+        if (authorities != null && authorities.contains("sales_forecast_config.reopen")) {
+            return;
+        }
+        checkChannelOwnership(userId, channel, roleCode);
     }
 
     private void checkChannelOwnership(Long userId, String channel, String roleCode) {

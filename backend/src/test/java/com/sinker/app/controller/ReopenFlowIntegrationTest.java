@@ -7,6 +7,7 @@ import com.sinker.app.repository.SalesForecastRepository;
 import com.sinker.app.security.JwtTokenProvider;
 import com.sinker.app.service.ForecastEditGuard;
 import com.sinker.app.service.FormSummaryService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -57,6 +58,9 @@ class ReopenFlowIntegrationTest {
         adminToken = tokenProvider.generateToken(adminId, "admin", "admin");
         // 業務角色（擁有 sales_forecast_config.view）
         salesToken = tokenProvider.generateToken(adminId, "admin", "sales");
+        // 業務視為擁有「家樂福」通路（edit-status 有通路歸屬檢查）
+        jdbc.update("INSERT INTO sales_channels_users (user_id, channel) VALUES (?, ?) " +
+                "ON DUPLICATE KEY UPDATE channel = channel", adminId, "家樂福");
 
         jdbc.update("INSERT INTO sales_forecast_config (month, auto_close_at, is_closed, closed_at, created_at, updated_at) " +
                 "VALUES (?, '2098-11-01 00:00:00', true, NOW(), NOW(), NOW())", MONTH);
@@ -80,6 +84,12 @@ class ReopenFlowIntegrationTest {
 
         SalesForecastConfig config = configRepository.findByMonth(MONTH).orElseThrow();
         formSummaryService.createFormVersion1Snapshot(MONTH, config);
+    }
+
+    @AfterEach
+    void tearDown() {
+        jdbc.update("DELETE FROM sales_channels_users WHERE user_id = (SELECT id FROM users WHERE username = 'admin') " +
+                "AND channel = '家樂福'");
     }
 
     @Test
@@ -168,6 +178,69 @@ class ReopenFlowIntegrationTest {
                         .header("Authorization", "Bearer " + adminToken)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"change_reason\":\"  \",\"rows\":[]}"))
-                .andExpect(status().isBadRequest());
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("change_reason is required"));
+    }
+
+    @Test
+    void editStatus_notOwnedChannel_forbidden() throws Exception {
+        mockMvc.perform(get("/api/sales-forecast/config/edit-status")
+                        .param("month", MONTH).param("channel", "愛買")
+                        .header("Authorization", "Bearer " + salesToken))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void editStatus_admin_canSeeAnyChannel() throws Exception {
+        // admin 角色不受通路歸屬限制
+        mockMvc.perform(get("/api/sales-forecast/config/edit-status")
+                        .param("month", MONTH).param("channel", "愛買")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void businessQueries_excludePlannerFormVersion() throws Exception {
+        // setUp 已建立 form_v1（生管版本）與一筆業務版本
+        mockMvc.perform(get("/api/sales-forecast/versions")
+                        .param("month", MONTH).param("channel", "家樂福")
+                        .header("Authorization", "Bearer " + salesToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[?(@.version=='form_v1')]").isEmpty());
+
+        mockMvc.perform(get("/api/sales-forecast")
+                        .param("month", MONTH).param("channel", "家樂福")
+                        .header("Authorization", "Bearer " + salesToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].version").value("2098/10/30 10:00:00(家樂福)"));
+    }
+
+    @Test
+    void reopened_editOrDeletePlannerVersionRow_forbidden() throws Exception {
+        String expiresAt = LocalDateTime.now(ZoneId.of("Asia/Taipei")).plusHours(2)
+                .withSecond(0).withNano(0).toString();
+        mockMvc.perform(post("/api/sales-forecast/config/" + configId + "/reopen")
+                        .header("Authorization", "Bearer " + adminToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"channels\":[\"家樂福\"],\"expiresAt\":\"" + expiresAt + "\",\"reason\":\"新品追加\"}"))
+                .andExpect(status().isCreated());
+
+        Integer plannerRowId = jdbc.queryForObject(
+                "SELECT id FROM sales_forecast WHERE month = ? AND channel = '家樂福' AND version = 'form_v1' LIMIT 1",
+                Integer.class, MONTH);
+
+        mockMvc.perform(put("/api/sales-forecast/" + plannerRowId)
+                        .header("Authorization", "Bearer " + salesToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"quantity\":5}"))
+                .andExpect(status().isForbidden());
+
+        mockMvc.perform(delete("/api/sales-forecast/" + plannerRowId)
+                        .header("Authorization", "Bearer " + salesToken))
+                .andExpect(status().isForbidden());
+
+        assertEquals(1, jdbc.queryForObject("SELECT COUNT(*) FROM sales_forecast WHERE id = ?", Integer.class, plannerRowId));
     }
 }

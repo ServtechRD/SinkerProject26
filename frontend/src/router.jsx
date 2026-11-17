@@ -10,6 +10,7 @@ import RoleListPage from './pages/roles/RoleListPage'
 import RoleEditPage from './pages/roles/RoleEditPage'
 import RoleCreatePage from './pages/roles/RoleCreatePage'
 import ForecastConfigPage from './pages/sales-forecast/ForecastConfigPage'
+import ForecastConfigDetailPage from './pages/sales-forecast/ForecastConfigDetailPage'
 import ForecastUploadPage from './pages/sales-forecast/ForecastUploadPage'
 import GiftForecastUploadPage from './pages/sales-forecast/GiftForecastUploadPage'
 import ForecastListPage from './pages/sales-forecast/ForecastListPage'
@@ -45,6 +46,7 @@ export default function AppRoutes() {
         <Route path="roles/create" element={<RoleCreatePage />} />
         <Route path="roles/:id/edit" element={<RoleEditPage />} />
         <Route path="sales-forecast/config" element={<ForecastConfigPage />} />
+        <Route path="sales-forecast/config/:id" element={<ForecastConfigDetailPage />} />
         <Route path="sales-forecast/upload" element={<ForecastUploadPage />} />
         <Route path="gift-sales-forecast/upload" element={<GiftForecastUploadPage />} />
         <Route path="sales-forecast/integration" element={<ForecastIntegrationPage />} />

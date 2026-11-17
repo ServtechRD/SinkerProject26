@@ -78,6 +78,11 @@ public class ReopenService {
             throw new IllegalArgumentException(String.join("、", busy) + " 已在補登中，請先結束原本的補登");
         }
 
+        // 舊版程式可能讓歷史月份沒有 form_v* 列，開放後結束時合併會讀到空而使未補登通路數量歸零
+        if (!formSummaryService.hasReopenBase(month)) {
+            throw new IllegalArgumentException("此月份沒有生管表單版本資料，無法開放補登，請洽系統管理員");
+        }
+
         String reason = request.getReason().trim();
         for (String channel : channels) {
             SalesForecastReopenWindow w = new SalesForecastReopenWindow();

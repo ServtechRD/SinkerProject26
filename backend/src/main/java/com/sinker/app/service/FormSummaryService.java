@@ -395,6 +395,17 @@ public class FormSummaryService {
     }
 
     /**
+     * 補登結束合併前的基礎資料是否存在：尚無任何表單版本時合併會自動建立第 1 版快照，視為可行；
+     * 已有表單版本時，最新版本的 form_v{N} 列必須存在，否則未補登通路合併後數量會歸零。
+     */
+    @Transactional(readOnly = true)
+    public boolean hasReopenBase(String month) {
+        List<SalesForecastFormVersion> versions = formVersionRepository.findByMonthOrderByVersionNoDesc(month);
+        return versions.isEmpty()
+                || forecastRepository.existsByMonthAndVersion(month, "form_v" + versions.get(0).getVersionNo());
+    }
+
+    /**
      * 補登結束：以最新生管版本為底，指定通路改用業務最新上傳（銷售＋禮品），存成新版本。
      * 同一次結束的多個通路合併成一個版本。
      */

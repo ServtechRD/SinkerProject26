@@ -104,8 +104,22 @@ class ReopenServiceTest {
     }
 
     @Test
+    void open_noFormVersionBaseRows_throwsAndWritesNothing() {
+        when(configRepository.findById(1)).thenReturn(Optional.of(config(true)));
+        when(formSummaryService.hasReopenBase("202612")).thenReturn(false);
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class,
+                () -> service.open(1, request("2026-12-12T18:00", "家樂福", "愛買"), 7L));
+
+        assertTrue(ex.getMessage().contains("沒有生管表單版本資料"));
+        verify(windowRepository, never()).save(any());
+        verifyNoInteractions(formLogService);
+    }
+
+    @Test
     void open_success_createsWindowPerChannelAndLogs() {
         when(configRepository.findById(1)).thenReturn(Optional.of(config(true)));
+        when(formSummaryService.hasReopenBase("202612")).thenReturn(true);
 
         service.open(1, request("2026-12-15T08:00", "家樂福", "愛買"), 7L);
 

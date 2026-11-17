@@ -34,6 +34,8 @@ public interface SalesForecastRepository extends JpaRepository<SalesForecast, In
 
     int countByMonthAndChannel(String month, String channel);
 
+    boolean existsByMonthAndVersion(String month, String version);
+
     /** 業務單筆新增的重複檢查：只看業務列，不含生管表單版本（form_v*） */
     @Query("SELECT COUNT(sf) > 0 FROM SalesForecast sf WHERE sf.month = :month AND sf.channel = :channel " +
            "AND sf.productCode = :productCode AND sf.version NOT LIKE 'form_v%'")

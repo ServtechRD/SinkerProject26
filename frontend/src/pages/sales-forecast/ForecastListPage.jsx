@@ -159,6 +159,7 @@ export default function ForecastListPage() {
   const [editRowRemarks, setEditRowRemarks] = useState({})
   const [saving, setSaving] = useState(false)
   const [saveConfirmOpen, setSaveConfirmOpen] = useState(false)
+  const [saveReason, setSaveReason] = useState('')
   const [remarkModal, setRemarkModal] = useState(null)
   /** 開啟中的列備註彈窗（rows 中的索引），null 為關閉 */
   const [rowRemarkModalIdx, setRowRemarkModalIdx] = useState(null)
@@ -447,12 +448,14 @@ export default function ForecastListPage() {
   }
 
   const handleSaveClick = () => {
+    setSaveReason('')
     setSaveConfirmOpen(true)
   }
 
   const handleSaveConfirm = () => {
+    if (!saveReason.trim()) return
     setSaveConfirmOpen(false)
-    performSave('')
+    performSave(saveReason)
   }
 
   const handleExportExcel = () => {
@@ -814,12 +817,23 @@ export default function ForecastListPage() {
           <ConfirmDialog
             open={saveConfirmOpen}
             title="確認儲存"
-            message="是否確認修改？"
+            message="是否確認修改？請填寫生管備註（修改原因）。"
             onConfirm={handleSaveConfirm}
             onCancel={() => setSaveConfirmOpen(false)}
             confirmText="是"
             confirmButtonClass="btn--primary"
-          />
+            confirmDisabled={!saveReason.trim()}
+          >
+            <label htmlFor="saveChangeReason">生管備註（修改原因）*</label>
+            <textarea
+              id="saveChangeReason"
+              className="form-input"
+              rows={3}
+              maxLength={200}
+              value={saveReason}
+              onChange={(e) => setSaveReason(e.target.value)}
+            />
+          </ConfirmDialog>
 
           {remarkModal && (
             <div className="forecast-remark-modal-overlay" onClick={() => setRemarkModal(null)} role="presentation">

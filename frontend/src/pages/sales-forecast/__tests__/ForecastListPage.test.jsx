@@ -371,14 +371,26 @@ describe('ForecastListPage', () => {
       await userEvent.type(input711, '改為10/15前')
       await userEvent.click(screen.getByRole('button', { name: '關閉' }))
       await userEvent.click(screen.getByRole('button', { name: '儲存' }))
+      await userEvent.type(screen.getByLabelText(/生管備註（修改原因）/), '家樂福加量')
       await userEvent.click(screen.getByRole('button', { name: '是' }))
 
       await waitFor(() => expect(saveFormSummaryVersion).toHaveBeenCalled())
       const payload = saveFormSummaryVersion.mock.calls[0][1]
+      expect(payload.change_reason).toBe('家樂福加量')
       expect(payload.rows[0].remarks).toEqual([
         { channel: '全聯', text: '12月替換新品' },
         { channel: '7-11', text: '改為10/15前' },
       ])
+    })
+
+    it('修改原因空白時不能確認儲存', async () => {
+      await openSummary()
+      await userEvent.click(screen.getByRole('button', { name: '編輯' }))
+      await userEvent.click(screen.getByRole('button', { name: '儲存' }))
+      expect(screen.getByRole('button', { name: '是' })).toBeDisabled()
+      await userEvent.type(screen.getByLabelText(/生管備註（修改原因）/), '   ')
+      expect(screen.getByRole('button', { name: '是' })).toBeDisabled()
+      expect(saveFormSummaryVersion).not.toHaveBeenCalled()
     })
   })
 })

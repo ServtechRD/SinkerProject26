@@ -8,6 +8,7 @@ import ForecastUploadPage from '../ForecastUploadPage'
 
 vi.mock('../../../api/forecastConfig', () => ({
   listConfigs: vi.fn(),
+  getEditStatus: vi.fn(),
 }))
 
 vi.mock('../../../api/forecast', () => ({
@@ -23,7 +24,7 @@ vi.mock('../../../api/forecast', () => ({
   getVersionDiff: vi.fn(),
 }))
 
-import { listConfigs } from '../../../api/forecastConfig'
+import { listConfigs, getEditStatus } from '../../../api/forecastConfig'
 import {
   uploadForecast,
   downloadTemplate,
@@ -36,21 +37,21 @@ const mockConfigs = [
   {
     id: 1,
     month: '202601',
-    autoCloseDay: 10,
+    autoCloseAt: '2026-01-10T00:00:00',
     isClosed: false,
     closedAt: null,
   },
   {
     id: 2,
     month: '202602',
-    autoCloseDay: 15,
+    autoCloseAt: '2026-01-10T00:00:00',
     isClosed: false,
     closedAt: null,
   },
   {
     id: 3,
     month: '202512',
-    autoCloseDay: 20,
+    autoCloseAt: '2026-01-10T00:00:00',
     isClosed: true,
     closedAt: '2025-12-20T10:00:00',
   },
@@ -85,6 +86,7 @@ function renderPage({ permissions = [], roleCode = 'sales', channels = [] } = {}
 describe('ForecastUploadPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    getEditStatus.mockResolvedValue({ status: 'OPEN' })
     getForecastVersions.mockResolvedValue([])
     getForecastList.mockResolvedValue([])
     updateForecastItem.mockResolvedValue({})
@@ -660,6 +662,7 @@ describe('ForecastUploadPage', () => {
     listConfigs.mockResolvedValue(mockConfigs)
     getForecastVersions.mockResolvedValue(['v1'])
     getForecastList.mockResolvedValue([])
+    getEditStatus.mockResolvedValue({ status: 'CLOSED', autoCloseAt: '2025-12-10T00:00:00' })
     renderPage({ permissions: ['sales_forecast.upload'], channels: ['家樂福'] })
 
     await selectMonthChannelAndQuery(user, { month: '202512', channel: '家樂福' })
@@ -966,5 +969,27 @@ describe('ForecastUploadPage', () => {
       const qtyCell = within(row).getByText('0').closest('td')
       expect(qtyCell?.className).toMatch(/quantity-cell--zero/)
     })
+  })
+
+  it('補登截止後顯示紅色提示與生管最新版數量', async () => {
+    const user = userEvent.setup()
+    listConfigs.mockResolvedValue(mockConfigs)
+    getEditStatus.mockResolvedValue({
+      status: 'CLOSED',
+      autoCloseAt: '2026-01-10T00:00:00',
+      plannerQuantities: { P1: 150 },
+    })
+    getForecastVersions.mockResolvedValue(['v1'])
+    getForecastList.mockResolvedValue([
+      { id: 1, category: 'c', spec: 's', productCode: 'P1', productName: 'N1', warehouseLocation: 'W', quantity: 120 },
+    ])
+    renderPage({ permissions: ['sales_forecast.upload'], channels: ['家樂福'] })
+
+    await selectMonthChannelAndQuery(user)
+
+    await waitFor(() => expect(getEditStatus).toHaveBeenCalledWith('202601', '家樂福'))
+    expect(await screen.findByText('生管最新版數量')).toBeInTheDocument()
+    expect(screen.getByText('150')).toHaveClass('planner-qty--changed')
+    expect(screen.getByText(/上傳與編輯已關閉/)).toBeInTheDocument()
   })
 })

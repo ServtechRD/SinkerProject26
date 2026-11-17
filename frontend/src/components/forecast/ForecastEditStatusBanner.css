@@ -1,0 +1,28 @@
+.forecast-edit-status {
+  margin: 8px 0;
+  padding: 10px 14px;
+  border-radius: 4px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.forecast-edit-status strong {
+  margin-right: 12px;
+}
+
+.forecast-edit-status--closed {
+  border: 1px solid #ef9a9a;
+  background: #ffebee;
+  color: #b71c1c;
+}
+
+.forecast-edit-status--reopen {
+  border: 1px solid #ffcc80;
+  background: #fff3e0;
+  color: #e65100;
+}
+
+.planner-qty--changed {
+  color: #c62828;
+  font-weight: 600;
+}

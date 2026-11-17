@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { listConfigs } from '../../api/forecastConfig'
+import { listConfigs, getEditStatus } from '../../api/forecastConfig'
+import ForecastEditStatusBanner, { PlannerQtyCell } from '../../components/forecast/ForecastEditStatusBanner'
 import {
   uploadGiftForecast,
   downloadGiftTemplate,
@@ -158,7 +159,14 @@ export default function GiftForecastUploadPage() {
     : VALID_CHANNELS.filter((ch) => userChannels.includes(ch))
 
   const selectedConfig = configs.find((c) => c.month === selectedMonth)
-  const isMonthOpen = selectedConfig && !selectedConfig.isClosed
+  const [editStatus, setEditStatus] = useState(null)
+  // 查詢後以後端判斷（含補登）為準；查詢前沿用月份設定
+  const isMonthOpen = editStatus ? editStatus.status !== 'CLOSED' : Boolean(selectedConfig && !selectedConfig.isClosed)
+  const showPlanner = Boolean(editStatus?.plannerQuantities)
+
+  useEffect(() => {
+    setEditStatus(null)
+  }, [selectedMonth, selectedChannel])
   const isOwnerOfChannel = canViewAllChannels || userChannels.includes(selectedChannel)
 
   const canUploadSection = isOwnerOfChannel && selectedMonth && selectedChannel && isMonthOpen
@@ -205,6 +213,9 @@ export default function GiftForecastUploadPage() {
     setEditingNewVersion(false)
     setNewVersionVersion('')
     setLoadingQuery(true)
+    getEditStatus(selectedMonth, selectedChannel)
+      .then(setEditStatus)
+      .catch(() => setEditStatus(null))
     setVersions([])
     setSelectedVersion('')
     setForecastData([])
@@ -596,6 +607,7 @@ export default function GiftForecastUploadPage() {
             )}
           </section>
 
+          <ForecastEditStatusBanner status={editStatus} month={selectedMonth} />
           {/* Block 3: 上傳結果 */}
           <section className="upload-block upload-block--result">
             <h2 className="upload-block-title">上傳結果</h2>
@@ -664,6 +676,7 @@ export default function GiftForecastUploadPage() {
                                 <th>品名</th>
                                 <th>庫位</th>
                                 <th className="align-right">箱數小計</th>
+                                {showPlanner && <th className="align-right">生管最新版數量</th>}
                                 <th>備註</th>
                                 {canEditResult && <th className="actions-cell">編輯</th>}
                               </tr>
@@ -703,6 +716,7 @@ export default function GiftForecastUploadPage() {
                                         </span>
                                       )}
                                     </td>
+                                    {showPlanner && <PlannerQtyCell item={item} planner={editStatus.plannerQuantities} />}
                                     <td>{item.remark || '-'}</td>
                                     {canEditResult && (
                                       <td className="actions-cell">

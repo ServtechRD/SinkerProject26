@@ -87,12 +87,23 @@ describe('ForecastConfigDetailPage', () => {
     expect(screen.getByRole('dialog', { name: '開放補登 – 202612' })).toBeInTheDocument()
   })
 
-  it('提前結束後重新載入', async () => {
+  it('提前結束確認後才呼叫並重新載入', async () => {
     endReopen.mockResolvedValue()
     renderPage()
     fireEvent.click(await screen.findByRole('button', { name: '提前結束' }))
+    expect(screen.getByText('確定要提前結束『家樂福』的補登嗎？')).toBeInTheDocument()
+    expect(endReopen).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '確定結束' }))
     await waitFor(() => expect(endReopen).toHaveBeenCalledWith('7', 3))
     await waitFor(() => expect(getFormDetail).toHaveBeenCalledTimes(2))
+  })
+
+  it('提前結束確認視窗按取消不呼叫 endReopen', async () => {
+    renderPage()
+    fireEvent.click(await screen.findByRole('button', { name: '提前結束' }))
+    fireEvent.click(screen.getByRole('button', { name: '取消' }))
+    expect(screen.queryByText('確定要提前結束『家樂福』的補登嗎？')).not.toBeInTheDocument()
+    expect(endReopen).not.toHaveBeenCalled()
   })
 
   it('403 顯示無權限', async () => {

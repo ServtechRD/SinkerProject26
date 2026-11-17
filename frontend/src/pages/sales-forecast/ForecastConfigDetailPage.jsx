@@ -4,6 +4,7 @@ import { getFormDetail, getFormLogs, endReopen } from '../../api/forecastConfig'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../../components/Toast'
 import { formatTaipeiDateTime, formatLocalDateTime, remainingText } from '../../utils/dateTime'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import ReopenDialog from './ReopenDialog'
 import './ForecastConfig.css'
 
@@ -30,6 +31,7 @@ export default function ForecastConfigDetailPage() {
   const [accessDenied, setAccessDenied] = useState(false)
   const [reopenOpen, setReopenOpen] = useState(false)
   const [endingId, setEndingId] = useState(null)
+  const [endTarget, setEndTarget] = useState(null)
 
   const canReopen = hasPermission(user, 'sales_forecast_config.reopen')
 
@@ -52,6 +54,7 @@ export default function ForecastConfigDetailPage() {
   }, [fetchAll])
 
   async function handleEnd(windowId) {
+    setEndTarget(null)
     setEndingId(windowId)
     try {
       await endReopen(id, windowId)
@@ -130,7 +133,7 @@ export default function ForecastConfigDetailPage() {
                               type="button"
                               className="btn btn--small btn--outline"
                               disabled={endingId === c.activeWindow.id}
-                              onClick={() => handleEnd(c.activeWindow.id)}
+                              onClick={() => setEndTarget({ windowId: c.activeWindow.id, channel: c.channel })}
                             >
                               提前結束
                             </button>
@@ -187,6 +190,16 @@ export default function ForecastConfigDetailPage() {
               setReopenOpen(false)
               fetchAll()
             }}
+          />
+
+          <ConfirmDialog
+            open={endTarget !== null}
+            title={`確定要提前結束『${endTarget?.channel}』的補登嗎？`}
+            message="結束後會以業務補登的數字產生新的生管版本，該通路先前的生管修正將被覆蓋。"
+            onConfirm={() => handleEnd(endTarget.windowId)}
+            onCancel={() => setEndTarget(null)}
+            confirmText="確定結束"
+            confirmButtonClass="btn--primary"
           />
         </>
       )}
